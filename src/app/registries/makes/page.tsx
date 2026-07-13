@@ -11,12 +11,11 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
-import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, CheckCircle2, FileDown, FileUp, ArrowLeft, RefreshCcw, Tag } from 'lucide-react';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { Trash2, Search, Plus, Pencil, Loader2, MapPin, CheckCircle2, FileDown, ArrowLeft, RefreshCcw, Tag, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +32,8 @@ type Make = {
   email: string;
   createdAt: any;
 };
+
+type SortKey = 'name' | 'gstin';
 
 const makeSchema = z.object({
   name: z.string().min(1, 'Name is required.'),
@@ -51,10 +52,8 @@ export default function MakesManagementPage() {
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [makeToEdit, setMakeToEdit] = React.useState<Make | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [isImporting, setIsImporting] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
-
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -67,13 +66,37 @@ export default function MakesManagementPage() {
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<any>(suppliersQuery);
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+  };
+
   const filteredMakes = React.useMemo(() => {
     if (!makes) return [];
-    return makes.filter(m => 
+    let result = makes.filter(m => 
       m.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (m.gstin || "").toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => a.name.localeCompare(b.name));
-  }, [makes, searchTerm]);
+    );
+
+    result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = a[key]?.toLowerCase() || '';
+      let valB: any = b[key]?.toLowerCase() || '';
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [makes, searchTerm, sortConfig]);
 
   const form = useForm<z.infer<typeof makeSchema>>({
     resolver: zodResolver(makeSchema),
@@ -150,6 +173,21 @@ export default function MakesManagementPage() {
     toast({ title: 'Make Removed' });
   };
 
+  const handleExport = () => {
+    if (filteredMakes.length === 0) return;
+    const exportData = filteredMakes.map(m => ({
+      'Name': m.name,
+      'GSTIN': m.gstin || '—',
+      'Address': m.address || '—',
+      'Mobile': m.mobile || '—',
+      'Email': m.email || '—'
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Makes");
+    XLSX.writeFile(wb, `Makes_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
   if (isUserLoading || isProfileLoading || makesLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
@@ -164,6 +202,9 @@ export default function MakesManagementPage() {
           <p className="text-muted-foreground text-sm font-medium">Manage manufacturing brands and brands associated with site inventory.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={filteredMakes.length === 0} className="h-10 rounded-sm font-bold border-primary/20 text-primary">
+            <FileDown className="mr-2 h-4 w-4" /> Export List
+          </Button>
           <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 rounded-sm font-bold shadow-md">
             <Plus className="mr-2 h-4 w-4" /> Add New Make
           </Button>
@@ -173,7 +214,10 @@ export default function MakesManagementPage() {
       <Card className="rounded-sm shadow-sm overflow-hidden border-primary/10">
         <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6">
           <div className="space-y-1">
-            <CardTitle className="text-base md:text-lg uppercase font-black">Authorized Makes</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base md:text-lg uppercase font-black">Authorized Makes</CardTitle>
+              <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-bold text-[10px] bg-primary/5 text-primary border-primary/10">{filteredMakes.length} Registered</Badge>
+            </div>
             <CardDescription className="text-xs">Brands registered for BoM mapping.</CardDescription>
           </div>
           <div className="relative w-full md:w-72">
@@ -190,9 +234,13 @@ export default function MakesManagementPage() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="px-6">Brand Name</TableHead>
-                  <TableHead>GSTIN</TableHead>
+                <TableRow>
+                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('name')}>
+                    <div className="flex items-center">Brand Name <SortIcon column="name" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('gstin')}>
+                    <div className="flex items-center">GSTIN <SortIcon column="gstin" /></div>
+                  </TableHead>
                   <TableHead>Linked Identity</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
@@ -227,8 +275,8 @@ export default function MakesManagementPage() {
                       </TableCell>
                       <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setMakeToEdit(m)}><Pencil className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDelete(m.id)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setMakeToEdit(m)}><Pencil className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => handleDelete(m.id)}><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>

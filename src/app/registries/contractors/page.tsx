@@ -41,7 +41,10 @@ import {
   Check,
   ChevronDown,
   Building2,
-  Wallet
+  Wallet,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -66,6 +69,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { format } from 'date-fns';
 
 type Contractor = {
   id: string;
@@ -83,6 +87,8 @@ type ContractorRole = {
   id: string;
   name: string;
 };
+
+type SortKey = 'name' | 'role' | 'gstin';
 
 const contractorSchema = z.object({
   name: z.string().min(1, 'Company Name is required.'),
@@ -105,6 +111,7 @@ export default function ContractorsManagementPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isImporting, setIsImporting] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
   
   // Role Management State
   const [isManageRolesOpen, setIsManageRolesOpen] = React.useState(false);
@@ -124,27 +131,38 @@ export default function ContractorsManagementPage() {
   const rolesQuery = useMemoFirebase(() => query(collection(firestore, 'contractor_roles'), orderBy('name', 'asc')), [firestore]);
   const { data: contractorRoles, isLoading: rolesLoading } = useCollection<ContractorRole>(rolesQuery);
 
-  // Initialize roles if empty
-  React.useEffect(() => {
-    if (!rolesLoading && contractorRoles && contractorRoles.length === 0 && isAdmin) {
-      const initialRoles = ["MMS Contractor", "AC & DC Contractor", "HT Line Contractor"];
-      const batch = writeBatch(firestore);
-      initialRoles.forEach(roleName => {
-        const ref = doc(collection(firestore, 'contractor_roles'));
-        batch.set(ref, { name: roleName });
-      });
-      batch.commit().catch(console.error);
-    }
-  }, [contractorRoles, rolesLoading, isAdmin, firestore]);
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+  };
 
   const filteredContractors = React.useMemo(() => {
     if (!contractors) return [];
-    return contractors.filter(c => 
+    let result = contractors.filter(c => 
       c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (c.gstin || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
       (c.role || "").toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => a.name.localeCompare(b.name));
-  }, [contractors, searchTerm]);
+    );
+
+    result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = a[key]?.toLowerCase() || '';
+      let valB: any = b[key]?.toLowerCase() || '';
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [contractors, searchTerm, sortConfig]);
 
   const form = useForm<z.infer<typeof contractorSchema>>({
     resolver: zodResolver(contractorSchema),
@@ -232,76 +250,21 @@ export default function ContractorsManagementPage() {
     toast({ title: 'Contractor Removed' });
   };
 
-  const handleDownloadTemplate = () => {
-    const ws = XLSX.utils.json_to_sheet([
-      { 
-        'Name': 'Sample Contractor Pvt Ltd', 
-        'Role': 'MMS Contractor',
-        'GSTIN': '27BBBBB0000B1Z5', 
-        'Mobile': '9876543210', 
-        'Address': '456 Service Lane, Mumbai, MH', 
-        'Email': 'ops@samplecontractor.com',
-        'Banking Details': 'Acc No: 123456789, IFSC: SBIN0001234'
-      }
-    ]);
+  const handleExport = () => {
+    if (filteredContractors.length === 0) return;
+    const exportData = filteredContractors.map(c => ({
+      'Name': c.name,
+      'Role': c.role || '—',
+      'GSTIN': c.gstin || '—',
+      'Mobile': c.mobile || '—',
+      'Email': c.email || '—',
+      'Address': c.address || '—',
+      'Banking Details': c.bankingDetails || '—'
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Template");
-    XLSX.writeFile(wb, "Contractor_Import_Template.xlsx");
-  };
-
-  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const data = new Uint8Array(event.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json(worksheet) as any[];
-
-        if (json.length === 0) {
-          toast({ variant: 'destructive', title: 'Import Failed', description: 'The file is empty.' });
-          return;
-        }
-
-        const batch = writeBatch(firestore);
-        let count = 0;
-
-        for (const row of json) {
-          const name = row['Name'] || row['name'];
-          const role = row['Role'] || row['role'] || 'Other';
-          if (name) {
-            const newDocRef = doc(collection(firestore, 'contractors'));
-            batch.set(newDocRef, {
-              name: String(name).trim(),
-              role: String(role).trim(),
-              gstin: String(row['GSTIN'] || row['gstin'] || '').trim().toUpperCase(),
-              mobile: String(row['Mobile'] || row['mobile'] || '').trim(),
-              address: String(row['Address'] || row['address'] || '').trim(),
-              email: String(row['Email'] || row['email'] || '').trim(),
-              bankingDetails: String(row['Banking Details'] || row['bankingDetails'] || '').trim(),
-              createdAt: serverTimestamp(),
-            });
-            count++;
-          }
-        }
-
-        if (count > 0) {
-          await batch.commit();
-          toast({ title: 'Import Successful', description: `Successfully imported ${count} contractors.` });
-        }
-      } catch (err: any) {
-        toast({ variant: 'destructive', title: 'Import Error', description: err.message });
-      } finally {
-        setIsImporting(false);
-        if (fileInputRef.current) fileInputRef.current.value = '';
-      }
-    };
-    reader.readAsArrayBuffer(file);
+    XLSX.utils.book_append_sheet(wb, ws, "Contractors");
+    XLSX.writeFile(wb, `Contractors_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
   if (isUserLoading || isProfileLoading || contractorsLoading || rolesLoading) {
@@ -309,7 +272,7 @@ export default function ContractorsManagementPage() {
   }
 
   return (
-    <div className="space-y-6 md:space-y-8">
+    <div className="space-y-6 md:space-y-8 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h1 className="flex items-center gap-2 text-primary">
@@ -318,15 +281,9 @@ export default function ContractorsManagementPage() {
           <p className="text-muted-foreground text-sm font-medium">Manage corporate service partners and labor contractors.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="h-10 rounded-sm font-bold border-primary/20 text-primary">
-            <FileDown className="mr-2 h-4 w-4" /> Template
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={filteredContractors.length === 0} className="h-10 rounded-sm font-bold border-primary/20 text-primary">
+            <FileDown className="mr-2 h-4 w-4" /> Export List
           </Button>
-          <div className="relative">
-            <input type="file" accept=".xlsx,.xls,.csv" className="hidden" ref={fileInputRef} onChange={handleBulkImport} />
-            <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="h-10 rounded-sm font-bold border-primary/20 text-primary">
-              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />} Bulk Import
-            </Button>
-          </div>
           <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 rounded-sm font-bold shadow-md">
             <Plus className="mr-2 h-4 w-4" /> Add Contractor
           </Button>
@@ -336,7 +293,10 @@ export default function ContractorsManagementPage() {
       <Card className="rounded-sm shadow-sm overflow-hidden border-primary/10">
         <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6">
           <div className="space-y-1">
-            <CardTitle className="text-base md:text-lg">Contractor Partners</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base md:text-lg">Contractor Partners</CardTitle>
+              <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-bold text-[10px] bg-primary/5 text-primary border-primary/10">{filteredContractors.length} Registered</Badge>
+            </div>
             <CardDescription className="text-xs">Registry of authorized service providers.</CardDescription>
           </div>
           <div className="relative w-full md:w-72">
@@ -353,10 +313,16 @@ export default function ContractorsManagementPage() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="px-6">Partner Name</TableHead>
-                  <TableHead>Role</TableHead>
-                  <TableHead>GSTIN</TableHead>
+                <TableRow>
+                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('name')}>
+                    <div className="flex items-center">Partner Name <SortIcon column="name" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('role')}>
+                    <div className="flex items-center">Role <SortIcon column="role" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('gstin')}>
+                    <div className="flex items-center">GSTIN <SortIcon column="gstin" /></div>
+                  </TableHead>
                   <TableHead>Communication</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>

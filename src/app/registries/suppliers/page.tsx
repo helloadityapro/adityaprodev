@@ -16,7 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
-import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, CheckCircle2, FileDown, FileUp, ArrowLeft, RefreshCcw } from 'lucide-react';
+import { Trash2, Search, Plus, Pencil, Loader2, Truck, Mail, Smartphone, MapPin, CheckCircle2, FileDown, FileUp, ArrowLeft, RefreshCcw, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
@@ -33,6 +33,8 @@ type Supplier = {
   email: string;
   createdAt: any;
 };
+
+type SortKey = 'name' | 'gstin';
 
 const supplierSchema = z.object({
   name: z.string().min(1, 'Company Name is required.'),
@@ -53,6 +55,7 @@ export default function SuppliersManagementPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isImporting, setIsImporting] = React.useState(false);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
 
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -67,13 +70,37 @@ export default function SuppliersManagementPage() {
   const makesQuery = useMemoFirebase(() => collection(firestore, 'makes'), [firestore]);
   const { data: allMakes } = useCollection<any>(makesQuery);
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+  };
+
   const filteredSuppliers = React.useMemo(() => {
     if (!suppliers) return [];
-    return suppliers.filter(s => 
+    let result = suppliers.filter(s => 
       s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (s.gstin || "").toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => a.name.localeCompare(b.name));
-  }, [suppliers, searchTerm]);
+    );
+
+    result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      let valA: any = a[key]?.toLowerCase() || '';
+      let valB: any = b[key]?.toLowerCase() || '';
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [suppliers, searchTerm, sortConfig]);
 
   const form = useForm<z.infer<typeof supplierSchema>>({
     resolver: zodResolver(supplierSchema),
@@ -150,6 +177,21 @@ export default function SuppliersManagementPage() {
     toast({ title: 'Supplier Removed' });
   };
 
+  const handleExport = () => {
+    if (filteredSuppliers.length === 0) return;
+    const exportData = filteredSuppliers.map(s => ({
+      'Name': s.name,
+      'GSTIN': s.gstin || '—',
+      'Address': s.address || '—',
+      'Mobile': s.mobile || '—',
+      'Email': s.email || '—'
+    }));
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Suppliers");
+    XLSX.writeFile(wb, `Suppliers_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
   if (isUserLoading || isProfileLoading || suppliersLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
@@ -164,6 +206,9 @@ export default function SuppliersManagementPage() {
           <p className="text-muted-foreground text-sm font-medium">Manage organizational material suppliers.</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={filteredSuppliers.length === 0} className="h-10 rounded-sm font-bold border-primary/20 text-primary">
+            <FileDown className="mr-2 h-4 w-4" /> Export List
+          </Button>
           <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 rounded-sm font-bold shadow-md">
             <Plus className="mr-2 h-4 w-4" /> Add New Supplier
           </Button>
@@ -173,7 +218,10 @@ export default function SuppliersManagementPage() {
       <Card className="rounded-sm shadow-sm overflow-hidden border-primary/10">
         <CardHeader className="bg-muted/5 border-b flex flex-col md:flex-row md:items-center justify-between gap-4 p-4 md:p-6">
           <div className="space-y-1">
-            <CardTitle className="text-base md:text-lg">Suppliers Database</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-base md:text-lg">Suppliers Database</CardTitle>
+              <Badge variant="secondary" className="h-5 rounded-sm px-1.5 font-bold text-[10px] bg-primary/5 text-primary border-primary/10">{filteredSuppliers.length} Registered</Badge>
+            </div>
             <CardDescription className="text-xs">Comprehensive list of all registered business partners.</CardDescription>
           </div>
           <div className="relative w-full md:w-72">
@@ -190,9 +238,13 @@ export default function SuppliersManagementPage() {
           <div className="overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow className="bg-muted/30">
-                  <TableHead className="px-6">Supplier Details</TableHead>
-                  <TableHead>GSTIN</TableHead>
+                <TableRow>
+                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('name')}>
+                    <div className="flex items-center">Supplier Details <SortIcon column="name" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('gstin')}>
+                    <div className="flex items-center">GSTIN <SortIcon column="gstin" /></div>
+                  </TableHead>
                   <TableHead>Linked Identity</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
