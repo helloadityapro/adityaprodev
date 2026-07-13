@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,7 @@ import {
   addDocumentNonBlocking,
   useFirebaseApp
 } from '@/firebase';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -51,6 +52,9 @@ import { Separator } from '@/components/ui/separator';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { sendNotification } from '@/lib/notifications';
 
 const woItemSchema = z.object({
   description: z.string().min(1, 'Description is required.'),
@@ -65,9 +69,14 @@ const woSchema = z.object({
   orderDate: z.string().min(1, 'Date is required.'),
   contractorId: z.string().min(1, 'Please select a contractor.'),
   contractorName: z.string(),
+  contractorAddress: z.string().optional(),
+  contractorGST: z.string().optional(),
   items: z.array(woItemSchema).min(1, 'At least one line item is required.'),
   description: z.string().min(10, 'Please provide a detailed overall scope of work.'),
   termsAndConditions: z.string().optional(),
+  issuerType: z.enum(['Aditya', 'Client']).default('Aditya'),
+  isManualSubject: z.boolean().default(false),
+  subject: z.string().optional(),
 });
 
 type Site = {
@@ -80,6 +89,8 @@ type Contractor = {
   id: string;
   name: string;
   gstin: string;
+  role: string;
+  address: string;
 };
 
 export default function CreateWOPage({ params }: { params: Promise<{ projectId: string }> }) {
@@ -108,14 +119,26 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
   const contractorsQuery = useMemoFirebase(() => collection(firestore, 'contractors'), [firestore]);
   const { data: allContractors } = useCollection<Contractor>(contractorsQuery);
 
   const form = useForm<z.infer<typeof woSchema>>({
     resolver: zodResolver(woSchema),
-    defaultValues: { woNumber: "", orderDate: format(new Date(), 'yyyy-MM-dd'), contractorId: "", contractorName: "", items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }], description: "", termsAndConditions: "" },
+    defaultValues: { 
+      woNumber: "", 
+      orderDate: format(new Date(), 'yyyy-MM-dd'), 
+      contractorId: "", 
+      contractorName: "", 
+      contractorAddress: "",
+      contractorGST: "",
+      items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }], 
+      description: "", 
+      termsAndConditions: "",
+      issuerType: "Aditya",
+      isManualSubject: false,
+      subject: "",
+    },
   });
 
   const { fields, append, remove } = useFieldArray({ control: form.control, name: "items" });
@@ -125,6 +148,23 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
     name: "items",
   }) || [];
 
+  const watchIssuerType = form.watch('issuerType');
+  const watchIsManualSubject = form.watch('isManualSubject');
+  const watchContractorId = form.watch('contractorId');
+
+  // Auto-generate subject logic
+  React.useEffect(() => {
+    if (!watchIsManualSubject && site) {
+      const contractor = allContractors?.find(c => c.id === watchContractorId);
+      const role = contractor?.role || "[Contractor Role]";
+      const company = site.projectCompany || "[Project Company]";
+      const siteName = site.name || "[Project Name]";
+      
+      const autoSubject = `Work Order for ${role} work of Solar Plant ${company}, at ${siteName}`;
+      form.setValue('subject', autoSubject);
+    }
+  }, [watchIsManualSubject, watchContractorId, site, allContractors, form]);
+
   const totalAmount = React.useMemo(() => {
     return watchedItems.reduce((sum, item) => {
       const qty = Number(item.quantity) || 0;
@@ -132,6 +172,14 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
       const gst = Number(item.gstPercent) || 0;
       const lineTotal = (qty * rate) * (1 + (gst / 100));
       return sum + lineTotal;
+    }, 0);
+  }, [watchedItems]);
+
+  const totalBasicAmount = React.useMemo(() => {
+    return watchedItems.reduce((sum, item) => {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.rate) || 0;
+      return sum + (qty * rate);
     }, 0);
   }, [watchedItems]);
 
@@ -186,20 +234,42 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
       await addDocumentNonBlocking(collection(firestore, 'project_wos'), {
         siteId: projectId, 
         siteName: site.name, 
+        projectCompany: site.projectCompany || "",
         woNumber: values.woNumber, 
         contractorId: values.contractorId, 
         contractorName: values.contractorName, 
+        contractorAddress: values.contractorAddress || "",
+        contractorGST: values.contractorGST || "",
         orderDate: values.orderDate, 
         items: values.items, 
         totalAmount, 
+        totalBasicAmount,
+        totalGstAmount: totalAmount - totalBasicAmount,
         description: values.description, 
         termsAndConditions: values.termsAndConditions || "",
         scopeAttachments: attachments,
+        issuerType: values.issuerType,
+        isManualSubject: values.isManualSubject,
+        subject: values.subject,
         status: 'Pending', 
         createdAt: serverTimestamp(), 
         createdByName: userProfile.username || user.email, 
         history: [historyEntry]
       });
+
+      // Notify Admins
+      const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
+      const adminDocs = await getDocs(adminsQuery);
+      adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
+        sendNotification(firestore, {
+          userId: adminDoc.id,
+          title: "New Work Order Logged",
+          description: `Site: ${site.name} • Contractor: ${values.contractorName} • Value: ₹${totalAmount.toLocaleString('en-IN')}`,
+          link: "/work-orders/manage",
+        });
+      });
+
       setFinalTotal(totalAmount);
       setIsSuccess(true);
       toast({ title: 'WO Submitted', description: `Work Order ${values.woNumber} has been sent for Admin approval.` });
@@ -209,6 +279,11 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
       setIsSubmitting(false);
     }
   };
+
+  const filteredContractors = allContractors?.filter(c => 
+    c.name.toLowerCase().includes(contractorSearch.toLowerCase()) ||
+    c.gstin.toLowerCase().includes(contractorSearch.toLowerCase())
+  ) || [];
 
   if (isProfileLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
 
@@ -236,7 +311,125 @@ export default function CreateWOPage({ params }: { params: Promise<{ projectId: 
       </div>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden"><CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader><CardContent className="pt-6"><div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"><FormField control={form.control} name="woNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">WO Number</FormLabel><FormControl><Input placeholder="e.g. AGEPL/WO/2026/042" {...field} className="h-11 rounded-sm uppercase font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="orderDate" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel><FormControl><div className="relative"><Input type="date" {...field} className="h-11 rounded-sm pr-10" /><Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" /></div></FormControl><FormMessage /></FormItem>)} /><FormField control={form.control} name="contractorId" render={({ field }) => (<FormItem className="flex flex-col"><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Contractor Partner</FormLabel><Popover open={isContractorPopoverOpen} onOpenChange={setIsContractorPopoverOpen}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>{field.value ? allContractors?.find(c => c.id === field.value)?.name : "Choose Contractor..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search contractors..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={contractorSearch} onChange={(e) => setContractorSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{allContractors?.filter(c => c.name.toLowerCase().includes(contractorSearch.toLowerCase())).map((c) => (<Button key={c.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(c.id); form.setValue('contractorName', c.name); setIsContractorPopoverOpen(false); setContractorSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", c.id === field.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start"><span className="font-bold">{c.name}</span><span className="text-[8px] font-mono text-muted-foreground">{c.gstin}</span></div></Button>))}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>)} /></div></CardContent></Card>
+          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+            <CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader>
+            <CardContent className="pt-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <FormField control={form.control} name="woNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">WO Number</FormLabel><FormControl><Input placeholder="e.g. AGEPL/WO/2026/042" {...field} className="h-11 rounded-sm uppercase font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="orderDate" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel><FormControl><div className="relative"><Input type="date" {...field} className="h-11 rounded-sm pr-10" /><Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" /></div></FormControl><FormMessage /></FormItem>)} />
+                <FormField control={form.control} name="contractorId" render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Contractor Partner</FormLabel>
+                    <Popover open={isContractorPopoverOpen} onOpenChange={setIsContractorPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>
+                            {field.value ? allContractors?.find(c => c.id === field.value)?.name : "Choose Contractor..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <div className="flex items-center border-b px-3">
+                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                          <Input placeholder="Search contractors..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={contractorSearch} onChange={(e) => setContractorSearch(e.target.value)} />
+                        </div>
+                        <ScrollArea className="h-[200px]">
+                          <div className="p-1">
+                            {filteredContractors.map((c) => (
+                              <Button key={c.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { 
+                                field.onChange(c.id); 
+                                form.setValue('contractorName', c.name); 
+                                form.setValue('contractorAddress', c.address || "");
+                                form.setValue('contractorGST', c.gstin || "");
+                                setIsContractorPopoverOpen(false); 
+                                setContractorSearch(""); 
+                              }}>
+                                <Check className={cn("mr-2 h-4 w-4 text-primary", c.id === field.value ? "opacity-100" : "opacity-0")} />
+                                <div className="flex flex-col items-start"><span className="font-bold">{c.name}</span><span className="text-[8px] font-mono text-muted-foreground">{c.gstin}</span></div>
+                              </Button>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
+              <div className="p-4 bg-muted/20 border rounded-sm space-y-4">
+                <FormField
+                  control={form.control}
+                  name="issuerType"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest">Work Order From (Letterhead Selection)</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col sm:flex-row gap-4"
+                        >
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="Aditya" /></FormControl>
+                            <FormLabel className="font-bold cursor-pointer text-xs uppercase">Aditya Green Energy Private Limited</FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="Client" /></FormControl>
+                            <FormLabel className="font-bold cursor-pointer text-xs uppercase">From Project Client ({site?.projectCompany || 'Site Company'})</FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <Separator className="bg-border/40" />
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <FormField
+                      control={form.control}
+                      name="isManualSubject"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest cursor-pointer">Add Subject Manually</FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="subject"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Document Subject</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            readOnly={!watchIsManualSubject} 
+                            placeholder="Standard subject will be generated if not manual..."
+                            className={cn("h-11 rounded-sm text-xs font-bold", !watchIsManualSubject && "bg-muted/30 italic font-medium")} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
           
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b pb-2 px-1"><div className="flex items-center gap-2"><ListPlus className="h-4 w-4 text-primary" /><h3 className="text-sm font-black uppercase tracking-widest text-foreground">Service Line Items</h3></div><Button type="button" variant="outline" size="sm" onClick={() => append({ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Service</Button></div>

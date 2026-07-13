@@ -224,13 +224,23 @@
       "properties": {
         "id": { "type": "string" },
         "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "projectCompany": { "type": "string" },
         "woNumber": { "type": "string" },
         "contractorId": { "type": "string" },
         "contractorName": { "type": "string" },
+        "contractorAddress": { "type": "string" },
+        "contractorGST": { "type": "string" },
         "orderDate": { "type": "string", "format": "date" },
-        "status": { "type": "string", "enum": ["Open", "Approved", "Rejected", "Cancelled"] },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected", "Cancelled"] },
         "totalAmount": { "type": "number" },
-        "description": { "type": "string" }
+        "totalBasicAmount": { "type": "number" },
+        "totalGstAmount": { "type": "number" },
+        "description": { "type": "string" },
+        "termsAndConditions": { "type": "string" },
+        "issuerType": { "type": "string", "enum": ["Aditya", "Client"] },
+        "isManualSubject": { "type": "boolean" },
+        "subject": { "type": "string" }
       },
       "required": ["woNumber", "contractorId", "totalAmount"]
     },

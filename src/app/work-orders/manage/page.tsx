@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -91,14 +92,21 @@ type WorkOrder = {
   woNumber: string;
   siteId: string;
   siteName: string;
+  projectCompany?: string;
   contractorName: string;
+  contractorAddress?: string;
+  contractorGST?: string;
   orderDate: string;
   status: string;
   totalAmount: number;
+  totalBasicAmount?: number;
+  totalGstAmount?: number;
   items: WOItem[];
   description: string;
   termsAndConditions?: string;
   scopeAttachments?: Attachment[];
+  issuerType?: 'Aditya' | 'Client';
+  subject?: string;
   createdAt: any;
   createdByName?: string;
   history?: any[];
@@ -122,6 +130,8 @@ export default function GlobalManageWOsPage() {
   const { user } = useUser();
   const router = useRouter();
   const { toast } = useToast();
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
@@ -149,6 +159,17 @@ export default function GlobalManageWOsPage() {
   }, [firestore, user, isProfileLoading]);
 
   const { data: allWOs, isLoading: isWOsLoading } = useCollection<WorkOrder>(wosQuery);
+
+  // Handle deep link via URL view parameter
+  React.useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && allWOs && allWOs.length > 0) {
+      const found = allWOs.find(p => p.id === viewId);
+      if (found) {
+        setViewingWO(found);
+      }
+    }
+  }, [searchParams, allWOs]);
 
   const handleSort = (key: WOSortKey) => {
     setSortConfig(prev => ({
@@ -260,20 +281,20 @@ export default function GlobalManageWOsPage() {
       const margin = 20;
       let currY = 30;
 
-      // Header
+      // Letterhead
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(22);
+      doc.setFontSize(18);
+      const letterhead = wo.issuerType === 'Client' ? (wo.projectCompany || 'PROJECT CLIENT') : 'ADITYA GREEN ENERGY PRIVATE LIMITED';
+      doc.text(letterhead.toUpperCase(), 105, currY, { align: 'center' });
+      
+      currY += 15;
+      doc.setFontSize(16);
       doc.setTextColor(45, 115, 255); // Primary Blue
       doc.text('WORK ORDER', 105, currY, { align: 'center' });
       
       currY += 15;
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      doc.text('ADITYA GREEN ENERGY PRIVATE LIMITED', margin, currY);
-      doc.setFont('helvetica', 'normal');
-      doc.text('Registered Office: Maharashtra, India', margin, currY + 5);
-      
-      currY += 20;
       doc.setDrawColor(200, 200, 200);
       doc.line(margin, currY, 210 - margin, currY);
       
@@ -282,10 +303,31 @@ export default function GlobalManageWOsPage() {
       doc.text(`WO NUMBER: ${wo.woNumber}`, margin, currY);
       doc.text(`DATE: ${wo.orderDate}`, 210 - margin, currY, { align: 'right' });
       
+      if (wo.subject) {
+        currY += 12;
+        doc.setFont('helvetica', 'bold');
+        doc.text('SUBJECT:', margin, currY);
+        doc.setFont('helvetica', 'normal');
+        const splitSubject = doc.splitTextToSize(wo.subject.toUpperCase(), 150);
+        doc.text(splitSubject, margin + 20, currY);
+        currY += (splitSubject.length * 5) + 2;
+      }
+
       currY += 10;
+      doc.setFont('helvetica', 'bold');
       doc.text('TO:', margin, currY);
       doc.setFont('helvetica', 'normal');
       doc.text(wo.contractorName, margin, currY + 5);
+      if (wo.contractorAddress) {
+        const splitAddr = doc.splitTextToSize(wo.contractorAddress, 80);
+        doc.text(splitAddr, margin, currY + 10);
+        currY += (splitAddr.length * 5);
+      }
+      if (wo.contractorGST) {
+        doc.setFont('helvetica', 'bold');
+        doc.text(`GSTIN: ${wo.contractorGST}`, margin, currY + 10);
+        currY += 10;
+      }
       
       currY += 15;
       doc.setFont('helvetica', 'bold');
@@ -293,25 +335,19 @@ export default function GlobalManageWOsPage() {
       doc.setFont('helvetica', 'normal');
       doc.text(wo.siteName, margin + 30, currY);
 
-      // Description
       currY += 15;
-      doc.setFont('helvetica', 'bold');
-      doc.text('SCOPE OF WORK:', margin, currY);
-      doc.setFont('helvetica', 'normal');
-      const splitDesc = doc.splitTextToSize(wo.description || 'N/A', 170);
-      doc.text(splitDesc, margin, currY + 5);
-      currY += 10 + (splitDesc.length * 5);
 
       // Table Header
       doc.setFillColor(245, 245, 245);
       doc.rect(margin, currY, 170, 10, 'F');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(8);
+      doc.setFontSize(7);
       doc.text('DESCRIPTION', margin + 2, currY + 6);
-      doc.text('QTY', margin + 70, currY + 6);
-      doc.text('RATE', margin + 90, currY + 6);
-      doc.text('BASIC', margin + 115, currY + 6);
-      doc.text('GST %', margin + 135, currY + 6);
+      doc.text('QTY', margin + 62, currY + 6);
+      doc.text('RATE', margin + 74, currY + 6);
+      doc.text('BASIC', margin + 92, currY + 6);
+      doc.text('GST %', margin + 112, currY + 6);
+      doc.text('GST AMT', margin + 127, currY + 6);
       doc.text('TOTAL', margin + 168, currY + 6, { align: 'right' });
       
       currY += 10;
@@ -320,14 +356,16 @@ export default function GlobalManageWOsPage() {
       wo.items.forEach((item) => {
         if (currY > 260) { doc.addPage(); currY = 30; }
         const basic = item.quantity * item.rate;
+        const gstAmount = basic * (item.gstPercent / 100);
         const sub = item.amount;
         
-        const splitItemDesc = doc.splitTextToSize(item.description, 65);
+        const splitItemDesc = doc.splitTextToSize(item.description, 60);
         doc.text(splitItemDesc, margin + 2, currY + 5);
-        doc.text(item.quantity.toString(), margin + 70, currY + 5);
-        doc.text(item.rate.toLocaleString(), margin + 90, currY + 5);
-        doc.text(basic.toLocaleString(), margin + 115, currY + 5);
-        doc.text(`${item.gstPercent}%`, margin + 135, currY + 5);
+        doc.text(item.quantity.toString(), margin + 62, currY + 5);
+        doc.text(item.rate.toLocaleString(), margin + 74, currY + 5);
+        doc.text(basic.toLocaleString(), margin + 92, currY + 5);
+        doc.text(`${item.gstPercent}%`, margin + 112, currY + 5);
+        doc.text(gstAmount.toLocaleString(), margin + 127, currY + 5);
         doc.setFont('helvetica', 'bold');
         doc.text(sub.toLocaleString(), 210 - margin - 2, currY + 5, { align: 'right' });
         doc.setFont('helvetica', 'normal');
@@ -336,25 +374,50 @@ export default function GlobalManageWOsPage() {
         doc.line(margin, currY - 2, 210 - margin, currY - 2);
       });
 
-      // Total
+      // Financial Summary
       currY += 10;
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(12);
+      doc.setFontSize(9);
+      
+      const totalBasic = wo.totalBasicAmount || wo.items.reduce((s, i) => s + (i.quantity * i.rate), 0);
+      const totalGst = wo.totalAmount - totalBasic;
+
+      doc.text('TOTAL BASIC VALUE:', margin + 110, currY);
+      doc.text(`INR ${totalBasic.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 210 - margin, currY, { align: 'right' });
+      
+      currY += 6;
+      doc.text('TOTAL GST AMOUNT:', margin + 110, currY);
+      doc.text(`INR ${totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 210 - margin, currY, { align: 'right' });
+
+      currY += 8;
+      doc.setFontSize(11);
       doc.text('TOTAL CONTRACT VALUE:', margin + 70, currY);
       doc.setTextColor(45, 115, 255);
-      doc.text(`INR ${wo.totalAmount.toLocaleString('en-IN')}`, 210 - margin, currY, { align: 'right' });
+      doc.text(`INR ${wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 210 - margin, currY, { align: 'right' });
+
+      // Scope of Work
+      currY += 20;
+      if (currY > 240) { doc.addPage(); currY = 30; }
+      doc.setTextColor(0, 0, 0);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text('SCOPE OF WORK:', margin, currY);
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(9);
+      const splitDesc = doc.splitTextToSize(wo.description || 'N/A', 170);
+      doc.text(splitDesc, margin, currY + 6);
+      currY += 10 + (splitDesc.length * 5);
 
       // T&C
       if (wo.termsAndConditions) {
-        currY += 20;
         if (currY > 240) { doc.addPage(); currY = 30; }
-        doc.setTextColor(0, 0, 0);
         doc.setFontSize(10);
+        doc.setFont('helvetica', 'bold');
         doc.text('TERMS & CONDITIONS:', margin, currY);
         doc.setFontSize(8);
         doc.setFont('helvetica', 'normal');
         const splitTC = doc.splitTextToSize(wo.termsAndConditions, 170);
-        doc.text(splitTC, margin, currY + 5);
+        doc.text(splitTC, margin, currY + 6);
       }
 
       doc.save(`WorkOrder_${wo.woNumber.replace(/\//g, '_')}.pdf`);
@@ -388,12 +451,19 @@ export default function GlobalManageWOsPage() {
     window.open(url, '_blank');
   };
 
+  const handleCloseDetail = () => {
+    setViewingWO(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
+  };
+
   if (isProfileLoading || isWOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
@@ -621,7 +691,7 @@ export default function GlobalManageWOsPage() {
       </div>
 
       {/* WO Detail Dialog */}
-      <Dialog open={!!viewingWO} onOpenChange={(o) => !o && setViewingWO(null)}>
+      <Dialog open={!!viewingWO} onOpenChange={(o) => !o && handleCloseDetail()}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
@@ -677,32 +747,6 @@ export default function GlobalManageWOsPage() {
 
                 <div className="space-y-4">
                   <div className="flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-primary" />
-                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Detailed Scope of Work</Label>
-                  </div>
-                  <div className="p-5 bg-muted/20 border rounded-sm text-sm leading-relaxed italic text-foreground/80 whitespace-pre-wrap">
-                    "{viewingWO.description || 'No detailed scope provided.'}"
-                  </div>
-                  
-                  {viewingWO.scopeAttachments && viewingWO.scopeAttachments.length > 0 && (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
-                      {viewingWO.scopeAttachments.map((att, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 border rounded-sm bg-background group hover:border-primary/30 transition-all">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div className="p-2 bg-muted rounded-sm"><FileText className="h-4 w-4 text-primary" /></div>
-                            <span className="text-[10px] font-bold truncate max-w-[150px]" title={att.name}>{att.name}</span>
-                          </div>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
-                            <a href={att.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
                     <Layers className="h-4 w-4 text-primary" />
                     <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Service Breakdown (Financial Detail)</Label>
                   </div>
@@ -740,6 +784,32 @@ export default function GlobalManageWOsPage() {
                       </TableBody>
                     </Table>
                   </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Detailed Scope of Work</Label>
+                  </div>
+                  <div className="p-5 bg-muted/20 border rounded-sm text-sm leading-relaxed italic text-foreground/80 whitespace-pre-wrap">
+                    "{viewingWO.description || 'No detailed scope provided.'}"
+                  </div>
+                  
+                  {viewingWO.scopeAttachments && viewingWO.scopeAttachments.length > 0 && (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-4">
+                      {viewingWO.scopeAttachments.map((att, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-3 border rounded-sm bg-background group hover:border-primary/30 transition-all">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2 bg-muted rounded-sm"><FileText className="h-4 w-4 text-primary" /></div>
+                            <span className="text-[10px] font-bold truncate max-w-[150px]" title={att.name}>{att.name}</span>
+                          </div>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
+                            <a href={att.url} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {viewingWO.termsAndConditions && (

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -39,7 +40,9 @@ import {
   ListPlus,
   FileUp,
   X,
-  ShieldAlert
+  ShieldAlert,
+  Settings2,
+  Info
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -47,9 +50,12 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Textarea } from '@/components/ui/textarea';
+import { Separator } from '@/components/ui/separator';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 
 const woItemSchema = z.object({
   description: z.string().min(1, 'Description is required.'),
@@ -62,13 +68,19 @@ const woItemSchema = z.object({
 const woSchema = z.object({
   siteId: z.string().min(1, 'Please select a project site.'),
   siteName: z.string(),
+  projectCompany: z.string().optional(),
   woNumber: z.string().min(3, 'WO Number is required.'),
   orderDate: z.string().min(1, 'Date is required.'),
   contractorId: z.string().min(1, 'Please select a contractor.'),
   contractorName: z.string(),
+  contractorAddress: z.string().optional(),
+  contractorGST: z.string().optional(),
   items: z.array(woItemSchema).min(1, 'At least one line item is required.'),
   description: z.string().min(10, 'Please provide a detailed overall scope of work.'),
   termsAndConditions: z.string().optional(),
+  issuerType: z.enum(['Aditya', 'Client']).default('Aditya'),
+  isManualSubject: z.boolean().default(false),
+  subject: z.string().optional(),
 });
 
 type Site = {
@@ -81,6 +93,8 @@ type Contractor = {
   id: string;
   name: string;
   gstin: string;
+  role: string;
+  address: string;
 };
 
 export default function GlobalCreateWOPage() {
@@ -118,13 +132,19 @@ export default function GlobalCreateWOPage() {
     defaultValues: {
       siteId: "",
       siteName: "",
+      projectCompany: "",
       woNumber: "",
       orderDate: format(new Date(), 'yyyy-MM-dd'),
       contractorId: "",
       contractorName: "",
+      contractorAddress: "",
+      contractorGST: "",
       items: [{ description: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }],
       description: "",
-      termsAndConditions: ""
+      termsAndConditions: "",
+      issuerType: "Aditya",
+      isManualSubject: false,
+      subject: "",
     },
   });
 
@@ -138,6 +158,25 @@ export default function GlobalCreateWOPage() {
     name: "items",
   }) || [];
 
+  const watchIssuerType = form.watch('issuerType');
+  const watchIsManualSubject = form.watch('isManualSubject');
+  const watchSiteName = form.watch('siteName');
+  const watchProjectCompany = form.watch('projectCompany');
+  const watchContractorId = form.watch('contractorId');
+
+  // Auto-generate subject logic
+  React.useEffect(() => {
+    if (!watchIsManualSubject) {
+      const contractor = allContractors?.find(c => c.id === watchContractorId);
+      const role = contractor?.role || "[Contractor Role]";
+      const company = watchProjectCompany || "[Project Company]";
+      const site = watchSiteName || "[Project Name]";
+      
+      const autoSubject = `Work Order for ${role} work of Solar Plant ${company}, at ${site}`;
+      form.setValue('subject', autoSubject);
+    }
+  }, [watchIsManualSubject, watchContractorId, watchSiteName, watchProjectCompany, allContractors, form]);
+
   const totalAmount = React.useMemo(() => {
     return watchedItems.reduce((sum, item) => {
       const qty = Number(item.quantity) || 0;
@@ -145,6 +184,14 @@ export default function GlobalCreateWOPage() {
       const gst = Number(item.gstPercent) || 0;
       const lineTotal = (qty * rate) * (1 + (gst / 100));
       return sum + lineTotal;
+    }, 0);
+  }, [watchedItems]);
+
+  const totalBasicAmount = React.useMemo(() => {
+    return watchedItems.reduce((sum, item) => {
+      const qty = Number(item.quantity) || 0;
+      const rate = Number(item.rate) || 0;
+      return sum + (qty * rate);
     }, 0);
   }, [watchedItems]);
 
@@ -205,26 +252,34 @@ export default function GlobalCreateWOPage() {
         }
       }
 
-      const historyEntry = {
-        action: 'Created',
-        userName: userProfile.username || user.email,
-        userId: user.uid,
-        timestamp: new Date(),
-        details: `Work Order issued for ₹${totalAmount.toLocaleString('en-IN')} (Pending Admin Approval)`
+      const historyEntry = { 
+        action: 'Created', 
+        userName: userProfile.username || user.email, 
+        userId: user.uid, 
+        timestamp: new Date(), 
+        details: `Work Order issued for ₹${totalAmount.toLocaleString('en-IN')} (Pending Admin Approval)` 
       };
 
-      addDocumentNonBlocking(collection(firestore, 'project_wos'), {
+      await addDocumentNonBlocking(collection(firestore, 'project_wos'), {
         siteId: values.siteId,
         siteName: values.siteName,
+        projectCompany: values.projectCompany || "",
         woNumber: values.woNumber,
         contractorId: values.contractorId,
         contractorName: values.contractorName,
+        contractorAddress: values.contractorAddress || "",
+        contractorGST: values.contractorGST || "",
         orderDate: values.orderDate,
         items: values.items,
         totalAmount,
+        totalBasicAmount,
+        totalGstAmount: totalAmount - totalBasicAmount,
         description: values.description,
         termsAndConditions: values.termsAndConditions || "",
         scopeAttachments: attachments,
+        issuerType: values.issuerType,
+        isManualSubject: values.isManualSubject,
+        subject: values.subject,
         status: 'Pending',
         createdAt: serverTimestamp(),
         createdByName: userProfile.username || user.email,
@@ -272,8 +327,8 @@ export default function GlobalCreateWOPage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
             <CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">General Context</CardTitle></CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <CardContent className="pt-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="siteId" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Target Project Site</FormLabel>
@@ -294,7 +349,13 @@ export default function GlobalCreateWOPage() {
                         <ScrollArea className="h-[200px]">
                           <div className="p-1">
                             {filteredSites.map((s) => (
-                              <Button key={s.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(s.id); form.setValue('siteName', s.name); setIsSitePopoverOpen(false); setSiteSearch(""); }}>
+                              <Button key={s.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { 
+                                field.onChange(s.id); 
+                                form.setValue('siteName', s.name); 
+                                form.setValue('projectCompany', s.projectCompany);
+                                setIsSitePopoverOpen(false); 
+                                setSiteSearch("");
+                              }}>
                                 <Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} />
                                 {s.name}
                               </Button>
@@ -327,7 +388,14 @@ export default function GlobalCreateWOPage() {
                         <ScrollArea className="h-[200px]">
                           <div className="p-1">
                             {filteredContractors.map((c) => (
-                              <Button key={c.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { field.onChange(c.id); form.setValue('contractorName', c.name); setIsContractorPopoverOpen(false); setContractorSearch(""); }}>
+                              <Button key={c.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { 
+                                field.onChange(c.id); 
+                                form.setValue('contractorName', c.name); 
+                                form.setValue('contractorAddress', c.address || "");
+                                form.setValue('contractorGST', c.gstin || "");
+                                setIsContractorPopoverOpen(false); 
+                                setContractorSearch(""); 
+                              }}>
                                 <Check className={cn("mr-2 h-4 w-4 text-primary", c.id === field.value ? "opacity-100" : "opacity-0")} />
                                 <div className="flex flex-col items-start"><span className="font-bold">{c.name}</span><span className="text-[8px] font-mono text-muted-foreground">{c.gstin}</span></div>
                               </Button>
@@ -349,9 +417,80 @@ export default function GlobalCreateWOPage() {
                   <FormItem><FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Order Date</FormLabel><FormControl><div className="relative"><Input type="date" {...field} className="h-11 rounded-sm pr-10" /><Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" /></div></FormControl><FormMessage /></FormItem>
                 )} />
               </div>
+
+              <div className="p-4 bg-muted/20 border rounded-sm space-y-4">
+                <FormField
+                  control={form.control}
+                  name="issuerType"
+                  render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest">Work Order From (Letterhead Selection)</FormLabel>
+                      <FormControl>
+                        <RadioGroup
+                          onValueChange={field.onChange}
+                          defaultValue={field.value}
+                          className="flex flex-col sm:flex-row gap-4"
+                        >
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="Aditya" /></FormControl>
+                            <FormLabel className="font-bold cursor-pointer text-xs uppercase">Aditya Green Energy Private Limited</FormLabel>
+                          </FormItem>
+                          <FormItem className="flex items-center space-x-2 space-y-0">
+                            <FormControl><RadioGroupItem value="Client" /></FormControl>
+                            <FormLabel className="font-bold cursor-pointer text-xs uppercase">From Project Client ({watchProjectCompany || 'Selected Site Company'})</FormLabel>
+                          </FormItem>
+                        </RadioGroup>
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
+
+                <Separator className="bg-border/40" />
+
+                <div className="space-y-4">
+                  <div className="flex items-center space-x-2">
+                    <FormField
+                      control={form.control}
+                      name="isManualSubject"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                          <FormControl>
+                            <Checkbox
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                          <div className="space-y-1 leading-none">
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest cursor-pointer">Add Subject Manually</FormLabel>
+                          </div>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <FormField
+                    control={form.control}
+                    name="subject"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Document Subject</FormLabel>
+                        <FormControl>
+                          <Input 
+                            {...field} 
+                            readOnly={!watchIsManualSubject} 
+                            placeholder="Standard subject will be generated if not manual..."
+                            className={cn("h-11 rounded-sm text-xs font-bold", !watchIsManualSubject && "bg-muted/30 italic font-medium")} 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
-
+          
           <div className="space-y-6">
             <div className="flex items-center justify-between border-b pb-2 px-1">
               <div className="flex items-center gap-2">
@@ -380,7 +519,7 @@ export default function GlobalCreateWOPage() {
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                       <div className="md:col-span-5">
                         <FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (
-                          <FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Service Description</FormLabel><FormControl><Input placeholder="e.g. Earthwork excavation" {...field} className="h-10 rounded-sm bg-background" /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Service Description</FormLabel><FormControl><Input placeholder="e.g. Labor for module mounting" {...field} className="h-10 rounded-sm bg-background" /></FormControl><FormMessage /></FormItem>
                         )} />
                       </div>
                       
@@ -392,7 +531,7 @@ export default function GlobalCreateWOPage() {
 
                       <div className="md:col-span-2">
                         <FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (
-                          <FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>
+                          <FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Unit Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>
                         )} />
                       </div>
 
