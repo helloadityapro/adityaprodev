@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -281,61 +280,66 @@ export default function GlobalManageWOsPage() {
       const margin = 20;
       let currY = 30;
 
+      const currencyFormat = (num: number) => num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      const toProperCase = (str: string) => str.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
+
       // Letterhead
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(18);
+      doc.setFontSize(14);
       const letterhead = wo.issuerType === 'Client' ? (wo.projectCompany || 'PROJECT CLIENT') : 'ADITYA GREEN ENERGY PRIVATE LIMITED';
       doc.text(letterhead.toUpperCase(), 105, currY, { align: 'center' });
       
-      currY += 15;
-      doc.setFontSize(16);
-      doc.setTextColor(45, 115, 255); // Primary Blue
-      doc.text('WORK ORDER', 105, currY, { align: 'center' });
-      
-      currY += 15;
+      currY += 8;
+      doc.setDrawColor(0);
+      doc.setLineWidth(0.4);
+      doc.line(margin, currY, 210 - margin, currY);
+
+      currY += 7;
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, currY, 210 - margin, currY);
+      doc.text('WORK ORDER', 105, currY, { align: 'center' });
       
-      currY += 10;
+      currY += 3;
+      doc.line(margin, currY, 210 - margin, currY);
+
+      currY += 12;
       doc.setFont('helvetica', 'bold');
       doc.text(`WO NUMBER: ${wo.woNumber}`, margin, currY);
       doc.text(`DATE: ${wo.orderDate}`, 210 - margin, currY, { align: 'right' });
       
-      if (wo.subject) {
-        currY += 12;
-        doc.setFont('helvetica', 'bold');
-        doc.text('SUBJECT:', margin, currY);
-        doc.setFont('helvetica', 'normal');
-        const splitSubject = doc.splitTextToSize(wo.subject.toUpperCase(), 150);
-        doc.text(splitSubject, margin + 20, currY);
-        currY += (splitSubject.length * 5) + 2;
-      }
+      currY += 10;
+      doc.text('PROJECT SITE:', margin, currY);
+      doc.setFont('helvetica', 'normal');
+      doc.text(wo.siteName, margin + 30, currY);
 
       currY += 10;
       doc.setFont('helvetica', 'bold');
       doc.text('TO:', margin, currY);
       doc.setFont('helvetica', 'normal');
       doc.text(wo.contractorName, margin, currY + 5);
+      currY += 5;
       if (wo.contractorAddress) {
         const splitAddr = doc.splitTextToSize(wo.contractorAddress, 80);
-        doc.text(splitAddr, margin, currY + 10);
+        doc.text(splitAddr, margin, currY + 5);
         currY += (splitAddr.length * 5);
       }
       if (wo.contractorGST) {
         doc.setFont('helvetica', 'bold');
-        doc.text(`GSTIN: ${wo.contractorGST}`, margin, currY + 10);
+        doc.text(`GSTIN: ${wo.contractorGST}`, margin, currY + 5);
         currY += 10;
       }
-      
-      currY += 15;
-      doc.setFont('helvetica', 'bold');
-      doc.text('PROJECT SITE:', margin, currY);
-      doc.setFont('helvetica', 'normal');
-      doc.text(wo.siteName, margin + 30, currY);
 
-      currY += 15;
+      if (wo.subject) {
+        currY += 5;
+        doc.setFont('helvetica', 'bold');
+        doc.text('SUBJECT:', margin, currY);
+        doc.setFont('helvetica', 'normal');
+        const splitSubject = doc.splitTextToSize(toProperCase(wo.subject), 150);
+        doc.text(splitSubject, margin + 20, currY);
+        currY += (splitSubject.length * 5) + 5;
+      }
+
+      currY += 5;
 
       // Table Header
       doc.setFillColor(245, 245, 245);
@@ -362,12 +366,12 @@ export default function GlobalManageWOsPage() {
         const splitItemDesc = doc.splitTextToSize(item.description, 60);
         doc.text(splitItemDesc, margin + 2, currY + 5);
         doc.text(item.quantity.toString(), margin + 62, currY + 5);
-        doc.text(item.rate.toLocaleString(), margin + 74, currY + 5);
-        doc.text(basic.toLocaleString(), margin + 92, currY + 5);
+        doc.text(item.rate.toLocaleString(undefined, {minimumFractionDigits: 2}), margin + 74, currY + 5);
+        doc.text(basic.toLocaleString(undefined, {minimumFractionDigits: 2}), margin + 92, currY + 5);
         doc.text(`${item.gstPercent}%`, margin + 112, currY + 5);
-        doc.text(gstAmount.toLocaleString(), margin + 127, currY + 5);
+        doc.text(gstAmount.toLocaleString(undefined, {minimumFractionDigits: 2}), margin + 127, currY + 5);
         doc.setFont('helvetica', 'bold');
-        doc.text(sub.toLocaleString(), 210 - margin - 2, currY + 5, { align: 'right' });
+        doc.text(currencyFormat(sub), 210 - margin - 2, currY + 5, { align: 'right' });
         doc.setFont('helvetica', 'normal');
         
         currY += Math.max(10, splitItemDesc.length * 5 + 2);
@@ -382,18 +386,18 @@ export default function GlobalManageWOsPage() {
       const totalBasic = wo.totalBasicAmount || wo.items.reduce((s, i) => s + (i.quantity * i.rate), 0);
       const totalGst = wo.totalAmount - totalBasic;
 
-      doc.text('TOTAL BASIC VALUE:', margin + 110, currY);
-      doc.text(`INR ${totalBasic.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 210 - margin, currY, { align: 'right' });
+      doc.text('TOTAL BASIC VALUE:', margin + 80, currY);
+      doc.text(`Rs ${currencyFormat(totalBasic)}`, 210 - margin, currY, { align: 'right' });
       
       currY += 6;
-      doc.text('TOTAL GST AMOUNT:', margin + 110, currY);
-      doc.text(`INR ${totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 210 - margin, currY, { align: 'right' });
+      doc.text('TOTAL GST AMOUNT:', margin + 80, currY);
+      doc.text(`Rs ${currencyFormat(totalGst)}`, 210 - margin, currY, { align: 'right' });
 
       currY += 8;
       doc.setFontSize(11);
       doc.text('TOTAL CONTRACT VALUE:', margin + 70, currY);
       doc.setTextColor(45, 115, 255);
-      doc.text(`INR ${wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`, 210 - margin, currY, { align: 'right' });
+      doc.text(`Rs ${currencyFormat(wo.totalAmount)}`, 210 - margin, currY, { align: 'right' });
 
       // Scope of Work
       currY += 20;
@@ -515,8 +519,8 @@ export default function GlobalManageWOsPage() {
         {filteredWOs.length > 0 ? filteredWOs.map((wo) => (
           <Card key={wo.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden cursor-pointer" onClick={() => setViewingWO(wo)}>
             <CardContent className="p-4 space-y-4">
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex flex-col gap-1 min-w-0">
+              <div className="flex justify-between items-start gap-4" onClick={(e) => e.stopPropagation()}>
+                <div className="flex flex-col gap-1 min-w-0" onClick={() => setViewingWO(wo)}>
                   <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{wo.orderDate}</span>
                   <h3 className="font-bold text-sm leading-tight text-foreground truncate">{wo.woNumber}</h3>
                 </div>
@@ -590,7 +594,7 @@ export default function GlobalManageWOsPage() {
                 <TableBody>
                   {filteredWOs.length > 0 ? filteredWOs.map((wo) => (
                     <React.Fragment key={wo.id}>
-                      <TableRow key={wo.id} className="hover:bg-muted/5 transition-colors cursor-pointer group" onClick={() => setViewingWO(wo)}>
+                      <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer group" onClick={() => setViewingWO(wo)}>
                         <TableCell className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(wo.id); }}>
@@ -681,7 +685,7 @@ export default function GlobalManageWOsPage() {
                       )}
                     </React.Fragment>
                   )) : (
-                    <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic text-xs uppercase opacity-40">No work orders discovered</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic text-xs uppercase font-black text-[10px] opacity-20">No work orders discovered</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -849,6 +853,24 @@ export default function GlobalManageWOsPage() {
                     ))}
                   </div>
                 </div>
+
+                {viewingWO.adminRemarks && (
+                  <div className={cn(
+                    "p-6 rounded-sm border-2 space-y-2 mt-8",
+                    viewingWO.status === 'Accepted' ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
+                  )}>
+                    <Label className={cn(
+                      "text-[10px] font-black uppercase tracking-widest",
+                      viewingWO.status === 'Accepted' ? "text-green-700" : "text-red-700"
+                    )}>Authority Decision Remarks</Label>
+                    <p className="text-sm font-medium italic leading-relaxed text-foreground/80">
+                      "{viewingWO.adminRemarks}"
+                    </p>
+                    <p className="text-[9px] font-bold opacity-40 uppercase pt-2">
+                      Processed by {viewingWO.processedByName} on {formatTimestamp(viewingWO.processedAt)}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </ScrollArea>
@@ -873,7 +895,7 @@ export default function GlobalManageWOsPage() {
                   <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setWoActionState({ wo: viewingWO!, type: 'Rejected' }); setViewingWO(null); }}>Reject WO</Button>
                 </div>
               )}
-              <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-10 tracking-widest">Close</Button></DialogClose>
+              <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-10 tracking-widest">Close Audit</Button></DialogClose>
             </div>
           </DialogFooter>
         </DialogContent>
