@@ -38,7 +38,7 @@ import {
   Clock,
   Printer
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -278,10 +278,31 @@ export default function GlobalManageWOsPage() {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
       const margin = 20;
+      const pageWidth = 210;
+      const contentWidth = pageWidth - (margin * 2);
       let currY = 30;
 
       const currencyFormat = (num: number) => num.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
       const toProperCase = (str: string) => str.toLowerCase().replace(/(?:^|\s)\w/g, (match) => match.toUpperCase());
+
+      // Helper for multi-page text handling
+      const addMultiLineText = (text: string, x: number, y: number, fontSize: number, fontWeight: 'bold' | 'normal' = 'normal') => {
+        doc.setFont('helvetica', fontWeight);
+        doc.setFontSize(fontSize);
+        const lines = doc.splitTextToSize(text || 'N/A', contentWidth);
+        const lineHeight = fontSize * 0.5; // conversion factor for mm
+        
+        let localY = y;
+        for (let line of lines) {
+          if (localY > 275) {
+            doc.addPage();
+            localY = 30;
+          }
+          doc.text(line, x, localY);
+          localY += lineHeight;
+        }
+        return localY;
+      };
 
       // Letterhead
       doc.setFont('helvetica', 'bold');
@@ -292,7 +313,7 @@ export default function GlobalManageWOsPage() {
       currY += 8;
       doc.setDrawColor(0);
       doc.setLineWidth(0.4);
-      doc.line(margin, currY, 210 - margin, currY);
+      doc.line(margin, currY, pageWidth - margin, currY);
 
       currY += 7;
       doc.setFontSize(10);
@@ -300,12 +321,12 @@ export default function GlobalManageWOsPage() {
       doc.text('WORK ORDER', 105, currY, { align: 'center' });
       
       currY += 3;
-      doc.line(margin, currY, 210 - margin, currY);
+      doc.line(margin, currY, pageWidth - margin, currY);
 
       currY += 12;
       doc.setFont('helvetica', 'bold');
       doc.text(`WO NUMBER: ${wo.woNumber}`, margin, currY);
-      doc.text(`DATE: ${wo.orderDate}`, 210 - margin, currY, { align: 'right' });
+      doc.text(`DATE: ${wo.orderDate}`, pageWidth - margin, currY, { align: 'right' });
       
       currY += 10;
       doc.text('PROJECT SITE:', margin, currY);
@@ -334,7 +355,7 @@ export default function GlobalManageWOsPage() {
         doc.setFont('helvetica', 'bold');
         doc.text('SUBJECT:', margin, currY);
         doc.setFont('helvetica', 'normal');
-        const splitSubject = doc.splitTextToSize(toProperCase(wo.subject), 150);
+        const splitSubject = doc.splitTextToSize(toProperCase(wo.subject), contentWidth - 20);
         doc.text(splitSubject, margin + 20, currY);
         currY += (splitSubject.length * 5) + 5;
       }
@@ -352,13 +373,13 @@ export default function GlobalManageWOsPage() {
       doc.text('BASIC', margin + 92, currY + 6);
       doc.text('GST %', margin + 112, currY + 6);
       doc.text('GST AMT', margin + 127, currY + 6);
-      doc.text('TOTAL', margin + 168, currY + 6, { align: 'right' });
+      doc.text('TOTAL', pageWidth - margin - 2, currY + 6, { align: 'right' });
       
       currY += 10;
       doc.setFont('helvetica', 'normal');
       
       wo.items.forEach((item) => {
-        if (currY > 260) { doc.addPage(); currY = 30; }
+        if (currY > 270) { doc.addPage(); currY = 30; }
         const basic = item.quantity * item.rate;
         const gstAmount = basic * (item.gstPercent / 100);
         const sub = item.amount;
@@ -371,14 +392,15 @@ export default function GlobalManageWOsPage() {
         doc.text(`${item.gstPercent}%`, margin + 112, currY + 5);
         doc.text(gstAmount.toLocaleString(undefined, {minimumFractionDigits: 2}), margin + 127, currY + 5);
         doc.setFont('helvetica', 'bold');
-        doc.text(currencyFormat(sub), 210 - margin - 2, currY + 5, { align: 'right' });
+        doc.text(currencyFormat(sub), pageWidth - margin - 2, currY + 5, { align: 'right' });
         doc.setFont('helvetica', 'normal');
         
         currY += Math.max(10, splitItemDesc.length * 5 + 2);
-        doc.line(margin, currY - 2, 210 - margin, currY - 2);
+        doc.line(margin, currY - 2, pageWidth - margin, currY - 2);
       });
 
       // Financial Summary
+      if (currY > 250) { doc.addPage(); currY = 30; }
       currY += 10;
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
@@ -387,46 +409,43 @@ export default function GlobalManageWOsPage() {
       const totalGst = wo.totalAmount - totalBasic;
 
       doc.text('TOTAL BASIC VALUE:', margin + 80, currY);
-      doc.text(`Rs ${currencyFormat(totalBasic)}`, 210 - margin, currY, { align: 'right' });
+      doc.text(`Rs ${currencyFormat(totalBasic)}`, pageWidth - margin, currY, { align: 'right' });
       
       currY += 6;
       doc.text('TOTAL GST AMOUNT:', margin + 80, currY);
-      doc.text(`Rs ${currencyFormat(totalGst)}`, 210 - margin, currY, { align: 'right' });
+      doc.text(`Rs ${currencyFormat(totalGst)}`, pageWidth - margin, currY, { align: 'right' });
 
       currY += 8;
       doc.setFontSize(11);
       doc.text('TOTAL CONTRACT VALUE:', margin + 70, currY);
       doc.setTextColor(45, 115, 255);
-      doc.text(`Rs ${currencyFormat(wo.totalAmount)}`, 210 - margin, currY, { align: 'right' });
+      doc.text(`Rs ${currencyFormat(wo.totalAmount)}`, pageWidth - margin, currY, { align: 'right' });
 
       // Scope of Work
-      currY += 20;
-      if (currY > 240) { doc.addPage(); currY = 30; }
+      currY += 15;
+      if (currY > 270) { doc.addPage(); currY = 30; }
       doc.setTextColor(0, 0, 0);
-      doc.setFontSize(10);
       doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
       doc.text('SCOPE OF WORK:', margin, currY);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(9);
-      const splitDesc = doc.splitTextToSize(wo.description || 'N/A', 170);
-      doc.text(splitDesc, margin, currY + 6);
-      currY += 10 + (splitDesc.length * 5);
+      currY += 7;
+      currY = addMultiLineText(wo.description || 'N/A', margin, currY, 9, 'normal');
 
       // T&C
       if (wo.termsAndConditions) {
-        if (currY > 240) { doc.addPage(); currY = 30; }
+        currY += 10;
+        if (currY > 270) { doc.addPage(); currY = 30; }
         doc.setFontSize(10);
         doc.setFont('helvetica', 'bold');
         doc.text('TERMS & CONDITIONS:', margin, currY);
-        doc.setFontSize(8);
-        doc.setFont('helvetica', 'normal');
-        const splitTC = doc.splitTextToSize(wo.termsAndConditions, 170);
-        doc.text(splitTC, margin, currY + 6);
+        currY += 7;
+        currY = addMultiLineText(wo.termsAndConditions, margin, currY, 9, 'normal');
       }
 
       doc.save(`WorkOrder_${wo.woNumber.replace(/\//g, '_')}.pdf`);
       toast({ title: 'Document Exported', description: 'Official Work Order PDF has been generated.' });
     } catch (e: any) {
+      console.error(e);
       toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
     } finally {
       setIsExportingPDF(false);
