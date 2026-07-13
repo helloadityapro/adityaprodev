@@ -14,14 +14,15 @@ import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
-import { Trash2, Search, Plus, Pencil, Loader2, MapPin, CheckCircle2, FileDown, ArrowLeft, RefreshCcw, Tag, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { collection, doc, serverTimestamp, query, where, getDocs, writeBatch } from 'firebase/firestore';
+import { Trash2, Search, Plus, Pencil, Loader2, MapPin, CheckCircle2, FileDown, ArrowLeft, RefreshCcw, Tag, ArrowUpDown, ArrowUp, ArrowDown, FileUp, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { cn } from '@/lib/utils';
+import { format } from 'date-fns';
 
 type Make = {
   id: string;
@@ -53,7 +54,10 @@ export default function MakesManagementPage() {
   const [makeToEdit, setMakeToEdit] = React.useState<Make | null>(null);
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isImporting, setIsImporting] = React.useState(false);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -188,6 +192,70 @@ export default function MakesManagementPage() {
     XLSX.writeFile(wb, `Makes_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
+  const handleDownloadTemplate = () => {
+    const wsData = [
+      ["Brand Name", "GSTIN", "Address", "Mobile", "Email"],
+      ["Tata Power Solar", "27AAAAA0000A1Z5", "123 Energy Park, Bangalore", "9876543210", "info@tatasolar.com"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "MakeTemplate");
+    XLSX.writeFile(wb, "Make_Import_Template.xlsx");
+  };
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
+
+        if (jsonData.length === 0) {
+          toast({ variant: "destructive", title: "Import Failed", description: "The uploaded file contains no data." });
+          return;
+        }
+
+        const batch = writeBatch(firestore);
+        let count = 0;
+
+        for (const row of jsonData) {
+          const name = row["Brand Name"] || row["name"];
+          if (name) {
+            const newDocRef = doc(collection(firestore, 'makes'));
+            batch.set(newDocRef, {
+              name: String(name).trim(),
+              gstin: String(row["GSTIN"] || "").trim().toUpperCase(),
+              address: String(row["Address"] || "").trim(),
+              mobile: String(row["Mobile"] || "").trim(),
+              email: String(row["Email"] || "").trim(),
+              createdAt: serverTimestamp()
+            });
+            count++;
+          }
+        }
+
+        if (count > 0) {
+          await batch.commit();
+          toast({ title: "Import Success", description: `Successfully added ${count} brands to the registry.` });
+        } else {
+          toast({ variant: "destructive", title: "Import Failed", description: "No valid rows found." });
+        }
+      } catch (err: any) {
+        toast({ variant: "destructive", title: "Import Error", description: err.message });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   if (isUserLoading || isProfileLoading || makesLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
@@ -201,7 +269,24 @@ export default function MakesManagementPage() {
           </h1>
           <p className="text-muted-foreground text-sm font-medium">Manage manufacturing brands and brands associated with site inventory.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
+            <Download className="mr-2 h-4 w-4" /> Template
+          </Button>
+          <div className="relative">
+            <input 
+              type="file" 
+              accept=".xlsx,.xls,.csv" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleBulkImport} 
+              disabled={isImporting}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
+              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+              Bulk Import
+            </Button>
+          </div>
           <Button variant="outline" size="sm" onClick={handleExport} disabled={filteredMakes.length === 0} className="h-10 rounded-sm font-bold border-primary/20 text-primary">
             <FileDown className="mr-2 h-4 w-4" /> Export List
           </Button>

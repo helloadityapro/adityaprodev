@@ -44,7 +44,8 @@ import {
   Wallet,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Download
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -267,6 +268,74 @@ export default function ContractorsManagementPage() {
     XLSX.writeFile(wb, `Contractors_Registry_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
+  const handleDownloadTemplate = () => {
+    const wsData = [
+      ["Company Name", "Role", "Banking Details", "GSTIN", "Address", "Mobile", "Email"],
+      ["A1 Infrastructure", "Civil Contractor", "State Bank of India, A/c: 12345678, IFSC: SBIN000123", "27AAAAA0000A1Z5", "123 Solar Street, Mumbai", "9876543210", "contact@a1infra.com"]
+    ];
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "ContractorTemplate");
+    XLSX.writeFile(wb, "Contractor_Import_Template.xlsx");
+  };
+
+  const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+        const jsonData = XLSX.utils.sheet_to_json(firstSheet) as any[];
+
+        if (jsonData.length === 0) {
+          toast({ variant: "destructive", title: "Import Failed", description: "The uploaded file contains no data." });
+          return;
+        }
+
+        const batch = writeBatch(firestore);
+        let count = 0;
+
+        for (const row of jsonData) {
+          const name = row["Company Name"] || row["name"];
+          const role = row["Role"] || row["role"];
+          
+          if (name && role) {
+            const newDocRef = doc(collection(firestore, 'contractors'));
+            batch.set(newDocRef, {
+              name: String(name).trim(),
+              role: String(role).trim(),
+              bankingDetails: String(row["Banking Details"] || "").trim(),
+              gstin: String(row["GSTIN"] || "").trim().toUpperCase(),
+              address: String(row["Address"] || "").trim(),
+              mobile: String(row["Mobile"] || "").trim(),
+              email: String(row["Email"] || "").trim(),
+              createdAt: serverTimestamp()
+            });
+            count++;
+          }
+        }
+
+        if (count > 0) {
+          await batch.commit();
+          toast({ title: "Import Success", description: `Successfully added ${count} contractors to the registry.` });
+        } else {
+          toast({ variant: "destructive", title: "Import Failed", description: "No valid rows found." });
+        }
+      } catch (err: any) {
+        toast({ variant: "destructive", title: "Import Error", description: err.message });
+      } finally {
+        setIsImporting(false);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
   if (isUserLoading || isProfileLoading || contractorsLoading || rolesLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
@@ -281,10 +350,27 @@ export default function ContractorsManagementPage() {
           <p className="text-muted-foreground text-sm font-medium">Manage corporate service partners and labor contractors.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport} disabled={filteredContractors.length === 0} className="h-10 rounded-sm font-bold border-primary/20 text-primary">
+          <Button variant="outline" size="sm" onClick={handleDownloadTemplate} className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
+            <Download className="mr-2 h-4 w-4" /> Template
+          </Button>
+          <div className="relative">
+            <input 
+              type="file" 
+              accept=".xlsx,.xls,.csv" 
+              className="hidden" 
+              ref={fileInputRef} 
+              onChange={handleBulkImport} 
+              disabled={isImporting}
+            />
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
+              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+              Bulk Import
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" onClick={handleExport} disabled={filteredContractors.length === 0} className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
             <FileDown className="mr-2 h-4 w-4" /> Export List
           </Button>
-          <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 rounded-sm font-bold shadow-md">
+          <Button onClick={() => setIsAddDialogOpen(true)} className="h-10 rounded-sm font-bold shadow-md px-6">
             <Plus className="mr-2 h-4 w-4" /> Add Contractor
           </Button>
         </div>
