@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -403,11 +402,11 @@ export default function ContractorsManagementPage() {
       </Card>
 
       <Dialog open={isAddDialogOpen || !!contractorToEdit} onOpenChange={(open) => { if(!open) { setIsAddDialogOpen(false); setContractorToEdit(null); } }}>
-        <DialogContent className="sm:max-w-2xl rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background max-h-[95vh] flex flex-col">
+        <DialogContent className="sm:max-w-2xl rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background max-h-[90vh] flex flex-col gap-0">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <DialogTitle className="text-xl font-black uppercase tracking-tight">{contractorToEdit ? 'Edit' : 'Register New'} Contractor</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1">
+          <ScrollArea className="flex-1 min-h-0">
             <div className="p-6">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(contractorToEdit ? onEditSubmit : onAddSubmit)} className="space-y-6">
@@ -485,7 +484,7 @@ export default function ContractorsManagementPage() {
               </Form>
             </div>
           </ScrollArea>
-          <DialogFooter className="p-6 border-t gap-2 flex flex-col sm:flex-row bg-muted/5">
+          <DialogFooter className="p-6 border-t gap-2 flex flex-col sm:flex-row shrink-0 bg-muted/5">
             <DialogClose asChild><Button variant="outline" className="flex-1 h-11 rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
             <Button type="button" onClick={form.handleSubmit(contractorToEdit ? onEditSubmit : onAddSubmit)} className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] shadow-lg" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : "Save Contractor"}
