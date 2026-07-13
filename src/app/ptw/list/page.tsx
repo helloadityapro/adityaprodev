@@ -180,16 +180,36 @@ function StatusBadge({ permit, className }: { permit: Permit, className?: string
   );
 }
 
-function PtwStatusBadge({ status, className }: { status: string, className?: string }) {
+function PtwStatusBadge({ permit, allUsers, className }: { permit: Permit, allUsers?: any[], className?: string }) {
+  const status = permit.ptwStatus || 'Open';
   const isClosed = status === 'Closed';
+  const currentStep = permit.closureStep || 'Engineer';
+  
+  let ownerName = 'Admin';
+  if (!isClosed) {
+    if (currentStep === 'Engineer') {
+      ownerName = permit.siteEngineerName || 'Engineer';
+    } else if (currentStep === 'Manager') {
+      const manager = allUsers?.find(u => u.id === permit.siteManagerId);
+      ownerName = manager?.username || 'Manager';
+    }
+  }
+
   return (
-    <Badge variant="outline" className={cn(
-      "flex items-center gap-1.5 text-[10px] font-black uppercase tracking-tighter border rounded-sm h-5 px-2",
-      isClosed ? "bg-emerald-500 text-white border-emerald-600" : "bg-primary text-white border-primary",
-      className
-    )}>
-      {status || 'Open'}
-    </Badge>
+    <div className="flex flex-col items-start gap-1">
+      <Badge variant="outline" className={cn(
+        "flex items-center justify-center gap-1.5 text-[10px] font-black uppercase tracking-tighter border rounded-sm h-5 px-2",
+        isClosed ? "bg-emerald-500 text-white border-emerald-600" : "bg-primary text-white border-primary",
+        className
+      )}>
+        {status}
+      </Badge>
+      {!isClosed && (
+        <span className="text-[9px] font-bold text-muted-foreground whitespace-nowrap pl-0.5">
+          Open from {ownerName}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -304,6 +324,9 @@ export default function PtwListPage() {
   const managersQuery = useMemoFirebase(() => isAdmin ? query(collection(firestore, 'users'), where('role', '==', 'Site Manager')) : null, [firestore, isAdmin]);
   const { data: managersList } = useCollection<any>(managersQuery);
 
+  const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: allPersonnel } = useCollection<any>(allUsersQuery);
+
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<{ name: string, id: string, projectCompany: string }>(sitesQuery);
 
@@ -317,7 +340,7 @@ export default function PtwListPage() {
     if (!isManager || !user) return null;
     return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
   }, [firestore, user, isManager]);
-  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
+  const { data: teamMembers } = useCollection<any>(teamQuery);
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
@@ -371,6 +394,17 @@ export default function PtwListPage() {
         return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
     }
   }, [dateFilter, customStart, customEnd]);
+
+  // Handle deep link via URL view parameter
+  React.useEffect(() => {
+    const viewId = searchParams.get('view');
+    if (viewId && permits && permits.length > 0) {
+      const found = permits.find(p => p.id === viewId);
+      if (found) {
+        setDetailsPermit(found);
+      }
+    }
+  }, [searchParams, permits]);
 
   const filteredPermits = React.useMemo(() => {
     if (!permits || !userProfile) return [];
@@ -694,6 +728,9 @@ export default function PtwListPage() {
 
   const handleCloseDetails = () => {
     setDetailsPermit(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
   const clearFilters = () => {
@@ -815,7 +852,7 @@ export default function PtwListPage() {
             <PopoverTrigger asChild>
               <Button variant="outline" role="combobox" className="flex-1 h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 justify-between">
                 <span className="truncate">{siteFilter === 'all' ? "All Accessible Sites" : siteFilter}</span>
-                <ChevronsUpDown className="ml-2 h-3 w-3 opacity-50 shrink-0" />
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-[240px] p-0" align="start">
@@ -830,7 +867,7 @@ export default function PtwListPage() {
                     All Accessible Sites
                   </Button>
                   {filteredSitesListForFilter.map(site => (
-                    <Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs rounded-sm h-9" onClick={() => { setSiteFilter(site.name); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
+                    <Button key={site.id} variant="ghost" className="w-full justify-start font-medium text-xs h-9" onClick={() => { setSiteFilter(site.name); setIsSitePopoverOpen(false); setSiteSearchQuery(""); }}>
                       <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === site.name ? "opacity-100" : "opacity-0")} />
                       {site.name}
                     </Button>
@@ -860,7 +897,7 @@ export default function PtwListPage() {
                 <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground"><ShieldCheck className="h-3.5 w-3.5 text-primary/60" /><span>{permit.ptwType}</span></div>
                 <div className="flex items-center justify-between">
                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-tight"><Calendar className="h-3.5 w-3.5" />{formatTimestamp(permit.requestDate)}</div>
-                   <PtwStatusBadge status={permit.ptwStatus} />
+                   <PtwStatusBadge permit={permit} allUsers={allPersonnel} />
                 </div>
               </div>
               <div className="pt-2 border-t border-primary/5 flex justify-end items-center gap-2">
@@ -913,7 +950,7 @@ export default function PtwListPage() {
                         <TableCell><div className="flex flex-col gap-0.5"><span className="font-mono text-[10px] font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</span><span className="font-bold text-sm truncate max-w-[180px]">{permit.siteName}</span></div></TableCell>
                         <TableCell className="text-xs font-semibold">{permit.ptwType}</TableCell>
                         <TableCell><StatusBadge permit={permit} /></TableCell>
-                        <TableCell><PtwStatusBadge status={permit.ptwStatus} /></TableCell>
+                        <TableCell><PtwStatusBadge permit={permit} allUsers={allPersonnel} /></TableCell>
                         <TableCell className="text-[10px] font-bold text-muted-foreground">{formatTimestamp(permit.requestDate)}</TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end gap-1">
@@ -924,7 +961,7 @@ export default function PtwListPage() {
                               </Button>
                             )}
                             {isAdmin && permit.status === 'Pending' && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setForwardingPermit(permit); title="Forward to another Manager" }}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm" onClick={(e) => { e.stopPropagation(); setForwardingPermit(permit); }} title="Forward to another Manager">
                                 <Forward className="h-4 w-4" />
                               </Button>
                             )}
@@ -984,29 +1021,29 @@ export default function PtwListPage() {
             </div>
             
             <div className="border rounded-sm overflow-hidden flex-1 flex flex-col bg-background shadow-inner">
-              <ScrollArea className="h-[250px]">
-                <div className="divide-y">
-                  {managersList?.filter((m: any) => m.username?.toLowerCase().includes(managerForwardSearch.toLowerCase()) || m.email?.toLowerCase().includes(managerForwardSearch.toLowerCase())).map((m: any) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => setNewManagerId(m.id)}
-                      className={cn(
-                        "w-full flex items-center gap-4 p-4 text-left transition-all",
-                        newManagerId === m.id ? "bg-primary/5" : "hover:bg-muted/5"
-                      )}
-                    >
-                      <div className="h-8 w-8 flex items-center justify-center shrink-0">
-                        {newManagerId === m.id ? <Check className="h-4 w-4 text-primary" /> : <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" />}
-                      </div>
-                      <div className="flex flex-col min-w-0">
-                        <span className={cn("text-sm font-bold truncate leading-tight", newManagerId === m.id ? "text-primary" : "text-foreground")}>{m.username}</span>
-                        <span className="text-[10px] font-mono text-muted-foreground uppercase truncate mt-0.5">{m.email}</span>
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </ScrollArea>
+                <ScrollArea className="h-[250px]">
+                  <div className="divide-y">
+                    {managersList?.filter((m: any) => m.username?.toLowerCase().includes(managerForwardSearch.toLowerCase()) || m.email?.toLowerCase().includes(managerForwardSearch.toLowerCase())).map((m: any) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        onClick={() => setNewManagerId(m.id)}
+                        className={cn(
+                          "w-full flex items-center gap-4 p-4 text-left transition-all",
+                          newManagerId === m.id ? "bg-primary/5" : "hover:bg-muted/5"
+                        )}
+                      >
+                        <div className="h-8 w-8 flex items-center justify-center shrink-0">
+                          {newManagerId === m.id ? <Check className="h-4 w-4 text-primary" /> : <div className="h-1.5 w-1.5 rounded-full bg-muted-foreground/20" />}
+                        </div>
+                        <div className="flex flex-col min-w-0">
+                          <span className={cn("text-sm font-bold truncate leading-tight", newManagerId === m.id ? "text-primary" : "text-foreground")}>{m.username}</span>
+                          <span className="text-[10px] font-mono text-muted-foreground uppercase truncate mt-0.5">{m.email}</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
             </div>
           </div>
           <DialogFooter className="p-4 bg-muted/5 border-t gap-3 flex flex-col sm:flex-row">
@@ -1031,7 +1068,7 @@ export default function PtwListPage() {
               <div><DialogTitle className="text-base sm:text-lg font-black tracking-tight text-foreground uppercase">Permit Audit Log</DialogTitle><DialogDescription className="text-[10px] font-bold text-muted-foreground">{detailsPermit?.serialNumber}</DialogDescription></div>
             </div>
             <div className="flex items-center gap-2">
-              {detailsPermit && <PtwStatusBadge status={detailsPermit.ptwStatus} />}
+              {detailsPermit && <PtwStatusBadge permit={detailsPermit} allUsers={allPersonnel} />}
               <DialogClose asChild className="sm:hidden"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-5 w-5" /></Button></DialogClose>
             </div>
           </DialogHeader>
