@@ -58,6 +58,7 @@ type UserProfile = {
   email: string;
   role: string;
   department: string;
+  suspended?: boolean;
 };
 
 type AttendanceRecord = {
@@ -109,7 +110,7 @@ export default function AttendanceMatrixPage() {
   const filteredUsers = React.useMemo(() => {
     if (!allUsers) return [];
     return allUsers
-      .filter(u => !EXCLUDED_PERSONNEL.includes(u.username))
+      .filter(u => !EXCLUDED_PERSONNEL.includes(u.username) && u.suspended !== true)
       .filter(u => 
         u.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email?.toLowerCase().includes(searchTerm.toLowerCase())

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from "react";
@@ -55,22 +56,30 @@ type User = {
   siteManagerId?: string;
   avatarUrl?: string;
   createdAt?: any;
+  suspended?: boolean;
 };
 
 const getRoleIcon = (roleName: string) => {
     const name = roleName?.toLowerCase() || '';
-    if (name.includes('admin')) return <Shield className="h-4 w-4" />;
+    if (name.includes('admin')) return < Shield className="h-4 w-4" />;
     if (name.includes('manager')) return <UserCog className="h-4 w-4" />;
     if (name.includes('engineer')) return <HardHat className="h-4 w-4" />;
     if (name.includes('driver')) return <Truck className="h-4 w-4" />;
     return <User className="h-4 w-4" />;
 };
 
-function StatusBadge({ isPending }: { isPending: boolean }) {
-  const status = isPending ? "Pending" : "Active";
+function StatusBadge({ user }: { user: User }) {
+  if (user.suspended) {
+    return (
+      <Badge className="bg-red-100 text-red-800 hover:bg-red-100/80 border-transparent text-xs font-medium uppercase px-2">
+        Suspended
+      </Badge>
+    );
+  }
+  const status = user.registrationRequest ? "Pending" : "Active";
   return (
     <Badge
-      className={cn("text-xs font-medium", {
+      className={cn("text-xs font-medium uppercase px-2", {
         "bg-yellow-100 text-yellow-800 hover:bg-yellow-100/80 dark:bg-yellow-900/50 dark:text-yellow-300 border-transparent": status === "Pending",
         "bg-green-100 text-green-800 hover:bg-green-100/80 dark:bg-green-900/50 dark:text-green-300 border-transparent": status === "Active",
       })}
@@ -218,7 +227,7 @@ export default function UsersPage() {
             'Date of Birth': u.dob ? format(new Date(u.dob), 'dd/MM/yyyy') : 'N/A',
             'Aadhar Number': u.aadharNumber || 'N/A',
             'PAN Number': u.panNumber || 'N/A',
-            'Status': u.registrationRequest ? 'Pending' : 'Active',
+            'Status': u.suspended ? 'Suspended' : (u.registrationRequest ? 'Pending' : 'Active'),
             'Date Created': u.createdAt ? format(u.createdAt.toDate(), 'dd/MM/yyyy HH:mm') : 'N/A'
         }));
 
@@ -305,7 +314,7 @@ export default function UsersPage() {
                         </TableHeader>
                         <TableBody>
                             {sortedAndFilteredUsers.length > 0 ? sortedAndFilteredUsers.map((u) => (
-                                <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
+                                <TableRow key={u.id} className={cn("hover:bg-muted/5 transition-colors", u.suspended && "opacity-60 bg-muted/20")}>
                                     <TableCell>
                                         <div className="flex items-center gap-3">
                                             <Avatar className="h-9 w-9 border"><AvatarFallback className="bg-primary/5 text-primary text-xs font-bold">{(u.username || u.email || '?').charAt(0).toUpperCase()}</AvatarFallback></Avatar>
@@ -346,7 +355,7 @@ export default function UsersPage() {
                                             </div>
                                         </div>
                                     </TableCell>
-                                    <TableCell><StatusBadge isPending={!!u.registrationRequest} /></TableCell>
+                                    <TableCell><StatusBadge user={u} /></TableCell>
                                     <TableCell className="text-right px-6">
                                         <div className="flex justify-end gap-1">
                                             {u.registrationRequest ? (

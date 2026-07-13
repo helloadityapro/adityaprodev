@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -145,6 +146,17 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
+type UserProfile = {
+  id: string;
+  username: string;
+  email: string;
+  role: string;
+  department: string;
+  suspended?: boolean;
+  ownDataOnly?: boolean;
+  assignedProjectIds?: string[];
+};
+
 const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher", "Demo Admin", "Demo Manager", "Demo User"];
 
 export default function ActivitiesPage() {
@@ -259,7 +271,7 @@ export default function ActivitiesPage() {
     const visitCount = countInRange(visits, 'startTime', (i) => i.status === 'completed');
     const dispatchCount = countInRange(vehicleReqs, 'requestDate', (i) => i.status === 'Ongoing' || i.status === 'Completed');
 
-    const activeStaff = allPersonnel?.filter(p => !EXCLUDED_PERSONNEL.includes(p.username)) || [];
+    const activeStaff = allPersonnel?.filter(p => !EXCLUDED_PERSONNEL.includes(p.username) && p.suspended !== true) || [];
     const activeStaffIds = new Set(activeStaff.map(p => p.id));
 
     const presentUserIds = new Set<string>();

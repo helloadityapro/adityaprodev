@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -45,6 +46,7 @@ type UserProfile = {
   username: string;
   email: string;
   role: string;
+  suspended?: boolean;
 };
 
 export default function AdminDayReportPage() {
@@ -70,8 +72,9 @@ export default function AdminDayReportPage() {
   const filteredUsersList = React.useMemo(() => {
     if (!allUsers) return [];
     return allUsers.filter(u => 
-      u.username?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-      u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())
+      (u.username?.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      u.email?.toLowerCase().includes(userSearchQuery.toLowerCase())) &&
+      u.suspended !== true
     );
   }, [allUsers, userSearchQuery]);
 
@@ -259,7 +262,7 @@ export default function AdminDayReportPage() {
                   <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                   <Input 
                     placeholder="Search users..." 
-                    className="h-9 w-full border-none focus-visible:ring-0 px-0 text-xs" 
+                    className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" 
                     value={userSearchQuery}
                     onChange={(e) => setUserSearchQuery(e.target.value)}
                   />
@@ -320,7 +323,7 @@ export default function AdminDayReportPage() {
                     <User className="h-4 w-4 text-primary" />
                     Role: {selectedUserObj?.role}
                   </div>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground font-semibold">
                     <Calendar className="h-4 w-4 text-primary" />
                     Date: {format(parseISO(selectedDate), 'eeee, dd MMM yyyy')}
                   </div>
@@ -728,7 +731,7 @@ export default function AdminDayReportPage() {
         <div className="flex flex-col items-center justify-center py-32 text-center bg-card border border-dashed rounded-sm border-primary/20 no-print">
           <FileText className="h-16 w-16 text-muted-foreground/20 mb-4" />
           <h3 className="text-xl font-bold">Ready to Audit</h3>
-          <p className="text-muted-foreground max-w-sm mx-auto mt-2">
+          <p className="text-muted-foreground max-w-sm mx-auto mt-2 text-sm font-medium">
             Select a personnel and date from the controls above to generate a consolidated activity report.
           </p>
         </div>

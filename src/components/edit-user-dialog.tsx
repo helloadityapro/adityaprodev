@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -20,9 +21,11 @@ import {
   FormItem,
   FormLabel,
   FormMessage,
+  FormDescription,
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { useFirestore, updateDocumentNonBlocking, useCollection, useMemoFirebase } from '@/firebase';
 import { doc, collection } from 'firebase/firestore';
@@ -38,6 +41,7 @@ const editUserSchema = z.object({
   doj: z.string().min(1, "Date of Joining is required."),
   aadharNumber: z.string().min(12, "Aadhar Number must be 12 digits.").max(12, "Aadhar Number must be 12 digits."),
   panNumber: z.string().min(10, "PAN Number must be 10 characters.").max(10, "PAN Number must be 10 characters."),
+  suspended: z.boolean().default(false),
 });
 
 type User = {
@@ -51,6 +55,7 @@ type User = {
   doj?: string;
   aadharNumber?: string;
   panNumber?: string;
+  suspended?: boolean;
 };
 
 interface EditUserDialogProps {
@@ -81,6 +86,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
       doj: '',
       aadharNumber: '',
       panNumber: '',
+      suspended: false,
     }
   });
 
@@ -95,6 +101,7 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
         doj: user.doj || '',
         aadharNumber: user.aadharNumber || '',
         panNumber: user.panNumber || '',
+        suspended: !!user.suspended,
       });
     }
   }, [user, form]);
@@ -294,6 +301,27 @@ export function EditUserDialog({ user, open, onOpenChange }: EditUserDialogProps
                         )}
                       />
                     </div>
+
+                    <FormField
+                      control={form.control}
+                      name="suspended"
+                      render={({ field }) => (
+                        <FormItem className="flex flex-row items-center justify-between rounded-sm border p-4 bg-muted/10">
+                          <div className="space-y-0.5">
+                            <FormLabel className="text-xs font-bold uppercase text-red-600">Suspend Account</FormLabel>
+                            <FormDescription className="text-[10px]">
+                              Exclude this user from active attendance reports and lists.
+                            </FormDescription>
+                          </div>
+                          <FormControl>
+                            <Switch
+                              checked={field.value}
+                              onCheckedChange={field.onChange}
+                            />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
                   </form>
                 </Form>
               )}

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -45,6 +46,7 @@ type UserProfile = {
   email: string;
   role: string;
   department: string;
+  suspended?: boolean;
 };
 
 type AttendanceRecord = {
@@ -154,7 +156,7 @@ export default function AttendanceSummaryPage() {
     if (!allUsers || !attendanceRecords) return [];
 
     const data = allUsers
-      .filter(u => !EXCLUDED_PERSONNEL.includes(u.username))
+      .filter(u => !EXCLUDED_PERSONNEL.includes(u.username) && u.suspended !== true)
       .map(u => {
         const record = attendanceRecords.find(r => r.userId === u.id);
         return {
