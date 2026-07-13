@@ -22,7 +22,8 @@ import {
   Zap,
   ShieldCheck,
   Check,
-  LayoutGrid
+  LayoutGrid,
+  UserCog
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -44,6 +45,8 @@ type Site = {
   acCapacity: any;
   dcCapacity: any;
   projectType?: 'groundmount' | 'rooftop';
+  latitude?: number;
+  longitude?: number;
 };
 
 type AccessConfig = {
@@ -101,6 +104,9 @@ export default function ProjectsListPage() {
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
   const { data: allOverrides, isLoading: overridesLoading } = useCollection<MappingOverride>(overridesQuery);
+
+  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: allUsers } = useCollection<UserProfile>(usersQuery);
 
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
@@ -346,6 +352,10 @@ export default function ProjectsListPage() {
         <div className="md:hidden space-y-4">
           {filteredSites.length > 0 ? filteredSites.map((site) => {
             const isStarred = starredIds.has(site.id);
+            const team = allUsers?.filter(u => u.assignedProjectIds?.includes(site.id)) || [];
+            const siteManagers = team.filter(u => u.role === 'Site Manager').map(u => u.username);
+            const siteEngineers = team.filter(u => u.role === 'Site Engineer').map(u => u.username);
+
             return (
               <Card 
                 key={site.id} 
@@ -367,6 +377,12 @@ export default function ProjectsListPage() {
                       <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-primary text-primary" : "text-muted-foreground/30")} />
                     </Button>
                   </div>
+
+                  {site.latitude && site.longitude && (
+                    <div className="flex items-center gap-1.5 text-[9px] font-mono font-bold text-muted-foreground/60 px-1">
+                      <MapPin className="h-3 w-3" /> {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}
+                    </div>
+                  )}
                   
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-2.5 bg-muted/20 rounded-sm space-y-1">
@@ -381,6 +397,25 @@ export default function ProjectsListPage() {
                       <div className="flex items-baseline gap-1">
                         <span className="font-black text-xs text-amber-600">{formatCapacity(site.dcCapacity)}</span>
                         <span className="text-[7px] font-bold uppercase opacity-50">MWp</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 border-t border-primary/5 pt-3">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Site Management</span>
+                      <div className="flex flex-wrap gap-1">
+                        {siteManagers.length > 0 ? siteManagers.map(m => (
+                          <Badge key={m} variant="secondary" className="h-4 px-1 text-[7px] font-black bg-primary/5 text-primary border-none">{m}</Badge>
+                        )) : <span className="text-[9px] text-muted-foreground/30 italic">No Manager Assigned</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Engineering Team</span>
+                      <div className="flex flex-wrap gap-1">
+                        {siteEngineers.length > 0 ? siteEngineers.map(e => (
+                          <Badge key={e} variant="outline" className="h-4 px-1 text-[7px] font-bold text-muted-foreground/80 border-border">{e}</Badge>
+                        )) : <span className="text-[9px] text-muted-foreground/30 italic">No Engineers Assigned</span>}
                       </div>
                     </div>
                   </div>
@@ -408,8 +443,10 @@ export default function ProjectsListPage() {
                   <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
                     <TableRow>
                       <TableHead className="w-12 text-center"></TableHead>
-                      <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Project Description</TableHead>
-                      <TableHead className="font-black uppercase text-[10px] tracking-widest">Company</TableHead>
+                      <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest min-w-[200px]">Project Description</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[140px]">Site Location</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[160px]">Site Manager</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[160px]">Site Engineer</TableHead>
                       <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">AC Capacity</TableHead>
                       <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">DC Capacity</TableHead>
                       <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Management</TableHead>
@@ -418,6 +455,10 @@ export default function ProjectsListPage() {
                   <TableBody>
                     {filteredSites.length > 0 ? filteredSites.map((site) => {
                       const isStarred = starredIds.has(site.id);
+                      const team = allUsers?.filter(u => u.assignedProjectIds?.includes(site.id)) || [];
+                      const siteManagers = team.filter(u => u.role === 'Site Manager').map(u => u.username);
+                      const siteEngineers = team.filter(u => u.role === 'Site Engineer').map(u => u.username);
+
                       return (
                         <TableRow key={site.id} className="hover:bg-muted/5 transition-colors group">
                           <TableCell className="text-center pl-4">
@@ -430,16 +471,42 @@ export default function ProjectsListPage() {
                               <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
                                 {activeTab === 'rooftop' ? <Building2 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
                               </div>
-                              <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
+                                <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 truncate">{site.projectCompany}</span>
+                              </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-xs font-medium text-muted-foreground break-words max-w-[200px]">{site.projectCompany}</TableCell>
+                          <TableCell>
+                            {site.latitude && site.longitude ? (
+                              <div className="flex items-center gap-1.5 text-[10px] font-mono font-black text-muted-foreground/60">
+                                <MapPin className="h-3 w-3 text-primary/40" />
+                                <span>{site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-[9px] text-muted-foreground/20 italic font-black uppercase">No GPS</span>
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                {siteManagers.length > 0 ? siteManagers.map(m => (
+                                    <Badge key={m} variant="secondary" className="h-4 px-1 text-[8px] font-black bg-primary/5 text-primary border-none uppercase truncate">{m}</Badge>
+                                )) : <span className="text-[9px] text-muted-foreground/30 italic">Unassigned</span>}
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-wrap gap-1 max-w-[150px]">
+                                {siteEngineers.length > 0 ? siteEngineers.map(e => (
+                                    <Badge key={e} variant="outline" className="h-4 px-1 text-[8px] font-bold text-muted-foreground border-border uppercase truncate">{e}</Badge>
+                                )) : <span className="text-[9px] text-muted-foreground/30 italic">Unassigned</span>}
+                            </div>
+                          </TableCell>
                           <TableCell className="text-center font-mono text-xs font-bold text-primary">{formatCapacity(site.acCapacity)} MW</TableCell>
                           <TableCell className="text-center font-mono text-xs font-bold text-amber-600">{formatCapacity(site.dcCapacity)} MWp</TableCell>
                           <TableCell className="text-right px-6"><Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary"><Link href={`/projects/${site.id}`}>Manage Site <ArrowRight className="ml-1.5 h-3 w-3" /></Link></Button></TableCell>
                         </TableRow>
                       );
-                    }) : <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell></TableRow>}
+                    }) : <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </div>
