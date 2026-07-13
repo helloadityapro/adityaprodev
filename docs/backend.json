@@ -159,10 +159,21 @@
       "properties": {
         "id": { "type": "string" },
         "name": { "type": "string" },
+        "role": { "type": "string" },
+        "bankingDetails": { "type": "string" },
         "gstin": { "type": "string" },
         "address": { "type": "string" },
         "mobile": { "type": "string" },
         "email": { "type": "string" }
+      },
+      "required": ["name", "role"]
+    },
+    "ContractorRole": {
+      "title": "Contractor Role",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
       },
       "required": ["name"]
     },
@@ -470,6 +481,10 @@
     "/contractors/{contractorId}": {
       "schema": { "$ref": "#/backend/entities/Contractor" },
       "description": "Service contractor registry."
+    },
+    "/contractor_roles/{roleId}": {
+      "schema": { "$ref": "#/backend/entities/ContractorRole" },
+      "description": "Registry of contractor types/roles."
     },
     "/project_boms/{bomId}": {
       "schema": { "$ref": "#/backend/entities/BoMItem" },

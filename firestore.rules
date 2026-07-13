@@ -151,6 +151,10 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isSignedIn() && resource.data.managerId == request.auth.uid);
     }
 
+    function isParticipant(data) {
+       return request.auth.uid == data.userId || request.auth.uid == data.siteManagerId || isAdmin();
+    }
+
     match /permits_to_work/{permitId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
@@ -219,6 +223,11 @@ service cloud.firestore {
 
     match /contractors/{contractorId} {
       allow read, write: if isSignedIn();
+    }
+    
+    match /contractor_roles/{roleId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /system_settings/{settingId} {
