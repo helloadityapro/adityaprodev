@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -341,6 +340,64 @@ export default function ProjectsListPage() {
               </Button>
             </div>
           </div>
+        </div>
+
+        {/* Mobile-Responsive Card List */}
+        <div className="md:hidden space-y-4">
+          {filteredSites.length > 0 ? filteredSites.map((site) => {
+            const isStarred = starredIds.has(site.id);
+            return (
+              <Card 
+                key={site.id} 
+                className="rounded-sm border-primary/10 shadow-sm active:bg-muted/5 transition-colors cursor-pointer"
+                onClick={() => router.push(`/projects/${site.id}`)}
+              >
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
+                        {activeTab === 'rooftop' ? <Building2 className="h-5 w-5" /> : <LayoutGrid className="h-5 w-5" />}
+                      </div>
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
+                        <span className="text-[10px] uppercase font-black text-muted-foreground break-words mt-1">{site.projectCompany}</span>
+                      </div>
+                    </div>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 -mt-1 -mr-2" onClick={(e) => toggleStar(e, site.id)}>
+                      <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-primary text-primary" : "text-muted-foreground/30")} />
+                    </Button>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="p-2.5 bg-muted/20 rounded-sm space-y-1">
+                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest block">AC CAP</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-black text-xs text-primary">{formatCapacity(site.acCapacity)}</span>
+                        <span className="text-[7px] font-bold uppercase opacity-50">MW</span>
+                      </div>
+                    </div>
+                    <div className="p-2.5 bg-muted/20 rounded-sm space-y-1">
+                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest block">DC CAP</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className="font-black text-xs text-amber-600">{formatCapacity(site.dcCapacity)}</span>
+                        <span className="text-[7px] font-bold uppercase opacity-50">MWp</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-primary/5 flex justify-end">
+                    <Button variant="ghost" size="sm" className="h-8 rounded-sm text-primary text-[10px] font-bold uppercase tracking-widest">
+                      Manage Site <ArrowRight className="ml-1.5 h-3 w-3" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          }) : (
+            <div className="py-20 text-center text-muted-foreground italic text-xs uppercase font-bold opacity-30 border-2 border-dashed rounded-sm">
+              No matching projects discovered
+            </div>
+          )}
         </div>
 
         <div className="hidden md:block">
