@@ -131,7 +131,7 @@ export default function ProjectMmsMatrixPage({ params }: { params: Promise<{ sit
   const filteredInst = React.useMemo(() => {
     if (!instRecords) return [];
     return [...instRecords].sort((a, b) => 
-      a.tableNumber.compare(b.tableNumber, undefined, { numeric: true, sensitivity: 'base' })
+      a.tableNumber.localeCompare(b.tableNumber, undefined, { numeric: true, sensitivity: 'base' })
     );
   }, [instRecords]);
 
