@@ -406,7 +406,7 @@ export default function ContractorsManagementPage() {
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <DialogTitle className="text-xl font-black uppercase tracking-tight">{contractorToEdit ? 'Edit' : 'Register New'} Contractor</DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1 min-h-0">
+          <div className="flex-1 overflow-y-auto custom-scrollbar">
             <div className="p-6">
               <Form {...form}>
                 <form onSubmit={form.handleSubmit(contractorToEdit ? onEditSubmit : onAddSubmit)} className="space-y-6">
@@ -483,7 +483,7 @@ export default function ContractorsManagementPage() {
                 </form>
               </Form>
             </div>
-          </ScrollArea>
+          </div>
           <DialogFooter className="p-6 border-t gap-2 flex flex-col sm:flex-row shrink-0 bg-muted/5">
             <DialogClose asChild><Button variant="outline" className="flex-1 h-11 rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
             <Button type="button" onClick={form.handleSubmit(contractorToEdit ? onEditSubmit : onAddSubmit)} className="flex-1 h-11 rounded-sm font-black uppercase text-[10px] shadow-lg" disabled={isSubmitting}>
