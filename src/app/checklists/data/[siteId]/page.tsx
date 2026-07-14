@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -11,7 +12,8 @@ import {
   LayoutGrid, 
   Zap, 
   ChevronRight, 
-  Building2
+  Building2,
+  Cpu
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -40,7 +42,6 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
 
   return (
     <div className="p-4 sm:p-8 space-y-8 animate-in fade-in duration-500">
-      {/* Back button */}
       <Button 
         variant="link" 
         size="sm" 
@@ -50,7 +51,6 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
         <ArrowLeft className="mr-2 h-4 w-4" /> Back to Registry
       </Button>
 
-      {/* Header Section */}
       <div className="flex items-center gap-4">
         <div className="bg-primary/10 p-3 rounded-lg shrink-0 shadow-sm border border-primary/5">
           <Building2 className="h-6 w-6 text-primary" />
@@ -67,11 +67,10 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
 
       <Separator className="bg-border/50" />
 
-      {/* Checklist Options List */}
       <div className="space-y-1">
         <h2 className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.25em] px-1 mb-4">Authorized Checklists</h2>
         
-        {/* Option 1: MMS */}
+        {/* MMS */}
         <div 
           onClick={() => router.push(`/checklists/data/${siteId}/mms`)}
           className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:bg-primary/[0.03] hover:border-primary/10 transition-all cursor-pointer active:scale-[0.99]"
@@ -88,11 +87,28 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
           <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-0.5" />
         </div>
 
-        <div className="py-1 px-1">
-           <Separator className="opacity-30" />
+        <div className="py-1 px-1"><Separator className="opacity-30" /></div>
+
+        {/* Inverter */}
+        <div 
+          onClick={() => router.push(`/checklists/data/${siteId}/inverter`)}
+          className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:bg-primary/[0.03] hover:border-primary/10 transition-all cursor-pointer active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="p-2.5 bg-muted rounded-md group-hover:bg-primary/10 transition-colors shrink-0">
+              <Cpu className="h-5 w-5 text-primary opacity-70 group-hover:opacity-100" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">Inverter Checklist</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Equipment Quality Registry</span>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-0.5" />
         </div>
 
-        {/* Option 2: HT Line */}
+        <div className="py-1 px-1"><Separator className="opacity-30" /></div>
+
+        {/* HT Line */}
         <div 
           onClick={() => router.push(`/checklists/data/${siteId}/ht-line`)}
           className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:bg-muted/50 transition-all cursor-pointer active:scale-[0.99]"

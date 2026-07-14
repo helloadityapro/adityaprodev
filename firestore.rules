@@ -130,6 +130,20 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /inverter_checklists/{checklistId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /inverter_makes/{makeId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /inverter_ratings/{ratingId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     match /vehicle_assignments/{assignmentId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();

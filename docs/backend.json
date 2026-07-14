@@ -177,6 +177,24 @@
       },
       "required": ["name"]
     },
+    "InverterMake": {
+      "title": "Inverter Manufacturer",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+    "InverterRating": {
+      "title": "Inverter Rating",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    },
     "BoMItem": {
       "title": "BoM Item",
       "type": "object",
@@ -391,11 +409,12 @@
         "items": {
           "type": "array",
           "items": {
-            "type": "object",
-            "properties": {
-              "name": { "type": "string" },
-              "checked": { "type": "boolean" },
-              "remarks": { "type": "string" }
+            "object": {
+              "properties": {
+                "name": { "type": "string" },
+                "checked": { "type": "boolean" },
+                "remarks": { "type": "string" }
+              }
             }
           }
         },
@@ -446,6 +465,44 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "tableNumber", "userId"]
+    },
+    "InverterChecklist": {
+      "title": "Inverter Checklist",
+      "type": "object",
+      "description": "Verification of inverter installation and stringing.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "projectCompany": { "type": "string" },
+        "inverterMake": { "type": "string" },
+        "inverterRating": { "type": "string" },
+        "inverterNumber": { "type": "string" },
+        "inverterSerialNumber": { "type": "string" },
+        "stringCount": { "type": "number" },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "remarks": { "type": "string" },
+              "attachments": { "type": "array", "items": { "type": "object" } },
+              "status": { "type": "string", "enum": ["OK", "NOT OK", "Pending"] }
+            }
+          }
+        },
+        "otherRemarks": { "type": "string" },
+        "otherAttachments": { "type": "array", "items": { "type": "object" } },
+        "customerRepPresent": { "type": "boolean" },
+        "customerRepName": { "type": "string" },
+        "customerRepRemarks": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"], "default": "Pending" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "inverterNumber", "userId"]
     }
   },
   "auth": {
@@ -496,6 +553,14 @@
       "schema": { "$ref": "#/backend/entities/ContractorRole" },
       "description": "Registry of contractor types/roles."
     },
+    "/inverter_makes/{makeId}": {
+      "schema": { "$ref": "#/backend/entities/InverterMake" },
+      "description": "Registry of Inverter Manufacturers."
+    },
+    "/inverter_ratings/{ratingId}": {
+      "schema": { "$ref": "#/backend/entities/InverterRating" },
+      "description": "Registry of Inverter Capacities."
+    },
     "/project_boms/{bomId}": {
       "schema": { "$ref": "#/backend/entities/BoMItem" },
       "description": "Bill of Materials per project site."
@@ -543,6 +608,10 @@
     "/installation_checklists/{checklistId}": {
       "schema": { "$ref": "#/backend/entities/InstallationChecklist" },
       "description": "General installation quality checks."
+    },
+    "/inverter_checklists/{checklistId}": {
+      "schema": { "$ref": "#/backend/entities/InverterChecklist" },
+      "description": "Inverter installation quality checks."
     },
     "/notifications/{notifId}": {
       "schema": { "$ref": "#/backend/entities/Notification" },

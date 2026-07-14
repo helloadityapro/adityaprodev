@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -57,7 +58,8 @@ import {
   FileBarChart,
   CalendarDays,
   AreaChart,
-  Bell
+  Bell,
+  Cpu
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -805,6 +807,14 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
                   <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/inverter'} onClick={handleMobileClose}>
+                      <Link href="/checklists/inverter">
+                        <Cpu className="h-4 w-4" />
+                        <span>Inverter Checklist</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
                     <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-line'} onClick={handleMobileClose}>
                       <Link href="/checklists/ht-line">
                         <Zap className="h-4 w-4" />
@@ -816,7 +826,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                     <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
                       <Link href="/checklists/data">
                         <Database className="h-4 w-4" />
-                        <span>Checklists Data</span>
+                        <span>Checklists Data Hub</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>

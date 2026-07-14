@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Definition of all available sidebar pages and their keys.
  * This acts as the source of truth for the User Access Management system.
@@ -26,6 +27,7 @@ export type PageKey =
   | 'attendance-map'
   | 'checklists-installation'
   | 'checklists-ht-line'
+  | 'checklists-inverter'
   | 'checklists-data'
   | 'master-data-tables-add'
   | 'master-data-tables-list'
@@ -95,6 +97,7 @@ export const APP_PAGES: AppPage[] = [
 
   { id: 'checklists-installation', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/installation' },
   { id: 'checklists-ht-line', label: 'HT Line Checklist', category: 'Checklists', path: '/checklists/ht-line' },
+  { id: 'checklists-inverter', label: 'Inverter Checklist', category: 'Checklists', path: '/checklists/inverter' },
   { id: 'checklists-data', label: 'Checklist Data Registry', category: 'Checklists', path: '/checklists/data' },
   
   { id: 'admin-attendance-summary', label: 'Daily Presence Summary', category: 'Administration', path: '/admin/attendance-summary' },
@@ -153,6 +156,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/attendance')) return 'attendance';
   if (path.startsWith('/checklists/installation')) return 'checklists-installation';
   if (path.startsWith('/checklists/ht-line')) return 'checklists-ht-line';
+  if (path.startsWith('/checklists/inverter')) return 'checklists-inverter';
   if (path.startsWith('/checklists/data')) return 'checklists-data';
   if (path.startsWith('/registries/tables')) {
     if (path.includes('/add')) return 'master-data-tables-add';
