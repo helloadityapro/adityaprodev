@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -13,9 +12,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, orderBy } from 'firebase/firestore';
-import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog, UserPlus, Loader2, Check, Pencil, ChevronsUpDown, X, Search, FilterX, Save, Cpu } from 'lucide-react';
+import { Trash2, SlidersHorizontal, Building2, UserCircle2, ShieldCheck, UserCog, UserPlus, Loader2, Check, Pencil, ChevronsUpDown, X, Search, FilterX, Save, Cpu, Zap } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -68,21 +67,11 @@ export default function AdminSettingsPage() {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-  const [assigningType, setAssigningType] = React.useState<PtwType | null>(null);
-  const [selectedAdminIds, setSelectedAdminIds] = React.useState<string[]>([]);
-  const [isAssigning, setIsAssigning] = React.useState(false);
-
   const [roleSearch, setRoleSearch] = React.useState("");
   const [deptSearch, setDeptSearch] = React.useState("");
   const [ptwSearch, setPtwSearch] = React.useState("");
   const [invMakeSearch, setInvMakeSearch] = React.useState("");
   const [invRatingSearch, setInvRatingSearch] = React.useState("");
-
-  React.useEffect(() => {
-    if (!isUserLoading && !isProfileLoading && !isAdmin) {
-      router.replace('/ptw/raise');
-    }
-  }, [isUserLoading, isProfileLoading, isAdmin, router]);
 
   const ptwTypesQuery = useMemoFirebase(() => collection(firestore, 'ptw_types'), [firestore]);
   const { data: ptwTypes, isLoading: ptwTypesLoading } = useCollection<PtwType>(ptwTypesQuery);
@@ -107,6 +96,21 @@ export default function AdminSettingsPage() {
   const departmentForm = useForm<z.infer<typeof genericItemSchema>>({ resolver: zodResolver(genericItemSchema), defaultValues: { name: '' } });
   const invMakeForm = useForm<z.infer<typeof genericItemSchema>>({ resolver: zodResolver(genericItemSchema), defaultValues: { name: '' } });
   const invRatingForm = useForm<z.infer<typeof genericItemSchema>>({ resolver: zodResolver(genericItemSchema), defaultValues: { name: '' } });
+
+  const filteredRoles = React.useMemo(() => {
+    if (!roles) return [];
+    return roles.filter(i => i.name.toLowerCase().includes(roleSearch.toLowerCase()));
+  }, [roles, roleSearch]);
+
+  const filteredDepts = React.useMemo(() => {
+    if (!departments) return [];
+    return departments.filter(i => i.name.toLowerCase().includes(deptSearch.toLowerCase()));
+  }, [departments, deptSearch]);
+
+  const filteredPtwTypes = React.useMemo(() => {
+    if (!ptwTypes) return [];
+    return ptwTypes.filter(i => i.name.toLowerCase().includes(ptwSearch.toLowerCase()));
+  }, [ptwTypes, ptwSearch]);
 
   const handleGenericSubmit = async (coll: string, values: any, form: any) => {
     addDocumentNonBlocking(collection(firestore, coll), values);
