@@ -153,10 +153,14 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
     setIsSubmitting(true);
     try {
       const timestamp = Date.now();
+      
+      // 1. Process point-wise checks
       const updatedChecks = [];
       for (let i = 0; i < values.checks.length; i++) {
         const check = values.checks[i];
         const newAttachments = [...check.attachments];
+        
+        // Handle local uploads for this check
         if (check.localFiles && check.localFiles.length > 0) {
           for (const file of check.localFiles) {
             const path = `checklists/inverter/${user.uid}/${timestamp}_edit_check_${i}_${file.name.replace(/\s+/g, '_')}`;
@@ -164,9 +168,16 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
             newAttachments.push(uploaded);
           }
         }
-        updatedChecks.push({ label: check.label, status: check.status, remarks: check.remarks, attachments: newAttachments });
+        
+        // Omit localFiles from the final Firestore payload
+        const { localFiles, ...checkClean } = check;
+        updatedChecks.push({ 
+          ...checkClean, 
+          attachments: newAttachments 
+        });
       }
 
+      // 2. Process additional other attachments
       const updatedOtherAttachments = [...values.otherAttachments];
       if (values.otherLocalFiles && values.otherLocalFiles.length > 0) {
         for (const file of values.otherLocalFiles) {
@@ -176,18 +187,31 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
         }
       }
 
+      // 3. Destructure values to omit raw File objects (otherLocalFiles)
+      const { otherLocalFiles, checks, otherAttachments, ...sanitizedValues } = values;
+
+      // 4. Perform non-blocking update
       updateDocumentNonBlocking(auditRef, {
-        ...values,
+        ...sanitizedValues,
         checks: updatedChecks,
         otherAttachments: updatedOtherAttachments,
         updatedAt: serverTimestamp(),
         status: 'Pending'
       });
 
-      toast({ title: "Revision Saved", description: "Audit record updated and returned to Pending status." });
+      toast({ 
+        title: "Revision Saved", 
+        description: "Audit record updated and returned to Pending status for review." 
+      });
+      
       router.back();
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Update Failed", description: e.message });
+      console.error("Inverter Edit Error:", e);
+      toast({ 
+        variant: "destructive", 
+        title: "Update Failed", 
+        description: e.message || "An error occurred during synchronization." 
+      });
       setIsSubmitting(false);
     }
   };
