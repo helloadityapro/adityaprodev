@@ -43,6 +43,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from '@/hooks/use-toast';
 
 type InverterChecklist = {
   id: string;
@@ -56,6 +58,8 @@ type InverterChecklist = {
   userId: string;
   status: string;
   createdAt: any;
+  checks: any[];
+  otherRemarks?: string;
 };
 
 export default function ProjectInverterDataPage({ params }: { params: Promise<{ siteId: string }> }) {
@@ -63,9 +67,12 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [deletingRecord, setDeletingRecord] = React.useState<InverterChecklist | null>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [generationProgress, setGenerationProgress] = React.useState(0);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -85,6 +92,94 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
       r.inverterMake.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
   }, [records, searchTerm]);
+
+  const handleExportPDF = async (items: InverterChecklist[]) => {
+    if (items.length === 0) return;
+    setIsExporting(true);
+    setGenerationProgress(0);
+
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const logoUrl = '/icon.png';
+
+      for (let index = 0; index < items.length; index++) {
+        const record = items[index];
+        if (index > 0) doc.addPage();
+        
+        setGenerationProgress(Math.round(((index + 1) / items.length) * 100));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        const margin = 15;
+        let currY = 40;
+        const colWidthLabel = 65;
+        const colWidthValue = 115;
+        const rowHeight = 8;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('INVERTER QUALITY CHECKLIST', margin, currY - 10);
+        
+        const drawRow = (label: string, value: string) => {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.rect(margin, currY, colWidthLabel, rowHeight);
+          doc.text(label, margin + 2, currY + 5.5);
+          doc.setFont('helvetica', 'normal');
+          doc.rect(margin + colWidthLabel, currY, colWidthValue, rowHeight);
+          doc.text(String(value || '—'), margin + colWidthLabel + 2, currY + 5.5);
+          currY += rowHeight;
+        };
+
+        drawRow('PROJECT COMPANY', record.projectCompany || 'Aditya Green Energy');
+        drawRow('PROJECT NAME', record.siteName);
+        drawRow('INVERTER NUMBER', record.inverterNumber);
+        drawRow('MAKE & RATING', `${record.inverterMake} (${record.inverterRating})`);
+        drawRow('STATUS', record.status);
+
+        currY += 5;
+        const col1 = 50; const colStatusRemarks = 95; const col3 = 35;
+        doc.setFont('helvetica', 'bold');
+        doc.rect(margin, currY, col1, rowHeight);
+        doc.text('VERIFICATION POINT', margin + 2, currY + 5.5);
+        doc.rect(margin + col1, currY, colStatusRemarks, rowHeight);
+        doc.text('STATUS & FINDINGS', margin + col1 + 2, currY + 5.5);
+        doc.rect(margin + col1 + colStatusRemarks, currY, col3, rowHeight);
+        doc.text('MEDIA', margin + col1 + colStatusRemarks + 2, currY + 5.5);
+        currY += rowHeight;
+
+        doc.setFont('helvetica', 'normal');
+        for (const check of record.checks) {
+          const combinedText = `${check.status || '—'}\n${check.remarks || '—'}`;
+          const combinedLines = doc.splitTextToSize(combinedText, colStatusRemarks - 4);
+          const attachments = check.attachments || [];
+          const h = Math.max(rowHeight, combinedLines.length * 4 + 4, attachments.length * 5 + 4);
+          
+          if (currY + h > 270) { doc.addPage(); currY = 30; }
+          
+          doc.rect(margin, currY, col1, h);
+          doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
+          doc.rect(margin + col1, currY, colStatusRemarks, h);
+          doc.text(combinedLines, margin + col1 + 2, currY + 5.5);
+          doc.rect(margin + col1 + colStatusRemarks, currY, col3, h);
+          if (attachments.length > 0) {
+            doc.setTextColor(0, 0, 255);
+            doc.text('View Proof', margin + col1 + colStatusRemarks + 2, currY + 5.5);
+            doc.link(margin + col1 + colStatusRemarks + 2, currY + 1, 20, 5, { url: attachments[0].url });
+            doc.setTextColor(0, 0, 0);
+          }
+          currY += h;
+        }
+      }
+      doc.save(`Inverter_Audit_Export_${site?.name.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: 'Export Complete' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
+    } finally {
+      setIsExporting(false);
+      setGenerationProgress(0);
+    }
+  };
 
   const handleDelete = () => {
     if (!deletingRecord) return;
@@ -114,9 +209,28 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
                   <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> View Matrix
                 </Link>
              </Button>
+             <Button 
+                onClick={() => handleExportPDF(filteredRecords)} 
+                disabled={isExporting || filteredRecords.length === 0} 
+                variant="outline" size="sm" 
+                className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary"
+             >
+                {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
+                Export PDF
+             </Button>
           </div>
         </div>
       </div>
+
+      {isExporting && (
+        <div className="space-y-1.5 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
+            <span>Rendering PDF Documents</span>
+            <span>{generationProgress}%</span>
+          </div>
+          <Progress value={generationProgress} className="h-1 rounded-none" />
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
         <div className="relative w-full md:w-96">
@@ -185,7 +299,7 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
                       <span className="text-[9px] font-black text-muted-foreground uppercase">{record.inverterRating}</span>
                     </div>
                   </TableCell>
-                  <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3 w-3 text-primary opacity-50" />{record.userName}</div></TableCell>
+                  <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
                   <TableCell>
                     <Badge variant="outline" className={cn(
                       "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
@@ -195,6 +309,7 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
                   </TableCell>
                   <TableCell className="text-right px-6">
                     <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => handleExportPDF([record])} title="Export PDF"><FileDown className="h-4 w-4" /></Button>
                       {(isAdmin || record.userId === user?.uid) && (
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/inverter/edit/${record.id}`}><Pencil className="h-4 w-4" /></Link></Button>
                       )}

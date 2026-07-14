@@ -70,15 +70,6 @@ const editSchema = z.object({
   customerRepName: z.string().optional(),
 });
 
-const CHECK_LABELS = {
-  mounting: "Inverter Mounting Condition",
-  acTerminations: "Inverter AC Terminations",
-  acCabinetPosition: "AC Cabinet Position",
-  dcStrings: "DC Strings Connection",
-  earthing: "Earthing Connections",
-  canopy: "Canopy Fixing",
-};
-
 export default function EditInverterAuditPage({ params }: { params: Promise<{ siteId: string, checklistId: string }> }) {
   const { siteId, checklistId } = React.use(params);
   const firestore = useFirestore();
@@ -166,7 +157,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
       for (let i = 0; i < values.checks.length; i++) {
         const check = values.checks[i];
         const newAttachments = [...check.attachments];
-        if (check.localFiles?.length) {
+        if (check.localFiles && check.localFiles.length > 0) {
           for (const file of check.localFiles) {
             const path = `checklists/inverter/${user.uid}/${timestamp}_edit_check_${i}_${file.name.replace(/\s+/g, '_')}`;
             const uploaded = await uploadFile(file, path);
@@ -177,7 +168,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
       }
 
       const updatedOtherAttachments = [...values.otherAttachments];
-      if (values.otherLocalFiles?.length) {
+      if (values.otherLocalFiles && values.otherLocalFiles.length > 0) {
         for (const file of values.otherLocalFiles) {
           const path = `checklists/inverter/${user.uid}/${timestamp}_edit_other_${file.name.replace(/\s+/g, '_')}`;
           const uploaded = await uploadFile(file, path);
@@ -190,10 +181,10 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
         checks: updatedChecks,
         otherAttachments: updatedOtherAttachments,
         updatedAt: serverTimestamp(),
-        status: 'Pending' // Return to pending on edit
+        status: 'Pending'
       });
 
-      toast({ title: "Revision Saved", description: "Audit record updated and returned to Pending." });
+      toast({ title: "Revision Saved", description: "Audit record updated and returned to Pending status." });
       router.back();
     } catch (e: any) {
       toast({ variant: "destructive", title: "Update Failed", description: e.message });
@@ -213,7 +204,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
            <div className="bg-primary/10 p-2.5 rounded-sm shrink-0"><Pencil className="h-6 w-6 text-primary" /></div>
            <div>
               <h1 className="text-2xl font-black uppercase tracking-tight">Edit Inverter Log</h1>
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{audit.siteName} • Inv #{audit.inverterNumber}</p>
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{audit?.siteName} • Inv #{audit?.inverterNumber}</p>
            </div>
         </div>
       </div>
@@ -288,7 +279,9 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-xs font-bold uppercase tracking-widest">Additional Feedback</CardTitle></CardHeader>
             <CardContent className="pt-6 space-y-6">
-              <FormField control={form.control} name="otherRemarks" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">General Remarks</FormLabel><FormControl><Textarea rows={4} {...field} className="rounded-sm bg-muted/5" /></FormControl></FormItem>)} />
+              <FormField control={form.control} name="otherRemarks" render={({ field }) => (
+                <FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">General Remarks</FormLabel><FormControl><Textarea rows={4} {...field} className="rounded-sm bg-muted/5" /></FormControl></FormItem>
+              )} />
               <div className="space-y-3">
                  <Label className="text-[10px] font-black uppercase text-muted-foreground">Supplementary Media</Label>
                  <div className="flex flex-wrap gap-4">
