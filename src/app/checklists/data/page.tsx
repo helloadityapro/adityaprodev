@@ -19,7 +19,8 @@ import {
   ArrowDown,
   LayoutGrid,
   Cpu,
-  Zap
+  Zap,
+  Loader2
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -42,10 +43,10 @@ export default function ChecklistsDataProjectListPage() {
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const mmsQuery = useMemoFirebase(() => collection(firestore, 'installation_checklists'), [firestore]);
-  const { data: mmsRecords } = useCollection<any>(mmsQuery);
+  const { data: mmsRecords, isLoading: mmsLoading } = useCollection<any>(mmsQuery);
 
   const inverterQuery = useMemoFirebase(() => collection(firestore, 'inverter_checklists'), [firestore]);
-  const { data: inverterRecords } = useCollection<any>(inverterQuery);
+  const { data: inverterRecords, isLoading: invLoading } = useCollection<any>(inverterQuery);
 
   // Note: HT Line checklist collection will be integrated once defined in backend schema.
   
@@ -122,7 +123,17 @@ export default function ChecklistsDataProjectListPage() {
     return siteSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
-  if (sitesLoading) return <div className="p-8 space-y-6"><Skeleton className="h-10 w-64" /><div className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div></div>;
+  if (sitesLoading || mmsLoading || invLoading) {
+    return (
+      <div className="p-4 sm:p-8 space-y-6">
+        <Skeleton className="h-10 w-64" />
+        <div className="flex flex-col items-center justify-center py-40 gap-4 animate-in fade-in duration-500">
+          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.3em] animate-pulse">Syncing Quality Registry...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
