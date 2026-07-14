@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -109,7 +108,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
   React.useEffect(() => {
     if (audit) {
       form.reset({
-        inverterNumber: audit.inverterNumber || "",
+        inverterNumber: audit.inverterNumber?.replace("INV-", "") || "",
         inverterSerialNumber: audit.inverterSerialNumber || "",
         inverterMake: audit.inverterMake || "",
         inverterRating: audit.inverterRating || "",
@@ -152,6 +151,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
     if (!user || !audit) return;
     setIsSubmitting(true);
     try {
+      const finalInverterNumber = values.inverterNumber.startsWith("INV-") ? values.inverterNumber : `INV-${values.inverterNumber}`;
       const timestamp = Date.now();
       
       // 1. Process point-wise checks
@@ -193,6 +193,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
       // 4. Perform non-blocking update
       updateDocumentNonBlocking(auditRef, {
         ...sanitizedValues,
+        inverterNumber: finalInverterNumber,
         checks: updatedChecks,
         otherAttachments: updatedOtherAttachments,
         updatedAt: serverTimestamp(),
@@ -238,7 +239,21 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-primary/5 border-b py-4"><CardTitle className="text-xs font-bold uppercase tracking-widest">Inverter Identity</CardTitle></CardHeader>
             <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FormField control={form.control} name="inverterNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Inverter #</FormLabel><FormControl><Input {...field} className="h-11 font-black uppercase" /></FormControl></FormItem>)} />
+              <FormField control={form.control} name="inverterNumber" render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Inverter #</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute left-3 top-3 text-sm font-bold text-muted-foreground uppercase">INV-</span>
+                      <Input 
+                        {...field} 
+                        className="h-11 rounded-sm pl-12 uppercase font-mono font-bold" 
+                        onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                      />
+                    </div>
+                  </FormControl>
+                </FormItem>
+              )} />
               <FormField control={form.control} name="inverterSerialNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Serial #</FormLabel><FormControl><Input {...field} className="h-11 font-mono" /></FormControl></FormItem>)} />
               <FormField control={form.control} name="inverterMake" render={({ field }) => (
                 <FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Make</FormLabel>

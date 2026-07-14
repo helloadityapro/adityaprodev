@@ -4,17 +4,14 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
+import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { 
   Select, 
   SelectContent, 
@@ -201,6 +198,7 @@ export default function InverterChecklistPage() {
     setUploadProgress({});
 
     try {
+      const finalInverterNumber = values.inverterNumber.startsWith("INV-") ? values.inverterNumber : `INV-${values.inverterNumber}`;
       const timestamp = Date.now();
       const finalChecks = [];
       
@@ -239,7 +237,7 @@ export default function InverterChecklistPage() {
         projectCompany: values.projectCompany || "",
         inverterMake: values.inverterMake,
         inverterRating: values.inverterRating,
-        inverterNumber: values.inverterNumber,
+        inverterNumber: finalInverterNumber,
         inverterSerialNumber: values.inverterSerialNumber,
         stringCount: values.stringCount,
         checks: finalChecks,
@@ -260,13 +258,13 @@ export default function InverterChecklistPage() {
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "New Inverter Audit Logged",
-          description: `${userProfile.username} submitted an audit for Inverter ${values.inverterNumber} at ${values.siteName}.`,
+          description: `${userProfile.username} submitted an audit for Inverter ${finalInverterNumber} at ${values.siteName}.`,
           link: `/checklists/data/${values.siteId}/inverter`,
           push: true
         });
       });
 
-      setSubmittedInv(values.inverterNumber);
+      setSubmittedInv(finalInverterNumber);
       setIsSuccess(true);
       toast({ title: "Audit Published", description: "Record successfully archived." });
     } catch (e: any) {
@@ -293,7 +291,7 @@ export default function InverterChecklistPage() {
           </CardHeader>
           <CardContent className="space-y-4 pb-8 px-8">
             <Button className="w-full h-12 text-sm font-black uppercase bg-emerald-600" onClick={() => router.push("/checklists/data")}>View Registry</Button>
-            <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase" onClick={() => { setIsSuccess(false); form.reset(); }}>Record Next Inverter</Button>
+            <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase" onClick={() => { setIsSuccess(false); form.reset(); setSubmittedInv(""); }}>Record Next Inverter</Button>
           </CardContent>
         </Card>
       </div>
@@ -400,7 +398,21 @@ export default function InverterChecklistPage() {
                 )} />
 
                 <FormField control={form.control} name="inverterNumber" render={({ field }) => (
-                  <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Inverter Number (ID) *</FormLabel><FormControl><Input placeholder="e.g. INV-01" {...field} className="h-11 rounded-sm uppercase font-mono font-bold" /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Inverter Number (ID) *</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <span className="absolute left-3 top-3 text-sm font-bold text-muted-foreground uppercase">INV-</span>
+                        <Input 
+                          placeholder="01" 
+                          {...field} 
+                          className="h-11 rounded-sm pl-12 uppercase font-mono font-bold" 
+                          onChange={(e) => field.onChange(e.target.value.replace(/\D/g, ""))}
+                        />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
 
                 <FormField control={form.control} name="inverterSerialNumber" render={({ field }) => (
