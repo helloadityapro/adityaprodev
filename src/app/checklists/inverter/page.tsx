@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, getDocs } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, getDocs } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { 
   Select, 
@@ -49,6 +49,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { sendNotification } from "@/lib/notifications";
 import { motion, AnimatePresence } from "framer-motion";
+import { useToast } from "@/hooks/use-toast";
 
 const checkItemSchema = z.object({
   status: z.enum(["OK", "NOT OK", "Pending"], { required_error: "Selection required" }),
@@ -443,7 +444,7 @@ export default function InverterChecklistPage() {
                               <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center gap-4">
                                 {['OK', 'NOT OK', 'Pending'].map(s => (
                                   <div key={s} className="flex items-center space-x-1.5">
-                                    <RadioGroupItem value={s} id={`${key}-${s}`} className="sr-only" />
+                                    <RadioGroupItem value="OK" id={`${key}-${s}`} className="sr-only" />
                                     <Label htmlFor={`${key}-${s}`} className={cn("flex items-center gap-1 px-3 py-1.5 rounded-sm border-2 cursor-pointer transition-all", field.value === s ? (s === 'OK' ? "bg-green-50 border-green-500 text-green-700" : s === 'NOT OK' ? "bg-red-50 border-red-500 text-red-700" : "bg-amber-50 border-amber-500 text-amber-700") : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>
                                       <span className="text-[10px] font-black uppercase">{s}</span>
                                     </Label>
