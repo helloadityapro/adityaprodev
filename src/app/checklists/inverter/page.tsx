@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -16,6 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { 
   Search, 
   Check, 
@@ -250,6 +256,7 @@ export default function InverterChecklistPage() {
       const adminsQuery = query(collection(firestore, 'users'), where('role', '==', 'Admin'));
       const adminDocs = await getDocs(adminsQuery);
       adminDocs.forEach(adminDoc => {
+        if (adminDoc.id === user.uid) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "New Inverter Audit Logged",
@@ -268,6 +275,8 @@ export default function InverterChecklistPage() {
       setIsSubmitting(false);
     }
   };
+
+  const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
 
   if (isSuccess) {
     return (
@@ -304,7 +313,7 @@ export default function InverterChecklistPage() {
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-primary/5 border-b py-4">
-              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Building2 className="h-4 w-4" /> Site Context</CardTitle>
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Building2 className="h-4 w-4 text-primary" /> Site Context</CardTitle>
             </CardHeader>
             <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
               <FormField control={form.control} name="siteId" render={({ field }) => (
