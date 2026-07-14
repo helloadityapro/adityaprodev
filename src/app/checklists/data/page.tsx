@@ -117,9 +117,9 @@ export default function ChecklistsDataProjectListPage() {
     }));
   };
 
-  const SiteSortIcon = ({ column }: { column: SiteSortKey }) => {
+  const SortIcon = ({ column }: { column: SiteSortKey }) => {
     if (siteSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return siteSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   if (sitesLoading) return <div className="p-8 space-y-6"><Skeleton className="h-10 w-64" /><div className="space-y-4"><Skeleton className="h-20 w-full" /><Skeleton className="h-20 w-full" /></div></div>;
@@ -195,10 +195,10 @@ export default function ChecklistsDataProjectListPage() {
                 <TableHeader className="bg-muted/30">
                   <TableRow>
                     <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSiteSort('name')}>
-                      <div className="flex items-center">Project Name <SiteSortIcon column="name" /></div>
+                      <div className="flex items-center">Project Name <SortIcon column="name" /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSiteSort('company')}>
-                      <div className="flex items-center">Project Company <SiteSortIcon column="company" /></div>
+                      <div className="flex items-center">Project Company <SortIcon column="company" /></div>
                     </TableHead>
                     <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">
                       <div className="flex items-center justify-center gap-1.5">
