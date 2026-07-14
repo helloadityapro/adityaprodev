@@ -9,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, useFirebaseApp } from "@/firebase";
+import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
 import { collection, doc, serverTimestamp, increment, query, where, getDocs } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { 
@@ -19,6 +19,8 @@ import {
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { 
   Search, 
   Check, 
