@@ -699,7 +699,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                       <SidebarMenuSubButton asChild isActive={pathname === '/attendance/map-view'} onClick={handleMobileClose}>
                         <Link href="/attendance/map-view">
                           <MapPin className="h-4 w-4" />
-                          <span>Live Map</span>
+                          <span>Attendance Map</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
@@ -751,7 +751,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                       <SidebarMenuSubButton asChild isActive={pathname === '/registries/makes'} onClick={handleMobileClose}>
                         <Link href="/registries/makes">
                           <Tag className="h-4 w-4" />
-                          <span>Makes Registry</span>
+                          <span>Makes</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
@@ -802,7 +802,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                     <SidebarMenuSubButton asChild isActive={pathname === '/checklists/installation'} onClick={handleMobileClose}>
                       <Link href="/checklists/installation">
                         <LayoutGrid className="h-4 w-4" />
-                        <span>Table Level MMS</span>
+                        <span>Table Level MMS Checklist</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
@@ -826,7 +826,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                     <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
                       <Link href="/checklists/data">
                         <Database className="h-4 w-4" />
-                        <span>Checklists Data Hub</span>
+                        <span>Checklists Data</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>

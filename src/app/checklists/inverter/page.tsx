@@ -170,8 +170,8 @@ export default function InverterChecklistPage() {
     const is300Make = make.includes("sineng") || make.includes("waaree");
     const is275Make = make.includes("wattpower");
 
-    if (is300Make && !rating.includes("300")) return "Recheck Inverterting";
-    if (is275Make && !rating.includes("275")) return "Recheck Inverterting";
+    if (is300Make && !rating.includes("300")) return "Recheck Inverter Rating";
+    if (is275Make && !rating.includes("275")) return "Recheck Inverter Rating";
     
     return null;
   }, [watchMake, watchRating]);
@@ -287,7 +287,7 @@ export default function InverterChecklistPage() {
             <div className="flex justify-center mb-6">
               <div className="bg-emerald-500/10 p-6 rounded-full"><CheckCircle2 className="h-16 w-16 text-emerald-600" /></div>
             </div>
-            <CardTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Audit Published</CardTitle>
+            <CardTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Checklist Submitted</CardTitle>
             <CardDescription className="text-base font-medium text-emerald-800/70 mt-2">
               Inverter audit <strong>#{submittedInv}</strong> has been successfully archived in the site registry.
             </CardDescription>
@@ -305,9 +305,9 @@ export default function InverterChecklistPage() {
     <div className="space-y-8 max-w-4xl mx-auto pb-20 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <Cpu className="h-7 w-7" /> Inverter Installation Audit
+          <Cpu className="h-7 w-7" /> Inverter Installation Checklist
         </h1>
-        <p className="text-muted-foreground font-medium text-sm">Component-level quality verification for site inverters.</p>
+        <p className="text-muted-foreground font-medium text-sm">Quality verification for site inverters.</p>
       </div>
 
       <Form {...form}>
@@ -446,7 +446,7 @@ export default function InverterChecklistPage() {
                               <RadioGroup onValueChange={field.onChange} value={field.value} className="flex items-center gap-4">
                                 {['OK', 'NOT OK', 'Pending'].map(s => (
                                   <div key={s} className="flex items-center space-x-1.5">
-                                    <RadioGroupItem value="OK" id={`${key}-${s}`} className="sr-only" />
+                                    <RadioGroupItem value={s} id={`${key}-${s}`} className="sr-only" />
                                     <Label htmlFor={`${key}-${s}`} className={cn("flex items-center gap-1 px-3 py-1.5 rounded-sm border-2 cursor-pointer transition-all", field.value === s ? (s === 'OK' ? "bg-green-50 border-green-500 text-green-700" : s === 'NOT OK' ? "bg-red-50 border-red-500 text-red-700" : "bg-amber-50 border-amber-500 text-amber-700") : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>
                                       <span className="text-[10px] font-black uppercase">{s}</span>
                                     </Label>
@@ -532,7 +532,7 @@ export default function InverterChecklistPage() {
                   <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" /></FormControl>
                   <div className="space-y-1 leading-none">
                     <FormLabel className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer font-bold">
-                      I, {userProfile?.username || user?.email}, hereby undertake and confirm that the information provided above is true and accurate as of {format(new Date(), 'dd MMMM yyyy')}. *
+                      I, {userProfile?.username || user?.email}, hereby undertake and confirm that the information provided above is true and accurate as of {format(new Date(), 'dd MMMM yyyy')}.
                     </FormLabel>
                     <FormMessage />
                   </div>
@@ -544,7 +544,7 @@ export default function InverterChecklistPage() {
           <div className="flex justify-end gap-3 pt-8">
             <Button type="button" variant="outline" onClick={() => router.back()} className="h-12 w-32 rounded-sm font-bold">Cancel</Button>
             <Button type="submit" disabled={isSubmitting} className="h-12 px-10 rounded-sm font-black uppercase text-xs tracking-widest shadow-xl">
-              {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</> : <><Save className="mr-2 h-4 w-4" /> Finalize Audit</>}
+              {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</> : <><Save className="mr-2 h-4 w-4" /> SUBMIT</>}
             </Button>
           </div>
         </form>
