@@ -159,7 +159,7 @@ export default function ChecklistsDataProjectListPage() {
         <Skeleton className="h-10 w-64" />
         <div className="flex flex-col items-center justify-center py-40 gap-4 animate-in fade-in duration-500">
           <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
-          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.3em] animate-pulse">Syncing Quality Registry</p>
+          <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.3em] animate-pulse">Loading</p>
         </div>
       </div>
     );

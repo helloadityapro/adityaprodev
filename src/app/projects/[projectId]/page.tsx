@@ -5,7 +5,7 @@ import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, orderBy, or, and, getDoc, increment, arrayUnion } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -63,7 +63,8 @@ import {
   IndianRupee,
   PieChart,
   AlertCircle,
-  Calendar
+  Calendar,
+  Cpu
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -126,11 +127,13 @@ type UserProfile = {
   mobile?: string;
   department?: string;
   customPermissions?: PageKey[];
+  ownDataOnly?: boolean;
 };
 
 type AccessConfig = {
   id: string;
   allowedPageKeys: PageKey[];
+  ownDataOnly?: boolean;
 };
 
 type AuditEntry = {
@@ -353,6 +356,18 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   const isManager = userProfile?.role === 'Site Manager';
+
+  // Permission check helper for BOM management
+  const hasPermission = React.useCallback((key: PageKey) => {
+    if (isAdmin) return true;
+    if (!userProfile) return false;
+    const allowedKeys = userProfile.customPermissions 
+      ? new Set(userProfile.customPermissions) 
+      : new Set(roleConfigs?.find(c => c.id === slugifyRole(userProfile.role || ""))?.allowedPageKeys || []);
+    return allowedKeys.has(key);
+  }, [userProfile, roleConfigs, isAdmin]);
+
+  const canManageBom = isAdmin || isManager || (hasPermission('project-tab-bom') && hasPermission('inventory'));
 
   // Define All Tabs
   const ALL_TABS = React.useMemo(() => [
@@ -1133,7 +1148,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           </TabsContent>
 
           <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
-            {(isAdmin || isManager) && (
+            {canManageBom && (
               <Card className="rounded-sm border-primary/10 bg-primary/5 shadow-sm">
                 <CardHeader className="py-2 border-b bg-muted/10">
                   <CardTitle className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Add BoM Entry</CardTitle>
@@ -1328,11 +1343,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell className="text-right px-6">
                               <div className="flex justify-end items-center gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setViewingBomLog(item)} title="View Log"><History className="h-4 w-4" /></Button>
-                                {isAdmin && (<Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingBomItem(item)} title="Edit Item"><Pencil className="h-4 w-4" /></Button>)}
+                                {canManageBom && (<Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setEditingBomItem(item)} title="Edit Item"><Pencil className="h-4 w-4" /></Button>)}
                                 {isAdmin && item.status === 'Pending' && (
                                   <><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setBomActionState({ item, type: 'Approved' })} title="Approve"><CheckCircle2 className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setBomActionState({ item, type: 'Rejected' })} title="Reject"><XCircle className="h-4 w-4" /></Button></>
                                 )}
-                                {(isAdmin || (isManager && item.status === 'Pending')) && (<Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))} title="Delete"><Trash2 className="h-4 w-4" /></Button>)}
+                                {(isAdmin || (canManageBom && item.status === 'Pending')) && (<Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => deleteDocumentNonBlocking(doc(firestore, 'project_boms', item.id))} title="Delete"><Trash2 className="h-4 w-4" /></Button>)}
                               </div>
                             </TableCell>
                           </TableRow>
@@ -2025,9 +2040,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <DialogDescription>Decide approval for {poActionState?.po.poNumber}.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Decision Remarks</Label>
-              <Textarea id="po-action-remarks" placeholder="Provide reason for decision..." className="min-h-[100px] rounded-sm" />
+              <Textarea id="po-action-remarks-global" placeholder="Provide reason for decision..." className="min-h-[120px] rounded-sm" />
             </div>
           </div>
           <DialogFooter>
@@ -2036,7 +2051,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               className={cn("min-w-[120px]", poActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
               disabled={isActionProcessing}
               onClick={() => {
-                const remarks = (document.getElementById('po-action-remarks') as HTMLTextAreaElement)?.value || "";
+                const remarks = (document.getElementById('po-action-remarks-global') as HTMLTextAreaElement)?.value || "";
                 handleProcessPO(remarks);
               }}
             >
@@ -2053,9 +2068,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <DialogDescription>Decide approval for {woActionState?.wo.woNumber}.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Decision Remarks</Label>
-              <Textarea id="wo-action-remarks" placeholder="Provide reason for decision..." className="min-h-[100px] rounded-sm" />
+              <Textarea id="wo-action-remarks-global" placeholder="Provide reason for decision..." className="min-h-[120px] rounded-sm" />
             </div>
           </div>
           <DialogFooter>
@@ -2064,7 +2079,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               className={cn("min-w-[120px]", woActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
               disabled={isActionProcessing}
               onClick={() => {
-                const remarks = (document.getElementById('wo-action-remarks') as HTMLTextAreaElement)?.value || "";
+                const remarks = (document.getElementById('wo-action-remarks-global') as HTMLTextAreaElement)?.value || "";
                 handleProcessWO(remarks);
               }}
             >
@@ -2114,8 +2129,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!viewingPO} onOpenChange={(o) => !o && setViewingPO(null)}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+      <Dialog open={!!viewingPO} onOpenChange={(o) => !o && handleCloseDetail()}>
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><ShoppingBag className="h-5 w-5 text-primary" /></div>
@@ -2142,7 +2157,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!viewingWO} onOpenChange={(o) => !o && setViewingWO(null)}>
+      <Dialog open={!!viewingWO} onOpenChange={(o) => !o && handleCloseDetail()}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3">
