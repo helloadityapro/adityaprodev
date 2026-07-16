@@ -36,7 +36,8 @@ import {
   X, 
   Save, 
   Info, 
-  CheckCircle2 
+  CheckCircle2,
+  FileText
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -407,7 +408,7 @@ export default function HTLineChecklistPage() {
                       )}
                       
                       <FormField control={form.control} name={`checks.${item.key}.quantity` as any} render={({ field }) => (
-                        <FormItem><FormLabel className="text-[10px] font-bold uppercase">Quantity Count *</FormLabel><FormControl><Input type="number" {...field} className="h-10 bg-background font-bold font-mono" /></FormControl></FormItem>
+                        <FormItem><FormLabel className="text-[10px] font-bold uppercase">Quantity Count *</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-bold font-mono" /></FormControl></FormItem>
                       )} />
                     </div>
                   )}
