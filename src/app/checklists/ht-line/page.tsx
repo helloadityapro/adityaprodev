@@ -50,14 +50,13 @@ import imageCompression from 'browser-image-compression';
 import { Progress } from "@/components/ui/progress";
 
 const POLE_SIZES = [
-  "RSJ 152 X 152",
-  "13 Mtr Long Pole RSJ 100 X 116",
-  "11 Mtr Long Pole RSJ 100 X 116",
-  "10 Mtr Long Pole RSJ 100 X 116",
-  "09 Mtr Long Pole"
+  "RSJ 152 X 152, 13 Mtr Long Pole",
+  "RSJ 100 X 116, 11 Mtr Long Pole",
+  "RSJ 100 X 116, 10 Mtr Long Pole",
+  "RSJ 100 X 116, 09 Mtr Long Pole"
 ];
 
-const STUD_SIZES = ["08", "09", "10", "11 Mtr"];
+const STUD_SIZES = ["08 Meters", "09 Meters", "10 Meters", "11 Meters"];
 
 const pointSchema = z.object({
   status: z.enum(['Yes', 'No']),
@@ -92,6 +91,7 @@ const CHECK_KEYS = [
   { key: 'discInsulator', label: 'Disc insulator installed?' },
   { key: 'pinInsulator', label: 'Pin insulator installed?' },
   { key: 'abSwitch', label: 'AB Switch installed?' },
+  { key: 'dangerBoard', label: 'Danger Board installed?' },
   { key: 'barbedWire', label: 'Barbed Wire installed?' },
   { key: 'concreting', label: 'Concreting Done Properly?' },
   { key: 'earthingSet', label: 'Earthing Set Installed?' },
@@ -244,7 +244,7 @@ export default function HTLineChecklistPage() {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4 pb-8 px-8">
-            <Button className="w-full h-12 text-sm font-black uppercase bg-emerald-600" onClick={() => router.push("/checklists/data")}>View Site Registry</Button>
+            <Button className="w-full h-12 text-sm font-black uppercase bg-emerald-600 shadow-lg" onClick={() => router.push("/checklists/data")}>View Site Registry</Button>
             <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase" onClick={() => { setIsSuccess(false); form.reset(); setUploadProgress({}); }}>Audit Next Pole</Button>
           </CardContent>
         </Card>
@@ -253,16 +253,16 @@ export default function HTLineChecklistPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-4xl mx-auto pb-20 px-2 sm:px-4">
+    <div className="space-y-6 md:space-y-8 max-w-4xl mx-auto pb-20 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <Zap className="h-7 w-7" /> HT Line Checklist
+        <h1 className="text-xl md:text-2xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+          <Zap className="h-6 w-6 sm:h-7 sm:w-7" /> HT Line Checklist
         </h1>
-        <p className="text-muted-foreground font-medium text-sm">Verify High Tension line pole components and installation quality.</p>
+        <p className="text-muted-foreground font-medium text-xs sm:text-sm leading-relaxed">Verify High Tension line pole components and installation quality.</p>
       </div>
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 md:space-y-8">
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-primary/5 border-b py-4">
               <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
@@ -270,7 +270,7 @@ export default function HTLineChecklistPage() {
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormField control={form.control} name="siteId" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Project Name *</FormLabel>
@@ -313,14 +313,14 @@ export default function HTLineChecklistPage() {
                 )} />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-2">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-2">
                 <FormField control={form.control} name="poleType" render={({ field }) => (
                   <FormItem className="space-y-3">
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Configuration *</FormLabel>
                     <FormControl>
-                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-6 h-11 items-center">
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pt-two" /><Label htmlFor="pt-two" className="font-bold cursor-pointer text-xs">Two Pole</Label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="Four Pole" id="pt-four" /><Label htmlFor="pt-four" className="font-bold cursor-pointer text-xs">Four Pole</Label></div>
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 sm:gap-6 h-11 items-center">
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pt-two" /><Label htmlFor="pt-two" className="font-bold cursor-pointer text-xs uppercase">Two Pole</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="Four Pole" id="pt-four" /><Label htmlFor="pt-four" className="font-bold cursor-pointer text-xs uppercase">Four Pole</Label></div>
                       </RadioGroup>
                     </FormControl>
                   </FormItem>
@@ -328,23 +328,21 @@ export default function HTLineChecklistPage() {
 
                 <FormField control={form.control} name="poleNumber" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                      Pole Number (2 Digits) * 
-                      <Popover><PopoverTrigger asChild><Info className="h-3 w-3 text-primary cursor-help" /></PopoverTrigger><PopoverContent className="text-[10px] p-2 leading-relaxed">Start numbering from Plant side and end at Substation side.</PopoverContent></Popover>
-                    </FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Number (2 Digits) *</FormLabel>
                     <FormControl><Input placeholder="01" maxLength={2} {...field} className="h-11 rounded-sm font-mono font-bold" /></FormControl>
+                    <p className="text-[9px] font-bold uppercase text-primary tracking-tighter pt-1.5">Start numbering from Plant side and end at Substation side.</p>
                     <FormMessage />
                   </FormItem>
                 )} />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormField control={form.control} name="poleSize" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Size *</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue placeholder="Select size" /></SelectTrigger></FormControl>
-                      <SelectContent>{POLE_SIZES.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+                      <SelectContent>{POLE_SIZES.map(s => <SelectItem key={s} value={s} className="text-[11px] font-medium">{s}</SelectItem>)}</SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
@@ -356,8 +354,8 @@ export default function HTLineChecklistPage() {
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
-                        <SelectItem value="Single Cut Point" className="text-xs">Single Cut Point</SelectItem>
-                        <SelectItem value="Double Cut Point" className="text-xs">Double Cut Point</SelectItem>
+                        <SelectItem value="Single Cut Point" className="text-xs uppercase font-medium">Single Cut Point</SelectItem>
+                        <SelectItem value="Double Cut Point" className="text-xs uppercase font-medium">Double Cut Point</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -372,53 +370,51 @@ export default function HTLineChecklistPage() {
               {CHECK_KEYS.map((item) => (
                 <div key={item.key} className="p-4 sm:p-6 space-y-4 hover:bg-muted/[0.01] transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <Label className="text-sm font-black uppercase tracking-tight text-foreground">{item.label}</Label>
-                    <div className="flex items-center gap-6">
+                    <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{item.label}</Label>
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
                       <FormField control={form.control} name={`checks.${item.key}.status` as any} render={({ field }) => (
                         <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
                           {['Yes', 'No'].map(s => (
                             <div key={s} className="flex items-center space-x-1.5">
                               <RadioGroupItem value={s} id={`${item.key}-${s}`} className="sr-only" />
-                              <Label htmlFor={`${item.key}-${s}`} className={cn("flex items-center gap-1 px-3 py-1 rounded-sm border-2 cursor-pointer transition-all text-[10px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-lg" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
+                              <Label htmlFor={`${item.key}-${s}`} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-sm border-2 cursor-pointer transition-all text-[10px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-lg" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
                             </div>
                           ))}
                         </RadioGroup>
                       )} />
-                      <div className="flex gap-1">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisibleRemarks(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-7 px-2 text-[9px] font-black uppercase", visibleRemarks[item.key] ? "text-primary" : "text-muted-foreground")}>
-                          <Plus className="h-3 w-3 mr-1" /> Remark
+                      <div className="flex gap-2 w-full sm:w-auto">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisibleRemarks(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-3 text-[10px] font-black uppercase border border-primary/5 bg-background", visibleRemarks[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
+                          <Plus className="h-3.5 w-3.5 mr-1" /> Remark
                         </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisiblePhotos(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-7 px-2 text-[9px] font-black uppercase", visiblePhotos[item.key] ? "text-primary" : "text-muted-foreground")}>
-                          <Camera className="h-3 w-3 mr-1" /> Photo
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisiblePhotos(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-3 text-[10px] font-black uppercase border border-primary/5 bg-background", visiblePhotos[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
+                          <Camera className="h-3.5 w-3.5 mr-1" /> Photo
                         </Button>
                       </div>
                     </div>
                   </div>
 
-                  {/* Conditional logic for Stud Size and Insulator Quantity */}
-                  {(item.key === 'studInstalled' && watchChecks['studInstalled']?.status === 'Yes') && (
-                    <div className="p-4 bg-primary/[0.03] border-l-4 border-primary rounded-sm animate-in slide-in-from-left-2 duration-300">
-                      <FormField control={form.control} name="studSize" render={({ field }) => (
-                        <FormItem><FormLabel className="text-[10px] font-bold uppercase">Stud Size *</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl><SelectTrigger className="h-10 bg-background"><SelectValue placeholder="Choose size" /></SelectTrigger></FormControl>
-                          <SelectContent>{STUD_SIZES.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
-                        </Select></FormItem>
-                      )} />
-                    </div>
-                  )}
-
-                  {(['discInsulator', 'pinInsulator'].includes(item.key) && watchChecks[item.key]?.status === 'Yes') && (
-                    <div className="p-4 bg-primary/[0.03] border-l-4 border-primary rounded-sm animate-in slide-in-from-left-2">
-                       <FormField control={form.control} name={`checks.${item.key}.quantity` as any} render={({ field }) => (
-                        <FormItem><FormLabel className="text-[10px] font-bold uppercase">Quantity *</FormLabel><FormControl><Input type="number" {...field} className="h-10 bg-background" /></FormControl></FormItem>
+                  {/* Conditional logic for Stud, Earthing and Insulator Quantity */}
+                  {((['studInstalled', 'earthingSet', 'discInsulator', 'pinInsulator'].includes(item.key)) && watchChecks[item.key]?.status === 'Yes') && (
+                    <div className="p-4 bg-primary/[0.03] border-l-4 border-primary rounded-sm animate-in slide-in-from-left-2 duration-300 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {item.key === 'studInstalled' && (
+                        <FormField control={form.control} name="studSize" render={({ field }) => (
+                          <FormItem><FormLabel className="text-[10px] font-bold uppercase">Stud Size *</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl><SelectTrigger className="h-10 bg-background"><SelectValue placeholder="Choose size" /></SelectTrigger></FormControl>
+                            <SelectContent>{STUD_SIZES.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+                          </Select></FormItem>
+                        )} />
+                      )}
+                      
+                      <FormField control={form.control} name={`checks.${item.key}.quantity` as any} render={({ field }) => (
+                        <FormItem><FormLabel className="text-[10px] font-bold uppercase">Quantity Count *</FormLabel><FormControl><Input type="number" {...field} className="h-10 bg-background font-bold font-mono" /></FormControl></FormItem>
                       )} />
                     </div>
                   )}
 
                   {visibleRemarks[item.key] && (
                     <FormField control={form.control} name={`checks.${item.key}.remarks` as any} render={({ field }) => (
-                      <FormControl><Textarea placeholder="Findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm animate-in fade-in duration-300" /></FormControl>
+                      <FormControl><Textarea placeholder="Describe findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm animate-in fade-in duration-300" /></FormControl>
                     )} />
                   )}
 
@@ -432,7 +428,7 @@ export default function HTLineChecklistPage() {
                               <Button type="button" variant="ghost" size="icon" className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground" onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}><X className="h-3 w-3" /></Button>
                             </Badge>
                           ))}
-                          <label className="cursor-pointer h-8 border border-dashed border-primary/30 bg-background flex items-center justify-center px-4 gap-2 rounded-sm hover:bg-primary/5 transition-all text-[9px] font-black uppercase text-primary tracking-widest"><Camera className="h-3.5 w-3.5" /> ADD PHOTO<input type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => onChange([...(value || []), ...Array.from(e.target.files || [])])} /></label>
+                          <label className="cursor-pointer h-10 border-2 border-dashed border-primary/20 bg-background flex items-center justify-center px-6 gap-2 rounded-sm hover:bg-primary/5 transition-all text-[10px] font-black uppercase text-primary tracking-widest shadow-sm"><Camera className="h-4 w-4" /> ATTACH PHOTO<input type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => onChange([...(value || []), ...Array.from(e.target.files || [])])} /></label>
                         </div>
                       </div>
                     )} />
@@ -443,21 +439,35 @@ export default function HTLineChecklistPage() {
           </Card>
 
           <Card className="rounded-sm shadow-md border-primary/10">
-            <CardHeader className="bg-muted/5 border-b py-4"><CardTitle className="text-xs font-bold uppercase tracking-widest">Pole Photos (Multi-angle) & Remarks</CardTitle></CardHeader>
-            <CardContent className="pt-6 space-y-6">
-              <FormField control={form.control} name="additionalRemarks" render={({ field }) => (
-                <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Observations</FormLabel><FormControl><Textarea rows={4} {...field} className="rounded-sm" /></FormControl></FormItem>
-              )} />
-              
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <ImageIcon className="h-4 w-4" /> Pole Photo Evidence
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
               <FormField control={form.control} name="generalPhotos" render={({ field: { value, onChange } }) => (
-                <div className="space-y-4 p-6 border-2 border-dashed rounded-sm bg-muted/5 text-center">
+                <div className="space-y-4 p-6 sm:p-10 border-2 border-dashed rounded-sm bg-muted/5 text-center">
+                  <p className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] mb-4">Attach pole photos from 2-3 angles</p>
                   <div className="flex flex-wrap gap-4 justify-center">
                     {(value || []).map((file: File, fIdx: number) => (
-                      <div key={fIdx} className="relative w-24 h-24 rounded-sm overflow-hidden border bg-background flex flex-col items-center justify-center"><img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" /><Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full" onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}><Trash2 className="h-3.5 w-3.5" /></Button></div>
+                      <div key={fIdx} className="relative w-24 h-24 rounded-sm overflow-hidden border bg-background flex flex-col items-center justify-center shadow-md"><img src={URL.createObjectURL(file)} className="w-full h-full object-cover" alt="Preview" /><Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg" onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}><Trash2 className="h-3.5 w-3.5" /></Button></div>
                     ))}
-                    <label className="flex flex-col items-center justify-center w-24 h-24 cursor-pointer border-2 border-dashed rounded-sm hover:bg-primary/5 transition-colors"><Plus className="h-6 w-6 text-primary" /><span className="text-[8px] font-black uppercase text-primary mt-1">Upload</span><input type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => onChange([...(value || []), ...Array.from(e.target.files || [])])} /></label>
+                    <label className="flex flex-col items-center justify-center w-24 h-24 cursor-pointer border-2 border-dashed border-primary/20 rounded-sm hover:bg-primary/5 transition-colors bg-background shadow-inner"><Plus className="h-7 w-7 text-primary/40" /><span className="text-[8px] font-black uppercase text-primary/40 mt-1">Add Photo</span><input type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => onChange([...(value || []), ...Array.from(e.target.files || [])])} /></label>
                   </div>
                 </div>
+              )} />
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-sm shadow-md border-primary/10">
+            <CardHeader className="bg-muted/5 border-b py-4">
+              <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                <FileText className="h-4 w-4" /> Additional Observations
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <FormField control={form.control} name="additionalRemarks" render={({ field }) => (
+                <FormItem><FormControl><Textarea rows={6} placeholder="Enter any extra site notes or findings..." {...field} className="rounded-sm text-sm" /></FormControl><FormMessage /></FormItem>
               )} />
             </CardContent>
           </Card>
@@ -465,7 +475,7 @@ export default function HTLineChecklistPage() {
           <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-8">
               <FormField control={form.control} name="undertaking" render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-4 rounded-sm bg-primary/5 border border-primary/20">
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-5 rounded-sm bg-primary/5 border border-primary/20">
                   <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" /></FormControl>
                   <div className="space-y-1">
                     <FormLabel className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer font-bold">
@@ -478,9 +488,9 @@ export default function HTLineChecklistPage() {
             </CardContent>
           </Card>
           
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-8">
-            <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-sm font-bold h-12 sm:w-32">Cancel</Button>
-            <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-12 px-10 shadow-xl shadow-primary/20 flex-1 sm:flex-none">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 sm:pt-8">
+            <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-sm font-bold h-12 sm:w-32 order-2 sm:order-1">Cancel</Button>
+            <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-12 px-10 shadow-xl shadow-primary/20 flex-1 sm:flex-none order-1 sm:order-2">
               {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</> : <><Save className="mr-2 h-4 w-4" /> SUBMIT AUDIT</>}
             </Button>
           </div>
