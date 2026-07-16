@@ -503,6 +503,41 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "inverterNumber", "userId"]
+    },
+    "HTLineChecklist": {
+      "title": "HT Line Checklist",
+      "type": "object",
+      "description": "Verification of High Tension line poles and components.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "projectCompany": { "type": "string" },
+        "poleType": { "type": "string", "enum": ["Two Pole", "Four Pole"] },
+        "poleNumber": { "type": "string" },
+        "poleSize": { "type": "string" },
+        "cutPointType": { "type": "string", "enum": ["Single Cut Point", "Double Cut Point"] },
+        "checks": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "status": { "type": "string", "enum": ["Yes", "No"] },
+              "quantity": { "type": "number" },
+              "remarks": { "type": "string" },
+              "attachments": { "type": "array", "items": { "type": "object" } }
+            }
+          }
+        },
+        "additionalRemarks": { "type": "string" },
+        "generalPhotos": { "type": "array", "items": { "type": "object" } },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected"], "default": "Pending" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "poleNumber", "userId"]
     }
   },
   "auth": {
@@ -612,6 +647,10 @@
     "/inverter_checklists/{checklistId}": {
       "schema": { "$ref": "#/backend/entities/InverterChecklist" },
       "description": "Inverter installation quality checks."
+    },
+    "/ht_line_checklists/{checklistId}": {
+      "schema": { "$ref": "#/backend/entities/HTLineChecklist" },
+      "description": "HT Line installation quality checks."
     },
     "/notifications/{notifId}": {
       "schema": { "$ref": "#/backend/entities/Notification" },

@@ -46,25 +46,24 @@ export default function ChecklistsDataProjectListPage() {
 
   // OPTIMIZATION: Instead of useCollection (real-time full doc sync), 
   // we use a one-time fetch of just necessary fields to calculate counts.
-  // This is dramatically faster for large datasets and fulfills the <10s requirement.
   const [mmsSiteIds, setMmsSiteIds] = React.useState<string[]>([]);
   const [invSiteIds, setInvSiteIds] = React.useState<string[]>([]);
+  const [htSiteIds, setHtSiteIds] = React.useState<string[]>([]);
   const [isCountsLoading, setIsCountsLoading] = React.useState(true);
 
   React.useEffect(() => {
     const fetchAuditCounts = async () => {
       setIsCountsLoading(true);
       try {
-        // Fetch snapshots of audit logs with a high but safe limit for performance.
-        // We use getDocs instead of onSnapshot to avoid the real-time listener overhead
-        // which was causing the >10s lag on large databases.
-        const [mmsSnap, invSnap] = await Promise.all([
+        const [mmsSnap, invSnap, htSnap] = await Promise.all([
           getDocs(query(collection(firestore, 'installation_checklists'), limit(5000))),
-          getDocs(query(collection(firestore, 'inverter_checklists'), limit(5000)))
+          getDocs(query(collection(firestore, 'inverter_checklists'), limit(5000))),
+          getDocs(query(collection(firestore, 'ht_line_checklists'), limit(5000)))
         ]);
 
         setMmsSiteIds(mmsSnap.docs.map(doc => doc.data().siteId as string));
         setInvSiteIds(invSnap.docs.map(doc => doc.data().siteId as string));
+        setHtSiteIds(htSnap.docs.map(doc => doc.data().siteId as string));
       } catch (err) {
         console.error("Optimization: Failed to fetch audit counts", err);
       } finally {
@@ -78,34 +77,20 @@ export default function ChecklistsDataProjectListPage() {
   const siteStats = React.useMemo(() => {
     const stats: Record<string, { mms: number; inverter: number; htLine: number; total: number }> = {};
     
-    // Initialize stats for all sites to ensure consistent mapping
     allSites?.forEach(s => {
       stats[s.id] = { mms: 0, inverter: 0, htLine: 0, total: 0 };
     });
 
-    // Efficiently count MMS Audits in-memory
-    mmsSiteIds.forEach(sid => {
-      if (stats[sid]) {
-        stats[sid].mms++;
-        stats[sid].total++;
-      }
-    });
-
-    // Efficiently count Inverter Audits in-memory
-    invSiteIds.forEach(sid => {
-      if (stats[sid]) {
-        stats[sid].inverter++;
-        stats[sid].total++;
-      }
-    });
+    mmsSiteIds.forEach(sid => { if (stats[sid]) { stats[sid].mms++; stats[sid].total++; } });
+    invSiteIds.forEach(sid => { if (stats[sid]) { stats[sid].inverter++; stats[sid].total++; } });
+    htSiteIds.forEach(sid => { if (stats[sid]) { stats[sid].htLine++; stats[sid].total++; } });
 
     return stats;
-  }, [mmsSiteIds, invSiteIds, allSites]);
+  }, [mmsSiteIds, invSiteIds, htSiteIds, allSites]);
 
   const filteredSortedSites = React.useMemo(() => {
     if (!allSites) return [];
     
-    // Hide sites that have no audit activity in the current snapshot
     let result = allSites.filter(s => (siteStats[s.id]?.total || 0) > 0);
 
     if (siteSearchQuery.trim() !== "") {
@@ -185,51 +170,8 @@ export default function ChecklistsDataProjectListPage() {
           </Badge>
         </div>
 
-        {/* Mobile-Responsive Grid View */}
-        <div className="md:hidden space-y-4">
-          {filteredSortedSites.length > 0 ? filteredSortedSites.map(site => (
-            <Card key={site.id} className="rounded-sm border-primary/10 shadow-sm active:bg-muted/5 cursor-pointer" onClick={() => router.push(`/checklists/data/${site.id}`)}>
-              <CardContent className="p-4 space-y-4">
-                <div className="flex items-center justify-between gap-4">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0"><Building2 className="h-5 w-5" /></div>
-                    <div className="flex flex-col min-w-0">
-                      <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
-                      <span className="text-[9px] uppercase font-black text-muted-foreground mt-1">{site.projectCompany}</span>
-                    </div>
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground/30" />
-                </div>
-                
-                <div className="grid grid-cols-3 gap-2 border-t pt-3">
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">MMS</span>
-                    <Badge variant="outline" className="h-6 px-1.5 font-bold text-[10px] border-primary/10 bg-primary/5 text-primary">
-                      {siteStats[site.id]?.mms || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Inverter</span>
-                    <Badge variant="outline" className="h-6 px-1.5 font-bold text-[10px] border-primary/10 bg-primary/5 text-primary">
-                      {siteStats[site.id]?.inverter || 0}
-                    </Badge>
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">HT Line</span>
-                    <Badge variant="outline" className="h-6 px-1.5 font-bold text-[10px] border-primary/10 bg-primary/5 text-primary">
-                      {siteStats[site.id]?.htLine || 0}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )) : (
-            <div className="py-20 text-center text-muted-foreground italic text-xs uppercase font-bold opacity-30 border border-dashed rounded-sm">No matching projects found</div>
-          )}
-        </div>
-
         {/* Desktop Enhanced Tabular View */}
-        <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden">
+        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>

@@ -134,6 +134,10 @@ service cloud.firestore {
       allow read, write: if isSignedIn();
     }
 
+    match /ht_line_checklists/{checklistId} {
+      allow read, write: if isSignedIn();
+    }
+
     match /inverter_makes/{makeId} {
       allow read: if isSignedIn();
       allow write: if isAdmin();

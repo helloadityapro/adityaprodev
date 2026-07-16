@@ -1,30 +1,179 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { Card, CardContent } from '@/components/ui/card';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, query, doc, limit, where } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { 
+  Search, 
+  Eye, 
+  ArrowLeft,
+  Loader2,
+  Trash2,
+  Calendar,
+  Zap,
+  Pencil,
+  FileDown,
+  User
+} from 'lucide-react';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
+import { isSuperAdmin } from '@/lib/auth-constants';
+import Link from 'next/link';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
+import { useToast } from '@/hooks/use-toast';
 
-export default function HTLineDataPlaceholderPage({ params }: { params: Promise<{ siteId: string }> }) {
+type HTLineChecklist = {
+  id: string;
+  siteId: string;
+  siteName: string;
+  projectCompany?: string;
+  poleNumber: string;
+  poleType: string;
+  userName: string;
+  userId: string;
+  status: string;
+  createdAt: any;
+};
+
+export default function ProjectHTLineDataPage({ params }: { params: Promise<{ siteId: string }> }) {
   const { siteId } = React.use(params);
+  const firestore = useFirestore();
+  const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
+  
+  const [searchTerm, setSearchTerm] = React.useState("");
+  const [deletingRecord, setDeletingRecord] = React.useState<HTLineChecklist | null>(null);
+
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
+  const siteRef = useMemoFirebase(() => doc(firestore, 'sites', siteId), [firestore, siteId]);
+  const { data: site, isLoading: siteLoading } = useDoc<any>(siteRef);
+
+  const htQuery = useMemoFirebase(() => query(collection(firestore, 'ht_line_checklists'), where('siteId', '==', siteId), limit(1000)), [firestore, siteId]);
+  const { data: records, isLoading: htLoading } = useCollection<HTLineChecklist>(htQuery);
+
+  const filteredRecords = React.useMemo(() => {
+    if (!records) return [];
+    return records.filter(r => 
+      r.poleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      r.userName.toLowerCase().includes(searchTerm.toLowerCase())
+    ).sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+  }, [records, searchTerm]);
+
+  const handleDelete = () => {
+    if (!deletingRecord) return;
+    deleteDocumentNonBlocking(doc(firestore, 'ht_line_checklists', deletingRecord.id));
+    setDeletingRecord(null);
+    toast({ title: 'Record Removed' });
+  };
+
+  if (isProfileLoading || siteLoading || htLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
         <Button variant="ghost" size="sm" onClick={() => router.push(`/checklists/data/${siteId}`)} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Project Hub
         </Button>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-1 min-w-0">
+            <h2 className="text-lg md:text-2xl font-black text-foreground uppercase tracking-tight flex items-center gap-2 md:gap-3 leading-none">
+              <Zap className="h-5 w-5 md:h-6 md:w-6 text-primary shrink-0" />
+              <span className="truncate">{site?.name} : HT Line Records</span>
+            </h2>
+            <p className="text-muted-foreground text-[8px] md:text-xs font-bold uppercase tracking-[0.2em]">{site?.projectCompany}</p>
+          </div>
+        </div>
       </div>
 
-      <div className="flex flex-col items-center justify-center min-h-[50vh] p-4">
-        <Card className="max-w-md w-full rounded-sm border-primary/10 shadow-xl overflow-hidden">
-          <CardContent className="pt-12 pb-12 flex flex-col items-center text-center">
-            <h1 className="text-lg font-black uppercase tracking-[0.2em] text-muted-foreground/60">Updating soon</h1>
-          </CardContent>
-        </Card>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+        <div className="relative w-full md:w-96">
+          <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+          <Input placeholder="Search Pole # or Auditor..." className="pl-10 h-11 text-sm rounded-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+        </div>
+        <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
+          {filteredRecords.length} Audits Indexed
+        </Badge>
       </div>
+
+      <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+        <CardContent className="p-0">
+          <Table>
+            <TableHeader className="bg-muted/30">
+              <TableRow>
+                <TableHead className="px-6">Timestamp</TableHead>
+                <TableHead>Pole #</TableHead>
+                <TableHead>Configuration</TableHead>
+                <TableHead>Auditor</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right px-6">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {filteredRecords.map(record => (
+                <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => router.push(`/checklists/data/${siteId}/ht-line/view/${record.id}`)}>
+                  <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
+                  <TableCell className="font-black text-sm text-primary">#{record.poleNumber}</TableCell>
+                  <TableCell><span className="text-xs font-bold">{record.poleType}</span></TableCell>
+                  <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
+                  <TableCell>
+                    <Badge variant="outline" className={cn(
+                      "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                      record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                      record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                    )}>{record.status}</Badge>
+                  </TableCell>
+                  <TableCell className="text-right px-6">
+                    <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/ht-line/view/${record.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                      {isAdmin && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filteredRecords.length === 0 && (
+                <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No HT Line records found.</TableCell></TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={!!deletingRecord} onOpenChange={o => !o && setDeletingRecord(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Audit Log?</AlertDialogTitle>
+            <AlertDialogDescription>Removing record for Pole {deletingRecord?.poleNumber}. This cannot be undone.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel>
+            <AlertDialogAction className="bg-destructive text-white rounded-sm" onClick={handleDelete}>Confirm Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
