@@ -14,7 +14,7 @@ import {
   addDocumentNonBlocking, 
   useFirebaseApp 
 } from '@/firebase';
-import { collection, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs, and } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -372,23 +372,23 @@ export default function HTLineChecklistPage() {
                 <div key={item.key} className="p-4 sm:p-6 space-y-4 hover:bg-muted/[0.01] transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{item.label}</Label>
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6">
+                    <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto no-scrollbar pb-1">
                       <FormField control={form.control} name={`checks.${item.key}.status` as any} render={({ field }) => (
-                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4">
+                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-2 shrink-0">
                           {['Yes', 'No'].map(s => (
-                            <div key={s} className="flex items-center space-x-1.5">
+                            <div key={s} className="flex items-center space-x-1">
                               <RadioGroupItem value={s} id={`${item.key}-${s}`} className="sr-only" />
-                              <Label htmlFor={`${item.key}-${s}`} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-sm border-2 cursor-pointer transition-all text-[10px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-lg" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
+                              <Label htmlFor={`${item.key}-${s}`} className={cn("flex items-center gap-1 px-2.5 py-1.5 rounded-sm border-2 cursor-pointer transition-all text-[9px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-sm" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
                             </div>
                           ))}
                         </RadioGroup>
                       )} />
-                      <div className="flex gap-2 w-full sm:w-auto">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisibleRemarks(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-3 text-[10px] font-black uppercase border border-primary/5 bg-background", visibleRemarks[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
-                          <Plus className="h-3.5 w-3.5 mr-1" /> Remark
+                      <div className="flex gap-1.5 shrink-0">
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisibleRemarks(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visibleRemarks[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
+                          <Plus className="h-3 w-3 mr-1" /> Remark
                         </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisiblePhotos(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-3 text-[10px] font-black uppercase border border-primary/5 bg-background", visiblePhotos[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
-                          <Camera className="h-3.5 w-3.5 mr-1" /> Photo
+                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisiblePhotos(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visiblePhotos[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
+                          <Camera className="h-3 w-3 mr-1" /> Photo
                         </Button>
                       </div>
                     </div>
@@ -442,7 +442,7 @@ export default function HTLineChecklistPage() {
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-muted/5 border-b py-4">
               <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                <ImageIcon className="h-4 w-4" /> Pole Photo Evidence
+                <ImageIcon className="h-4 w-4 text-primary" /> Pole Photo Evidence
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
