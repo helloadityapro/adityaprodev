@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -20,7 +19,18 @@ import {
   ThumbsDown, 
   Loader2, 
   MapPin,
-  Building2
+  Building2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  RotateCw,
+  ChevronLeft,
+  ChevronRight,
+  ImageIcon,
+  Film,
+  PlayCircle,
+  FileImage,
+  Download
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -65,7 +75,19 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
 
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [approvingAction, setApprovingAction] = React.useState<'Approved' | 'Rejected' | null>(null);
-  const [viewUrl, setViewUrl] = React.useState<string | null>(null);
+  
+  // Advanced Media Viewer State
+  const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
+  const [viewFiles, setViewFiles] = React.useState<Attachment[]>([]);
+  const [currentFileIndex, setCurrentFileIndex] = React.useState(0);
+  const [scale, setScale] = React.useState(1);
+  const [rotation, setRotation] = React.useState(0);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
+
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const mediaRef = React.useRef<HTMLDivElement>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -93,8 +115,67 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
     }
   };
 
+  // Viewer Helpers
+  const isVideo = (file: Attachment) => {
+    const type = file.contentType?.toLowerCase() || '';
+    const name = (file.name || '').toLowerCase();
+    return type.startsWith('video/') || name.endsWith('.mp4') || name.endsWith('.mov') || name.endsWith('.webm');
+  };
+
+  const isHeic = (file: Attachment) => {
+    const name = (file.name || "").toLowerCase();
+    return name.endsWith('.heic') || name.endsWith('.heif');
+  };
+
+  const resetViewer = () => {
+    setScale(1);
+    setRotation(0);
+    setPosition({ x: 0, y: 0 });
+  };
+
+  const openViewer = (file: Attachment, gallery: Attachment[]) => {
+    setViewFiles(gallery);
+    setCurrentFileIndex(gallery.findIndex(a => a.url === file.url) || 0);
+    setViewFile(file);
+    resetViewer();
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!viewFile || isVideo(viewFile) || isHeic(viewFile)) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    const newScale = Math.min(Math.max(scale + delta, 1), 4);
+    setScale(newScale);
+    if (newScale === 1) setPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1 || (viewFile && (isVideo(viewFile) || isHeic(viewFile)))) return;
+    setIsDragging(true);
+    setStartPan({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || scale <= 1) return;
+    const newX = e.clientX - startPan.x;
+    const newY = e.clientY - startPan.y;
+    const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
+    const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
+    setPosition({ x: Math.min(Math.max(newX, -limitX), limitX), y: Math.min(Math.max(newY, -limitY), limitY) });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+  const handleDoubleClick = () => { if (viewFile && (isVideo(viewFile) || isHeic(viewFile))) return; if (scale > 1) { setScale(1); setPosition({ x: 0, y: 0 }); } else { setScale(2); } };
+  const nextFile = () => { if (viewFiles.length <= 1) return; const nextIdx = (currentFileIndex + 1) % viewFiles.length; setCurrentFileIndex(nextIdx); setViewFile(viewFiles[nextIdx]); resetViewer(); };
+  const prevFile = () => { if (viewFiles.length <= 1) return; const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length; setCurrentFileIndex(prevIdx); setViewFile(viewFiles[prevIdx]); resetViewer(); };
+
   if (auditLoading) return <div className="p-8 space-y-4 max-w-4xl mx-auto"><Skeleton className="h-10 w-48" /><Skeleton className="h-64 w-full" /></div>;
   if (!audit) return <div className="p-12 text-center italic">Record not found.</div>;
+
+  const allGalleryFiles = [
+    ...(audit.checks?.flatMap(c => c.attachments || []) || []),
+    ...(audit.generalPhotos || [])
+  ];
 
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 animate-in fade-in duration-500">
@@ -152,8 +233,14 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
                 {check.attachments && check.attachments.length > 0 && (
                   <div className="flex flex-wrap gap-3">
                     {check.attachments.map((file, fIdx) => (
-                      <div key={fIdx} className="relative aspect-video w-32 md:w-40 rounded-sm overflow-hidden border shadow-sm cursor-pointer group" onClick={() => setViewUrl(file.url)}>
-                        <img src={file.url} className="w-full h-full object-cover" alt="Audit" />
+                      <div key={fIdx} className="relative aspect-video w-32 md:w-40 rounded-sm overflow-hidden border shadow-sm cursor-pointer group" onClick={() => openViewer(file, allGalleryFiles)}>
+                        {isVideo(file) ? (
+                          <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                            <Film className="h-6 w-6 text-white/40" />
+                          </div>
+                        ) : (
+                          <img src={file.url} className="w-full h-full object-cover" alt="Audit" />
+                        )}
                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Maximize2 className="h-5 w-5 text-white" /></div>
                       </div>
                     ))}
@@ -168,8 +255,14 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
                 <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4 block">Pole Evidence Photos</Label>
                 <div className="flex flex-wrap gap-4">
                   {audit.generalPhotos?.map((file, fIdx) => (
-                    <div key={fIdx} className="relative aspect-square w-32 md:w-48 rounded-sm overflow-hidden border-2 border-white shadow-xl cursor-pointer group" onClick={() => setViewUrl(file.url)}>
-                      <img src={file.url} className="w-full h-full object-cover" alt="General" />
+                    <div key={fIdx} className="relative aspect-square w-32 md:w-48 rounded-sm overflow-hidden border-2 border-white shadow-xl cursor-pointer group" onClick={() => openViewer(file, allGalleryFiles)}>
+                      {isVideo(file) ? (
+                        <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                          <Film className="h-8 w-8 text-white/40" />
+                        </div>
+                      ) : (
+                        <img src={file.url} className="w-full h-full object-cover" alt="General" />
+                      )}
                       <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Maximize2 className="h-6 w-6 text-white" /></div>
                     </div>
                   ))}
@@ -220,10 +313,69 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!viewUrl} onOpenChange={(o) => !o && setViewUrl(null)}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex items-center justify-center rounded-sm overflow-hidden">
-          <Button variant="ghost" size="icon" className="absolute top-4 right-4 text-white z-50 h-10 w-10" onClick={() => setViewUrl(null)}><X className="h-6 w-6" /></Button>
-          {viewUrl && <img src={viewUrl} className="max-w-full max-h-full object-contain" alt="evidence" />}
+      {/* Advanced Media Viewer Dialog */}
+      <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { resetViewer(); setViewFile(null); setViewFiles([]); } }}>
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[100]">
+          <DialogHeader className="sr-only"><DialogTitle>Audit Media Evidence</DialogTitle></DialogHeader>
+          <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">{viewFile?.name}</span>
+                <span className="text-[8px] font-bold text-white/50 uppercase">{currentFileIndex + 1} of {viewFiles.length} Evidence Artifacts</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setRotation(prev => (prev + 90) % 360)}><RotateCw className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
+              <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
+              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-red-500"><X className="h-6 w-6" /></Button></DialogClose>
+            </div>
+          </div>
+
+          {viewFiles.length > 1 && (
+            <>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[110]">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
+              </div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[110]">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
+              </div>
+            </>
+          )}
+
+          <div 
+            ref={containerRef} 
+            className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none z-[105]", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} 
+            onWheel={handleWheel} 
+            onMouseDown={handleMouseDown} 
+            onMouseMove={handleMouseMove} 
+            onMouseUp={handleMouseUp} 
+            onMouseLeave={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
+          >
+            <div 
+              ref={mediaRef} 
+              className={cn("transition-transform duration-200 ease-out flex items-center justify-center pointer-events-none w-fit h-fit", isDragging && "transition-none")} 
+              style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)` }}
+            >
+              {viewFile && (
+                isVideo(viewFile) ? (
+                  <div className="pointer-events-auto"><video src={viewFile.url} controls autoPlay className="max-w-[90vw] max-h-[75vh] shadow-2xl rounded-sm" /></div>
+                ) : isHeic(viewFile) ? (
+                  <div className="bg-white/5 p-12 rounded-sm flex flex-col items-center gap-6 text-center pointer-events-auto">
+                    <FileImage className="h-16 w-16 text-primary opacity-20" />
+                    <p className="text-white font-black text-sm uppercase tracking-widest">HEIC Media Unsupported</p>
+                    <Button asChild className="rounded-sm font-bold uppercase text-[10px] tracking-widest"><a href={viewFile.url} download={viewFile.name}><Download className="h-3.5 w-3.5 mr-2" /> Download File</a></Button>
+                  </div>
+                ) : (
+                  <img src={viewFile.url} className="max-w-[90vw] max-h-[75vh] object-contain shadow-2xl rounded-sm" alt="Evidence" />
+                )
+              )}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
