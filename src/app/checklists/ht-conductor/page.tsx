@@ -13,7 +13,6 @@ import {
   useCollection, 
   addDocumentNonBlocking, 
   updateDocumentNonBlocking,
-  setDocumentNonBlocking
 } from '@/firebase';
 import { collection, doc, serverTimestamp, query, where, getDocs, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -313,32 +312,38 @@ export default function HTConductorChecklistPage() {
               <div className="divide-y">
                 {fields.map((field, index) => (
                   <div key={field.id} className="p-4 sm:p-6 space-y-4 hover:bg-muted/[0.01] transition-colors relative group">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div className="space-y-1">
-                        <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{form.watch(`spans.${index}.label`)} *</Label>
-                      </div>
+                    <div className="flex flex-col gap-2">
+                      <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{form.watch(`spans.${index}.label`)} *</Label>
+                      
                       <div className="flex items-center gap-2">
                         <FormField control={form.control} name={`spans.${index}.distance`} render={({ field }) => (
-                          <FormItem className="space-y-0">
+                          <FormItem className="space-y-0 flex-1 sm:flex-none">
                             <FormControl>
                               <div className="relative">
-                                <Input type="number" step="0.01" {...field} value={field.value ?? ""} className="h-11 w-[140px] rounded-sm font-mono font-bold pl-4 pr-10" />
+                                <Input type="number" step="0.01" {...field} value={field.value ?? ""} className="h-11 w-full sm:w-[160px] rounded-sm font-mono font-bold pl-4 pr-10" />
                                 <span className="absolute right-3 top-3 text-[9px] font-black text-muted-foreground uppercase">Mtrs</span>
                               </div>
                             </FormControl>
                           </FormItem>
                         )} />
+                        
                         <Button 
                           type="button" 
                           variant="ghost" 
-                          size="icon" 
                           onClick={() => toggleRemark(index)}
-                          className={cn("h-11 w-11 rounded-sm border", visibleRemarks[index] ? "text-primary border-primary/20 bg-primary/5" : "text-muted-foreground border-input")}
+                          className={cn(
+                            "h-11 px-4 rounded-sm border whitespace-nowrap shrink-0", 
+                            visibleRemarks[index] ? "text-primary border-primary/30 bg-primary/10" : "text-muted-foreground border-input hover:bg-muted"
+                          )}
                         >
-                          <Plus className="h-4 w-4" />
+                          <Plus className="h-3.5 w-3.5 mr-2" /> 
+                          <span className="text-[10px] font-black uppercase tracking-widest">+ Remark</span>
                         </Button>
+
                         {index > 2 && (
-                          <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive rounded-sm border border-destructive/10" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive rounded-sm border border-destructive/10 shrink-0" onClick={() => remove(index)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         )}
                       </div>
                     </div>
@@ -346,7 +351,7 @@ export default function HTConductorChecklistPage() {
                     {visibleRemarks[index] && (
                       <FormField control={form.control} name={`spans.${index}.remarks`} render={({ field }) => (
                         <FormItem className="animate-in fade-in duration-300">
-                          <FormControl><Textarea placeholder="Add observation for this span..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-xs" /></FormControl>
+                          <FormControl><Textarea placeholder="Add observation for this span..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm" /></FormControl>
                         </FormItem>
                       )} />
                     )}
