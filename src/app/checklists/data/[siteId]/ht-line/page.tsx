@@ -20,7 +20,8 @@ import {
   Zap,
   Pencil,
   FileDown,
-  User
+  User,
+  LayoutGrid
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -93,8 +94,8 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
   return (
     <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.push(`/checklists/data/${siteId}`)} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Project Hub
+        <Button variant="ghost" size="sm" onClick={() => router.push(`/checklists/data`)} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Registry
         </Button>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1 min-w-0">
@@ -103,6 +104,13 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
               <span className="truncate">{site?.name} : HT Line Records</span>
             </h2>
             <p className="text-muted-foreground text-[8px] md:text-xs font-bold uppercase tracking-[0.2em]">{site?.projectCompany}</p>
+          </div>
+          <div className="flex items-center gap-3">
+             <Button variant="outline" size="sm" className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary" asChild>
+                <Link href={`/checklists/data/${siteId}/ht-line/matrix`}>
+                  <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> View Matrix
+                </Link>
+             </Button>
           </div>
         </div>
       </div>
@@ -119,46 +127,48 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
 
       <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead className="px-6">Timestamp</TableHead>
-                <TableHead>Pole #</TableHead>
-                <TableHead>Configuration</TableHead>
-                <TableHead>Auditor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right px-6">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRecords.map(record => (
-                <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => router.push(`/checklists/data/${siteId}/ht-line/view/${record.id}`)}>
-                  <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
-                  <TableCell className="font-black text-sm text-primary">#{record.poleNumber}</TableCell>
-                  <TableCell><span className="text-xs font-bold">{record.poleType}</span></TableCell>
-                  <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn(
-                      "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
-                      record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                      record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
-                    )}>{record.status}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right px-6">
-                    <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/ht-line/view/${record.id}`}><Eye className="h-4 w-4" /></Link></Button>
-                      {isAdmin && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>
-                      )}
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="px-6">Timestamp</TableHead>
+                  <TableHead>Pole #</TableHead>
+                  <TableHead>Configuration</TableHead>
+                  <TableHead>Auditor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
-              ))}
-              {filteredRecords.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No HT Line records found.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredRecords.map(record => (
+                  <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => router.push(`/checklists/data/${siteId}/ht-line/view/${record.id}`)}>
+                    <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
+                    <TableCell className="font-black text-sm text-primary">#{record.poleNumber}</TableCell>
+                    <TableCell><span className="text-xs font-bold">{record.poleType}</span></TableCell>
+                    <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn(
+                        "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                        record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                        record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                      )}>{record.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right px-6">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/ht-line/view/${record.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredRecords.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No HT Line records found.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
