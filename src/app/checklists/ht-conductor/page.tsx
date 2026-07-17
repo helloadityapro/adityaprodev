@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -35,7 +34,8 @@ import {
   ArrowLeft,
   CheckCircle2,
   AlertCircle,
-  MessageCircle
+  MessageCircle,
+  Navigation
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -316,7 +316,7 @@ export default function HTConductorChecklistPage() {
                             onClick={() => toggleRemark(index)}
                             className={cn("h-7 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visibleRemarks[index] ? "text-primary border-primary/20" : "text-muted-foreground")}
                           >
-                            <Plus className="h-3 w-3 mr-1" /> Remark
+                            <Plus className="h-3.5 w-3.5 mr-1" /> Remark
                           </Button>
                           {index > 2 && (
                             <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>
@@ -365,13 +365,7 @@ export default function HTConductorChecklistPage() {
             </Button>
           </div>
         </form>
-      </寿Form>
+      </Form>
     </div>
-  );
-}
-
-function Navigation({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
   );
 }
