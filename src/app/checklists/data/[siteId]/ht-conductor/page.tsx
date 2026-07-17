@@ -21,7 +21,8 @@ import {
   Pencil,
   FileDown,
   User,
-  History
+  History,
+  TrendingUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -50,7 +51,7 @@ type HTConductorChecklist = {
   userId: string;
   status: string;
   createdAt: any;
-  spans: any[];
+  spans: { label: string; distance: number; remarks?: string }[];
 };
 
 export default function ProjectHTConductorDataPage({ params }: { params: Promise<{ siteId: string }> }) {
@@ -72,6 +73,14 @@ export default function ProjectHTConductorDataPage({ params }: { params: Promise
 
   const htQuery = useMemoFirebase(() => query(collection(firestore, 'ht_conductor_checklists'), where('siteId', '==', siteId), limit(1000)), [firestore, siteId]);
   const { data: records, isLoading: htLoading } = useCollection<HTConductorChecklist>(htQuery);
+
+  const siteTotalLength = React.useMemo(() => {
+    if (!records) return 0;
+    return records.reduce((acc, record) => {
+      const recordTotal = record.spans?.reduce((sum, span) => sum + (Number(span.distance) || 0), 0) || 0;
+      return acc + recordTotal;
+    }, 0);
+  }, [records]);
 
   const filteredRecords = React.useMemo(() => {
     if (!records) return [];
@@ -112,58 +121,72 @@ export default function ProjectHTConductorDataPage({ params }: { params: Promise
           <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search auditor or status..." className="pl-10 h-11 text-sm rounded-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
-        <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
-          {filteredRecords.length} Audits Indexed
-        </Badge>
+        <div className="flex flex-wrap items-center gap-3">
+          <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-8 border-primary/20 text-primary bg-primary/5">
+            <TrendingUp className="h-3.5 w-3.5 mr-2" /> Total Site Length: {siteTotalLength.toFixed(2)} Mtrs
+          </Badge>
+          <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
+            {filteredRecords.length} Audits Indexed
+          </Badge>
+        </div>
       </div>
 
       <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead className="px-6">Timestamp</TableHead>
-                <TableHead>Config</TableHead>
-                <TableHead>Spans</TableHead>
-                <TableHead>Auditor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right px-6">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRecords.map(record => (
-                <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => record.status === 'Draft' ? router.push('/checklists/ht-conductor') : router.push(`/checklists/data/${siteId}/ht-conductor/view/${record.id}`)}>
-                  <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
-                  <TableCell className="font-bold text-sm text-primary">{record.poleConfiguration}</TableCell>
-                  <TableCell><span className="text-xs font-bold">{record.spans?.length || 0} Points</span></TableCell>
-                  <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn(
-                      "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
-                      record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                      record.status === 'Draft' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                      record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
-                    )}>{record.status}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right px-6">
-                    <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                      {record.status === 'Draft' ? (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href="/checklists/ht-conductor"><History className="h-4 w-4" /></Link></Button>
-                      ) : (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/ht-conductor/view/${record.id}`}><Eye className="h-4 w-4" /></Link></Button>
-                      )}
-                      {isAdmin && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>
-                      )}
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="px-6">Timestamp</TableHead>
+                  <TableHead>Config</TableHead>
+                  <TableHead>Spans</TableHead>
+                  <TableHead className="text-center">Total Length</TableHead>
+                  <TableHead>Auditor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
-              ))}
-              {filteredRecords.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No HT Conductor records found.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredRecords.map(record => {
+                  const recordTotal = record.spans?.reduce((sum, span) => sum + (Number(span.distance) || 0), 0) || 0;
+                  return (
+                    <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => record.status === 'Draft' ? router.push('/checklists/ht-conductor') : router.push(`/checklists/data/${siteId}/ht-conductor/view/${record.id}`)}>
+                      <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
+                      <TableCell className="font-bold text-sm text-primary">{record.poleConfiguration}</TableCell>
+                      <TableCell><span className="text-xs font-bold">{record.spans?.length || 0} Points</span></TableCell>
+                      <TableCell className="text-center font-mono font-bold text-xs text-primary">{recordTotal.toFixed(2)} Mtrs</TableCell>
+                      <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(
+                          "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                          record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                          record.status === 'Draft' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                          record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                        )}>
+                          {record.status === 'Draft' ? 'In Progress' : record.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                          {record.status === 'Draft' ? (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href="/checklists/ht-conductor"><History className="h-4 w-4" /></Link></Button>
+                          ) : (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/ht-conductor/view/${record.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                          )}
+                          {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+                {filteredRecords.length === 0 && (
+                  <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No HT Conductor records found.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

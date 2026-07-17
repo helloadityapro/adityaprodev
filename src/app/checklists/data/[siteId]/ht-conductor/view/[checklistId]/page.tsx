@@ -21,7 +21,8 @@ import {
   MapPin,
   Building2,
   Navigation,
-  MessageCircle
+  MessageCircle,
+  TrendingUp
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -70,6 +71,11 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
   const isManager = userProfile?.role === 'Site Manager';
   const canApprove = isAdmin || isManager;
 
+  const recordTotalLength = React.useMemo(() => {
+    if (!audit?.spans) return 0;
+    return audit.spans.reduce((sum, span) => sum + (Number(span.distance) || 0), 0);
+  }, [audit]);
+
   const handleProcessAudit = async (remarks: string) => {
     if (!approvingAction || !audit) return;
     setIsProcessing(true);
@@ -110,17 +116,20 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
            <Badge variant="outline" className={cn(
              "rounded-sm text-[10px] font-black uppercase px-3 h-8",
              audit.status === 'Approved' ? "bg-green-100 text-green-700 border-green-200" :
-             audit.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
-           )}>{audit.status}</Badge>
+             audit.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-200" :
+             audit.status === 'Draft' ? "bg-amber-100 text-amber-700 border-amber-200" :
+             "bg-yellow-50 text-yellow-700 border-yellow-200"
+           )}>{audit.status === 'Draft' ? 'In Progress' : audit.status}</Badge>
         </div>
       </div>
 
       <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden">
         <CardHeader className="bg-primary/5 border-b p-6 md:p-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Personnel</Label><p className="text-sm font-bold flex items-center gap-2"><User className="h-3.5 w-3.5 text-primary opacity-50" />{audit.userName}</p></div>
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Plant Config</Label><p className="text-sm font-bold uppercase">{audit.poleConfiguration}</p></div>
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Total Spans</Label><p className="text-xs font-bold leading-tight">{audit.spans?.length || 0} Points Logged</p></div>
+            <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-primary tracking-widest">Total Length</Label><p className="text-sm font-black text-primary flex items-center gap-1.5"><TrendingUp className="h-3.5 w-3.5" />{recordTotalLength.toFixed(2)} Mtrs</p></div>
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Timestamp</Label><p className="text-xs font-mono font-bold text-muted-foreground">{audit.createdAt ? format(audit.createdAt.toDate(), 'dd MMM yy, HH:mm') : '—'}</p></div>
           </div>
         </CardHeader>
@@ -150,7 +159,7 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
                     </div>
                   </TableCell>
                   <TableCell className="text-right px-8 font-mono font-black text-primary text-base">
-                    {span.distance.toFixed(2)}
+                    {Number(span.distance).toFixed(2)}
                   </TableCell>
                 </TableRow>
               ))}
