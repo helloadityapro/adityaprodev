@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
 
 const CHECK_KEYS = [
   { key: 'studInstalled', label: 'Stud' },
