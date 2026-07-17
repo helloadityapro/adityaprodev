@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -90,7 +89,7 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
       r.inverterNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.inverterMake.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+    ).sort((a, b) => a.inverterNumber.localeCompare(b.inverterNumber, undefined, { numeric: true, sensitivity: 'base' }));
   }, [records, searchTerm]);
 
   const handleExportPDF = async (items: InverterChecklist[]) => {
@@ -277,55 +276,57 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
 
       <Card className="hidden md:block rounded-sm border-primary/10 shadow-md overflow-hidden">
         <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead className="px-6">Timestamp</TableHead>
-                <TableHead>Inverter #</TableHead>
-                <TableHead>Make & Rating</TableHead>
-                <TableHead>Auditor</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right px-6">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRecords.map(record => (
-                <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => router.push(`/checklists/data/${siteId}/inverter/view/${record.id}`)}>
-                  <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
-                  <TableCell className="font-black text-sm text-primary">{record.inverterNumber}</TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-bold">{record.inverterMake}</span>
-                      <span className="text-[9px] font-black text-muted-foreground uppercase">{record.inverterRating}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className={cn(
-                      "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
-                      record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                      record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
-                    )}>{record.status}</Badge>
-                  </TableCell>
-                  <TableCell className="text-right px-6">
-                    <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => handleExportPDF([record])} title="Export PDF"><FileDown className="h-4 w-4" /></Button>
-                      {(isAdmin || record.userId === user?.uid) && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/inverter/edit/${record.id}`}><Pencil className="h-4 w-4" /></Link></Button>
-                      )}
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/inverter/view/${record.id}`}><Eye className="h-4 w-4" /></Link></Button>
-                      {isAdmin && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>
-                      )}
-                    </div>
-                  </TableCell>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="px-6">Timestamp</TableHead>
+                  <TableHead>Inverter #</TableHead>
+                  <TableHead>Make & Rating</TableHead>
+                  <TableHead>Auditor</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
-              ))}
-              {filteredRecords.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No records found.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {filteredRecords.map(record => (
+                  <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => router.push(`/checklists/data/${siteId}/inverter/view/${record.id}`)}>
+                    <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
+                    <TableCell className="font-black text-sm text-primary">{record.inverterNumber}</TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-bold">{record.inverterMake}</span>
+                        <span className="text-[9px] font-black text-muted-foreground uppercase">{record.inverterRating}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className={cn(
+                        "rounded-sm text-[9px] font-black uppercase px-1.5 h-5",
+                        record.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                        record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
+                      )}>{record.status}</Badge>
+                    </TableCell>
+                    <TableCell className="text-right px-6">
+                      <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => handleExportPDF([record])} title="Export PDF"><FileDown className="h-4 w-4" /></Button>
+                        {(isAdmin || record.userId === user?.uid) && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/inverter/edit/${record.id}`}><Pencil className="h-4 w-4" /></Link></Button>
+                        )}
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/inverter/view/${record.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filteredRecords.length === 0 && (
+                  <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No records found.</TableCell></TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -79,7 +78,7 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
     return records.filter(r => 
       r.poleNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.userName.toLowerCase().includes(searchTerm.toLowerCase())
-    ).sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
+    ).sort((a, b) => a.poleNumber.localeCompare(b.poleNumber, undefined, { numeric: true, sensitivity: 'base' }));
   }, [records, searchTerm]);
 
   const handleDelete = () => {
@@ -117,7 +116,7 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
         <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search Pole # or Auditor..." className="pl-10 h-11 text-sm rounded-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
         <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
