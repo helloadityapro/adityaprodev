@@ -34,17 +34,20 @@ import {
   Save, 
   ArrowLeft,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  MessageCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 const spanSchema = z.object({
   label: z.string(),
-  distance: z.coerce.number().min(0.01, 'Distance required.'),
+  distance: z.preprocess((val) => (val === "" ? undefined : val), z.coerce.number().min(0.01, 'Distance required.')),
+  remarks: z.string().optional(),
 });
 
 const conductorSchema = z.object({
@@ -69,6 +72,7 @@ export default function HTConductorChecklistPage() {
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
   const [existingDraftId, setExistingDraftId] = React.useState<string | null>(null);
+  const [visibleRemarks, setVisibleRemarks] = React.useState<Record<number, boolean>>({});
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -84,9 +88,9 @@ export default function HTConductorChecklistPage() {
       projectCompany: "",
       poleConfiguration: "Two Pole",
       spans: [
-        { label: "Two Pole to Pole 1 Distance", distance: 0 },
-        { label: "Pole 1 to Pole 2 Distance", distance: 0 },
-        { label: "Pole 2 to Pole 3 Distance", distance: 0 },
+        { label: "Two Pole to Pole 1 Distance", distance: undefined as any },
+        { label: "Pole 1 to Pole 2 Distance", distance: undefined as any },
+        { label: "Pole 2 to Pole 3 Distance", distance: undefined as any },
       ],
     },
   });
@@ -147,8 +151,12 @@ export default function HTConductorChecklistPage() {
     const currentCount = fields.length;
     append({
       label: `Pole ${currentCount} to Pole ${currentCount + 1} Distance`,
-      distance: 0
+      distance: undefined as any
     });
+  };
+
+  const toggleRemark = (idx: number) => {
+    setVisibleRemarks(prev => ({ ...prev, [idx]: !prev[idx] }));
   };
 
   const saveToFirestore = async (values: z.infer<typeof conductorSchema>, status: 'Draft' | 'Pending') => {
@@ -237,7 +245,7 @@ export default function HTConductorChecklistPage() {
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             {field.value ? allSites?.find(s => s.id === field.value)?.name : "Choose site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -278,8 +286,8 @@ export default function HTConductorChecklistPage() {
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Configuration at Plant *</FormLabel>
                   <FormControl>
                     <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 sm:gap-10 h-11 items-center">
-                      <div className="flex items-center space-x-2"><RadioGroupItem value="Four Pole" id="pc-four" /><Label htmlFor="edit-gm" className="font-bold cursor-pointer text-xs uppercase">Four Pole</Label></div>
-                      <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pc-two" /><Label htmlFor="edit-rt" className="font-bold cursor-pointer text-xs uppercase">Two Pole</Label></div>
+                      <div className="flex items-center space-x-2"><RadioGroupItem value="Four Pole" id="pc-four" /><Label htmlFor="pc-four" className="font-bold cursor-pointer text-xs uppercase">Four Pole</Label></div>
+                      <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pc-two" /><Label htmlFor="pc-two" className="font-bold cursor-pointer text-xs uppercase">Two Pole</Label></div>
                     </RadioGroup>
                   </FormControl>
                 </FormItem>
@@ -297,24 +305,45 @@ export default function HTConductorChecklistPage() {
               <div className="divide-y">
                 {fields.map((field, index) => (
                   <div key={field.id} className="p-4 sm:p-6 space-y-4 hover:bg-muted/[0.01] transition-colors relative group">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{form.watch(`spans.${index}.label`)} *</Label>
+                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                      <div className="space-y-1">
+                        <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{form.watch(`spans.${index}.label`)} *</Label>
+                        <div className="flex items-center gap-2">
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => toggleRemark(index)}
+                            className={cn("h-7 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visibleRemarks[index] ? "text-primary border-primary/20" : "text-muted-foreground")}
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Remark
+                          </Button>
+                          {index > 2 && (
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                          )}
+                        </div>
+                      </div>
                       <div className="flex items-center gap-2">
                         <FormField control={form.control} name={`spans.${index}.distance`} render={({ field }) => (
                           <FormItem className="space-y-0">
                             <FormControl>
                               <div className="relative">
-                                <Input type="number" step="0.01" {...field} className="h-10 w-[140px] rounded-sm font-mono font-bold pl-4 pr-10" />
-                                <span className="absolute right-3 top-2.5 text-[9px] font-black text-muted-foreground uppercase">Mtrs</span>
+                                <Input type="number" step="0.01" {...field} value={field.value ?? ""} className="h-11 w-[140px] rounded-sm font-mono font-bold pl-4 pr-10" />
+                                <span className="absolute right-3 top-3 text-[9px] font-black text-muted-foreground uppercase">Mtrs</span>
                               </div>
                             </FormControl>
                           </FormItem>
                         )} />
-                        {index > 2 && (
-                          <Button variant="ghost" size="icon" className="h-10 w-10 text-destructive rounded-sm" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
-                        )}
                       </div>
                     </div>
+                    
+                    {visibleRemarks[index] && (
+                      <FormField control={form.control} name={`spans.${index}.remarks`} render={({ field }) => (
+                        <FormItem className="animate-in fade-in duration-300">
+                          <FormControl><Textarea placeholder="Add observation for this span..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-xs" /></FormControl>
+                        </FormItem>
+                      )} />
+                    )}
                   </div>
                 ))}
               </div>
@@ -336,7 +365,7 @@ export default function HTConductorChecklistPage() {
             </Button>
           </div>
         </form>
-      </Form>
+      </寿Form>
     </div>
   );
 }

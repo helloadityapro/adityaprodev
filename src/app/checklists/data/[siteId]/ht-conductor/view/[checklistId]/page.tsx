@@ -20,7 +20,8 @@ import {
   Loader2, 
   MapPin,
   Building2,
-  Navigation
+  Navigation,
+  MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -43,7 +44,7 @@ type HTConductorChecklist = {
   userId: string;
   status: string;
   createdAt: any;
-  spans: { label: string; distance: number }[];
+  spans: { label: string; distance: number; remarks?: string }[];
   adminRemarks?: string;
   processedBy?: string;
   processedByName?: string;
@@ -135,9 +136,17 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
               {audit.spans?.map((span, idx) => (
                 <TableRow key={idx} className="hover:bg-primary/[0.01]">
                   <TableCell className="px-8 py-5">
-                    <div className="flex items-center gap-3">
-                      <div className="h-6 w-6 rounded-sm bg-muted flex items-center justify-center font-mono font-black text-[10px] text-muted-foreground">{idx + 1}</div>
-                      <span className="font-bold text-sm text-foreground uppercase tracking-tight">{span.label}</span>
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-3">
+                        <div className="h-6 w-6 rounded-sm bg-muted flex items-center justify-center font-mono font-black text-[10px] text-muted-foreground">{idx + 1}</div>
+                        <span className="font-bold text-sm text-foreground uppercase tracking-tight">{span.label}</span>
+                      </div>
+                      {span.remarks && (
+                        <div className="flex items-start gap-2 ml-9">
+                          <MessageCircle className="h-3 w-3 text-primary opacity-40 shrink-0 mt-0.5" />
+                          <p className="text-[10px] font-medium italic text-muted-foreground leading-relaxed">"{span.remarks}"</p>
+                        </div>
+                      )}
                     </div>
                   </TableCell>
                   <TableCell className="text-right px-8 font-mono font-black text-primary text-base">

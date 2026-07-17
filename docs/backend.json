@@ -555,7 +555,8 @@
             "type": "object",
             "properties": {
               "label": { "type": "string" },
-              "distance": { "type": "number" }
+              "distance": { "type": "number" },
+              "remarks": { "type": "string" }
             }
           }
         },
