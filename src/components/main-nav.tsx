@@ -823,6 +823,14 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
                   <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-conductor'} onClick={handleMobileClose}>
+                      <Link href="/checklists/ht-conductor">
+                        <Zap className="h-4 w-4" />
+                        <span>HT Conductor Checklist</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
                     <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
                       <Link href="/checklists/data">
                         <Database className="h-4 w-4" />

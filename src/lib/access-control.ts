@@ -27,6 +27,7 @@ export type PageKey =
   | 'attendance-map'
   | 'checklists-installation'
   | 'checklists-ht-line'
+  | 'checklists-ht-conductor'
   | 'checklists-inverter'
   | 'checklists-data'
   | 'master-data-tables-add'
@@ -97,6 +98,7 @@ export const APP_PAGES: AppPage[] = [
 
   { id: 'checklists-installation', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/installation' },
   { id: 'checklists-ht-line', label: 'HT Line Checklist', category: 'Checklists', path: '/checklists/ht-line' },
+  { id: 'checklists-ht-conductor', label: 'HT Conductor Checklist', category: 'Checklists', path: '/checklists/ht-conductor' },
   { id: 'checklists-inverter', label: 'Inverter Checklist', category: 'Checklists', path: '/checklists/inverter' },
   { id: 'checklists-data', label: 'Checklist Data Registry', category: 'Checklists', path: '/checklists/data' },
   
@@ -156,6 +158,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/attendance')) return 'attendance';
   if (path.startsWith('/checklists/installation')) return 'checklists-installation';
   if (path.startsWith('/checklists/ht-line')) return 'checklists-ht-line';
+  if (path.startsWith('/checklists/ht-conductor')) return 'checklists-ht-conductor';
   if (path.startsWith('/checklists/inverter')) return 'checklists-inverter';
   if (path.startsWith('/checklists/data')) return 'checklists-data';
   if (path.startsWith('/registries/tables')) {

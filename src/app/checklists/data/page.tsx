@@ -49,21 +49,24 @@ export default function ChecklistsDataProjectListPage() {
   const [mmsSiteIds, setMmsSiteIds] = React.useState<string[]>([]);
   const [invSiteIds, setInvSiteIds] = React.useState<string[]>([]);
   const [htSiteIds, setHtSiteIds] = React.useState<string[]>([]);
+  const [htCondSiteIds, setHtCondSiteIds] = React.useState<string[]>([]);
   const [isCountsLoading, setIsCountsLoading] = React.useState(true);
 
   React.useEffect(() => {
     const fetchAuditCounts = async () => {
       setIsCountsLoading(true);
       try {
-        const [mmsSnap, invSnap, htSnap] = await Promise.all([
+        const [mmsSnap, invSnap, htSnap, htCondSnap] = await Promise.all([
           getDocs(query(collection(firestore, 'installation_checklists'), limit(5000))),
           getDocs(query(collection(firestore, 'inverter_checklists'), limit(5000))),
-          getDocs(query(collection(firestore, 'ht_line_checklists'), limit(5000)))
+          getDocs(query(collection(firestore, 'ht_line_checklists'), limit(5000))),
+          getDocs(query(collection(firestore, 'ht_conductor_checklists'), limit(5000)))
         ]);
 
         setMmsSiteIds(mmsSnap.docs.map(doc => doc.data().siteId as string));
         setInvSiteIds(invSnap.docs.map(doc => doc.data().siteId as string));
         setHtSiteIds(htSnap.docs.map(doc => doc.data().siteId as string));
+        setHtCondSiteIds(htCondSnap.docs.map(doc => doc.data().siteId as string));
       } catch (err) {
         console.error("Optimization: Failed to fetch audit counts", err);
       } finally {
@@ -75,18 +78,19 @@ export default function ChecklistsDataProjectListPage() {
   }, [firestore]);
 
   const siteStats = React.useMemo(() => {
-    const stats: Record<string, { mms: number; inverter: number; htLine: number; total: number }> = {};
+    const stats: Record<string, { mms: number; inverter: number; htLine: number; htCond: number; total: number }> = {};
     
     allSites?.forEach(s => {
-      stats[s.id] = { mms: 0, inverter: 0, htLine: 0, total: 0 };
+      stats[s.id] = { mms: 0, inverter: 0, htLine: 0, htCond: 0, total: 0 };
     });
 
     mmsSiteIds.forEach(sid => { if (stats[sid]) { stats[sid].mms++; stats[sid].total++; } });
     invSiteIds.forEach(sid => { if (stats[sid]) { stats[sid].inverter++; stats[sid].total++; } });
     htSiteIds.forEach(sid => { if (stats[sid]) { stats[sid].htLine++; stats[sid].total++; } });
+    htCondSiteIds.forEach(sid => { if (stats[sid]) { stats[sid].htCond++; stats[sid].total++; } });
 
     return stats;
-  }, [mmsSiteIds, invSiteIds, htSiteIds, allSites]);
+  }, [mmsSiteIds, invSiteIds, htSiteIds, htCondSiteIds, allSites]);
 
   const filteredSortedSites = React.useMemo(() => {
     if (!allSites) return [];
@@ -132,8 +136,8 @@ export default function ChecklistsDataProjectListPage() {
   };
 
   const SortIcon = ({ column }: { column: SiteSortKey }) => {
-    if (siteSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return siteSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    if (siteSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
+    return siteSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
   };
 
   const isPageLoading = sitesLoading || isCountsLoading;
@@ -198,6 +202,11 @@ export default function ChecklistsDataProjectListPage() {
                         <Zap className="h-3.5 w-3.5" /> HT Line
                       </div>
                     </TableHead>
+                    <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <Zap className="h-3.5 w-3.5 text-primary" /> Conductor
+                      </div>
+                    </TableHead>
                     <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSiteSort('total')}>
                       <div className="flex items-center justify-center">Total Audits <SortIcon column="total" /></div>
                     </TableHead>
@@ -225,6 +234,11 @@ export default function ChecklistsDataProjectListPage() {
                         </Badge>
                       </TableCell>
                       <TableCell className="text-center">
+                        <Badge variant="outline" className="rounded-sm h-6 px-2 text-[10px] font-bold border-primary/10 bg-primary/5 text-primary/60">
+                          {siteStats[site.id]?.htCond || 0}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
                         <Badge variant="default" className="rounded-sm h-6 px-3 text-[10px] font-black border-none shadow-sm">
                           {siteStats[site.id]?.total || 0}
                         </Badge>
@@ -233,7 +247,7 @@ export default function ChecklistsDataProjectListPage() {
                     </TableRow>
                   ))}
                   {filteredSortedSites.length === 0 && (
-                    <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No active audits discovered</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No active audits discovered</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>

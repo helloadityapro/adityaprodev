@@ -89,8 +89,8 @@ const CHECK_KEYS = [
   { key: 'studInstalled', label: 'Stud installed?' },
   { key: 'vCross', label: 'V-Cross installed?' },
   { key: 'stayInstalled', label: 'Stay Installed?' },
-  { key: 'discInsulator', label: 'Disc insulator installed?' },
-  { key: 'pinInsulator', label: 'Pin insulator installed?' },
+  { key: 'discInsulator', label: 'Disc insulators installed?' },
+  { key: 'pinInsulator', label: 'Pin insulators installed?' },
   { key: 'abSwitch', label: 'AB Switch installed?' },
   { key: 'dangerBoard', label: 'Danger Board installed?' },
   { key: 'barbedWire', label: 'Barbed Wire installed?' },
@@ -317,7 +317,7 @@ export default function HTLineChecklistPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-2">
                 <FormField control={form.control} name="poleType" render={({ field }) => (
                   <FormItem className="space-y-3">
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Configuration *</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Four Pole / Two Pole in Plant? *</FormLabel>
                     <FormControl>
                       <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 sm:gap-6 h-11 items-center">
                         <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pt-two" /><Label htmlFor="pt-two" className="font-bold cursor-pointer text-xs uppercase">Two Pole</Label></div>

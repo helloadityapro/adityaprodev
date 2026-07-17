@@ -538,6 +538,33 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "poleNumber", "userId"]
+    },
+    "HTConductorChecklist": {
+      "title": "HT Conductor Checklist",
+      "type": "object",
+      "description": "Sequential pole distance verification for HT conductors.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "projectCompany": { "type": "string" },
+        "poleConfiguration": { "type": "string", "enum": ["Two Pole", "Four Pole"] },
+        "spans": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "distance": { "type": "number" }
+            }
+          }
+        },
+        "status": { "type": "string", "enum": ["Draft", "Pending", "Approved", "Rejected"] },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "poleConfiguration", "userId"]
     }
   },
   "auth": {
@@ -651,6 +678,10 @@
     "/ht_line_checklists/{checklistId}": {
       "schema": { "$ref": "#/backend/entities/HTLineChecklist" },
       "description": "HT Line installation quality checks."
+    },
+    "/ht_conductor_checklists/{checklistId}": {
+      "schema": { "$ref": "#/backend/entities/HTConductorChecklist" },
+      "description": "Sequential pole distance verification for HT conductors."
     },
     "/notifications/{notifId}": {
       "schema": { "$ref": "#/backend/entities/Notification" },

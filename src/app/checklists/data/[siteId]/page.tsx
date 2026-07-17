@@ -118,11 +118,27 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
               <Zap className="h-5 w-5 text-muted-foreground/60" />
             </div>
             <div className="flex flex-col min-w-0">
-              <div className="flex items-center gap-2">
-                <span className="text-sm font-bold text-foreground truncate">HT Line Checklist</span>
-                <Badge variant="outline" className="h-4 px-1.5 text-[8px] font-black uppercase bg-amber-50 text-amber-700 border-amber-200 shadow-none shrink-0">In Progress</Badge>
-              </div>
+              <span className="text-sm font-bold text-foreground truncate">HT Line Checklist</span>
               <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">HV Transmission Audit</span>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+
+        <div className="py-1 px-1"><Separator className="opacity-30" /></div>
+
+        {/* HT Conductor */}
+        <div 
+          onClick={() => router.push(`/checklists/data/${siteId}/ht-conductor`)}
+          className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:bg-muted/50 transition-all cursor-pointer active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="p-2.5 bg-muted rounded-md shrink-0">
+              <Zap className="h-5 w-5 text-primary opacity-60" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-bold text-foreground truncate">HT Conductor Checklist</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Pole Distance Audits</span>
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:translate-x-0.5 transition-transform" />
