@@ -43,6 +43,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
+import { format } from 'date-fns';
 
 const spanSchema = z.object({
   label: z.string(),
@@ -56,6 +58,9 @@ const conductorSchema = z.object({
   projectCompany: z.string().optional(),
   poleConfiguration: z.enum(['Two Pole', 'Four Pole']),
   spans: z.array(spanSchema).min(1, 'At least one span distance is required.'),
+  undertaking: z.boolean().refine(val => val === true, {
+    message: "Mandatory compliance undertaking."
+  }),
 });
 
 type Site = { id: string; name: string; projectCompany?: string };
@@ -92,6 +97,7 @@ export default function HTConductorChecklistPage() {
         { label: "Pole 1 to Pole 2 Distance", distance: undefined as any },
         { label: "Pole 2 to Pole 3 Distance", distance: undefined as any },
       ],
+      undertaking: false,
     },
   });
 
@@ -136,7 +142,8 @@ export default function HTConductorChecklistPage() {
             siteName: draft.siteName,
             projectCompany: draft.projectCompany || "",
             poleConfiguration: draft.poleConfiguration,
-            spans: draft.spans
+            spans: draft.spans,
+            undertaking: false,
           });
           toast({ title: 'Draft Resumed', description: 'Previously saved work for this site has been loaded.' });
         } else {
@@ -167,8 +174,9 @@ export default function HTConductorChecklistPage() {
     else setIsSubmitting(true);
 
     try {
+      const { undertaking, ...restValues } = values;
       const data = {
-        ...values,
+        ...restValues,
         userId: user.uid,
         userName: userProfile.username || user.email,
         status,
@@ -305,23 +313,9 @@ export default function HTConductorChecklistPage() {
               <div className="divide-y">
                 {fields.map((field, index) => (
                   <div key={field.id} className="p-4 sm:p-6 space-y-4 hover:bg-muted/[0.01] transition-colors relative group">
-                    <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                       <div className="space-y-1">
                         <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{form.watch(`spans.${index}.label`)} *</Label>
-                        <div className="flex items-center gap-2">
-                          <Button 
-                            type="button" 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={() => toggleRemark(index)}
-                            className={cn("h-7 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visibleRemarks[index] ? "text-primary border-primary/20" : "text-muted-foreground")}
-                          >
-                            <Plus className="h-3.5 w-3.5 mr-1" /> Remark
-                          </Button>
-                          {index > 2 && (
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                          )}
-                        </div>
                       </div>
                       <div className="flex items-center gap-2">
                         <FormField control={form.control} name={`spans.${index}.distance`} render={({ field }) => (
@@ -334,6 +328,18 @@ export default function HTConductorChecklistPage() {
                             </FormControl>
                           </FormItem>
                         )} />
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => toggleRemark(index)}
+                          className={cn("h-11 w-11 rounded-sm border", visibleRemarks[index] ? "text-primary border-primary/20 bg-primary/5" : "text-muted-foreground border-input")}
+                        >
+                          <Plus className="h-4 w-4" />
+                        </Button>
+                        {index > 2 && (
+                          <Button variant="ghost" size="icon" className="h-11 w-11 text-destructive rounded-sm border border-destructive/10" onClick={() => remove(index)}><Trash2 className="h-4 w-4" /></Button>
+                        )}
                       </div>
                     </div>
                     
@@ -352,6 +358,22 @@ export default function HTConductorChecklistPage() {
                   <Plus className="h-4 w-4 mr-2" /> Add More Pole Spans
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden">
+            <CardContent className="p-6 sm:p-8">
+              <FormField control={form.control} name="undertaking" render={({ field }) => (
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-5 rounded-sm bg-primary/5 border border-primary/20">
+                  <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" /></FormControl>
+                  <div className="space-y-1">
+                    <FormLabel className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer font-bold">
+                      I, {userProfile?.username || user?.email}, hereby undertake and confirm that the information provided above is full and final, true and accurate as of {format(new Date(), 'dd MMMM yyyy')}. *
+                    </FormLabel>
+                    <FormMessage />
+                  </div>
+                </FormItem>
+              )} />
             </CardContent>
           </Card>
 
