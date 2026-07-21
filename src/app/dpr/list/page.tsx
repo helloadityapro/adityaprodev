@@ -35,7 +35,8 @@ import {
   Share2,
   Tags,
   ChevronDown,
-  Check
+  Check,
+  ArrowRight
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Input } from '@/components/ui/input';
@@ -387,7 +388,7 @@ export default function DPRListPage() {
                   </span>
                   <h3 className="font-bold text-sm leading-tight text-foreground truncate">{dpr.siteName}</h3>
                 </div>
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col items-end gap-1.5 shrink-0">
                   <Badge variant="outline" className="text-[8px] font-black uppercase rounded-sm border-primary/20 text-primary">
                     DPR
                   </Badge>
@@ -549,112 +550,114 @@ export default function DPRListPage() {
           <h1 className="flex items-center gap-2">
             <FileText className="h-8 w-8 text-primary" /> DPR Data Registry
           </h1>
-          <p className="text-muted-foreground">Historical log of all progress updates across authorized locations.</p>
+          <p className="text-muted-foreground text-sm font-medium">Historical log of all progress updates across authorized locations.</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-4 items-end bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
-        <div className="md:col-span-2 lg:col-span-2 space-y-1">
-          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Search Records</Label>
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 md:h-4 md:w-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search site, user or update..." 
-              className="pl-8 h-9 md:h-10 rounded-sm border-primary/20 text-xs md:text-sm"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
-        </div>
-
-        <div className="space-y-1">
-          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Site Groups</Label>
-          <Popover>
-            <PopoverTrigger asChild>
-              <Button 
-                variant="outline" 
-                disabled={activeTab !== 'site'}
-                className={cn(
-                  "w-full justify-between h-9 md:h-10 rounded-sm border-primary/20 bg-background text-xs font-bold uppercase",
-                  selectedGroupIds.length > 0 && "border-primary text-primary"
-                )}
-              >
-                <div className="flex items-center gap-2 truncate">
-                  <Tags className="h-3.5 w-3.5 opacity-50" />
-                  <span className="truncate">
-                    {selectedGroupIds.length === 0 ? "All Groups" : `${selectedGroupIds.length} Groups`}
-                  </span>
-                </div>
-                <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-64 p-0 rounded-sm border-primary/10 shadow-2xl overflow-hidden">
-              <div className="bg-primary/5 p-3 border-b">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Organizational Groups</h3>
-              </div>
-              <ScrollArea className="h-[250px]">
-                <div className="p-2 space-y-1">
-                  {siteGroups?.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")).map((group: any) => (
-                    <div 
-                      key={group.id} 
-                      className={cn(
-                        "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/50 transition-colors cursor-pointer",
-                        selectedGroupIds.includes(group.id) && "bg-primary/10"
-                      )}
-                      onClick={() => setSelectedGroupIds(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
-                    >
-                      <Checkbox checked={selectedGroupIds.includes(group.id)} onCheckedChange={() => {}} />
-                      <span className="text-xs font-bold uppercase truncate">{group.name}</span>
-                    </div>
-                  ))}
-                  {(!siteGroups || siteGroups.length === 0) && (
-                    <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground opacity-30">No groups registered</p>
-                  )}
-                </div>
-              </ScrollArea>
-              {selectedGroupIds.length > 0 && (
-                <Button variant="ghost" onClick={() => setSelectedGroupIds([])} className="w-full rounded-none h-8 text-[9px] font-black uppercase text-primary border-t">Reset Filter</Button>
-              )}
-            </PopoverContent>
-          </Popover>
-        </div>
-        
-        <div className="space-y-1">
-          <Label className="text-[9px] md:text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Time Range</Label>
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="h-9 md:h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
-              <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
-              <SelectValue placeholder="Select Range" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
-              <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
-              <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
-              <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
-              <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
-              <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
-              <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex items-end gap-2">
-          {dateFilter === 'custom' ? (
-            <div className="flex-1 flex gap-2 animate-in fade-in zoom-in-95">
-              <div className="flex-1 space-y-1">
-                <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" />
-              </div>
-              <div className="flex-1 space-y-1">
-                <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 md:h-10 rounded-sm border-primary/20 text-[10px] md:text-sm" />
-              </div>
+      <div className="bg-card p-3 border rounded-sm shadow-sm no-print">
+        <div className="flex flex-wrap items-end gap-2 md:gap-3">
+          <div className="flex-1 min-w-[200px] space-y-1.5">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Records</Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input 
+                placeholder="Search site, user or update..." 
+                className="pl-8 h-9 text-xs rounded-sm border-primary/10 bg-background"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
             </div>
-          ) : (
-            <div className="flex-1" />
-          )}
-          <Button variant="ghost" size="icon" className="h-9 w-9 md:h-10 md:w-10 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
-            <FilterX className="h-3.5 w-3.5 md:h-4 md:w-4" />
+          </div>
+
+          <div className="w-[110px] sm:w-[130px] space-y-1.5">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Groups</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button 
+                  variant="outline" 
+                  disabled={activeTab !== 'site'}
+                  className={cn(
+                    "w-full justify-between h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase px-2",
+                    selectedGroupIds.length > 0 && "border-primary text-primary"
+                  )}
+                >
+                  <div className="flex items-center gap-1 truncate">
+                    <Tags className="h-3.5 w-3.5 opacity-50" />
+                    <span className="truncate">
+                      {selectedGroupIds.length === 0 ? "All" : `${selectedGroupIds.length}`}
+                    </span>
+                  </div>
+                  <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="end" className="w-64 p-0 rounded-sm border-primary/10 shadow-2xl overflow-hidden">
+                <div className="bg-primary/5 p-3 border-b">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Organizational Groups</h3>
+                </div>
+                <ScrollArea className="h-[250px]">
+                  <div className="p-2 space-y-1">
+                    {siteGroups?.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || "")).map((group: any) => (
+                      <div 
+                        key={group.id} 
+                        className={cn(
+                          "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/50 transition-colors cursor-pointer",
+                          selectedGroupIds.includes(group.id) && "bg-primary/10"
+                        )}
+                        onClick={() => setSelectedGroupIds(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
+                      >
+                        <Checkbox checked={selectedGroupIds.includes(group.id)} onCheckedChange={() => {}} />
+                        <span className="text-xs font-bold uppercase truncate">{group.name}</span>
+                      </div>
+                    ))}
+                    {(!siteGroups || siteGroups.length === 0) && (
+                      <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground opacity-30">No groups registered</p>
+                    )}
+                  </div>
+                </ScrollArea>
+                {selectedGroupIds.length > 0 && (
+                  <Button variant="ghost" onClick={() => setSelectedGroupIds([])} className="w-full rounded-none h-8 text-[9px] font-black uppercase text-primary border-t">Reset Filter</Button>
+                )}
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="w-[110px] sm:w-[140px] space-y-1.5">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Time</Label>
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
+                <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
+                <SelectItem value="7days" className="text-[10px] font-bold uppercase">7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-[10px] font-bold uppercase">Month</SelectItem>
+                <SelectItem value="lastYear" className="text-[10px] font-bold uppercase">Year</SelectItem>
+                <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All</SelectItem>
+                <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <Button variant="ghost" size="icon" className="h-9 w-9 rounded-sm text-muted-foreground border border-transparent hover:border-primary/10 shrink-0" onClick={clearFilters} title="Clear Filters">
+            <FilterX className="h-4 w-4" />
           </Button>
         </div>
+
+        {dateFilter === 'custom' && (
+           <div className="flex items-center gap-3 pt-3 border-t border-border/50 mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
+             <div className="flex-1 space-y-1">
+                <Label className="text-[9px] font-black uppercase text-primary tracking-widest px-1">Start Range</Label>
+                <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 text-[10px] rounded-sm border-primary/20" />
+              </div>
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground mt-4 shrink-0" />
+              <div className="flex-1 space-y-1">
+                <Label className="text-[9px] font-black uppercase text-primary tracking-widest px-1">End Range</Label>
+                <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 text-[10px] rounded-sm border-primary/20" />
+              </div>
+           </div>
+        )}
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
@@ -667,15 +670,18 @@ export default function DPRListPage() {
           </TabsTrigger>
         </TabsList>
 
-        <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden" id="printable-report-area">
-          <CardHeader className="border-b bg-muted/5">
+        <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
+          <CardHeader className="border-b bg-muted/5 py-4">
             <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>{activeTab === 'site' ? 'Project Site Reports' : 'Other Work Reports'}</CardTitle>
-                <CardDescription>
-                  Viewing records from {queryDateRange.start} to {queryDateRange.end}
+              <div className="space-y-1">
+                <CardTitle className="text-sm font-bold uppercase tracking-widest">{activeTab === 'site' ? 'Project Site Reports' : 'Other Work Reports'}</CardTitle>
+                <CardDescription className="text-[10px] font-medium uppercase opacity-60">
+                  {queryDateRange.start} to {queryDateRange.end}
                 </CardDescription>
               </div>
+              <Badge variant="secondary" className="h-6 px-3 rounded-full font-black text-[10px] bg-primary/5 text-primary border-primary/10">
+                {sortedAndFilteredDprs.length} Records
+              </Badge>
             </div>
           </CardHeader>
           <CardContent className="p-0">

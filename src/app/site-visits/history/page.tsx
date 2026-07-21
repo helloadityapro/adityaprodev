@@ -354,9 +354,9 @@ export default function SiteVisitsHistoryPage() {
     <div className="space-y-8">
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2">
-          <History className="h-8 w-8 text-primary" /> {isAdmin ? "Global Presence Logs" : "Presence Data Hub"}
+          <History className="h-8 w-8 text-primary" /> {isAdmin ? "Global Site Visits Data" : "Site Visits Data"}
         </h1>
-        <p className="text-muted-foreground">Historical records of presence logs from authorized locations.</p>
+        <p className="text-muted-foreground">Historical records of your Site Visits.</p>
       </div>
 
       <div className="bg-card p-3 border rounded-sm shadow-sm no-print">
