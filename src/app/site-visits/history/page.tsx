@@ -178,7 +178,6 @@ export default function SiteVisitsHistoryPage() {
 
   const historyQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
-    // FIX: Added explicit ordering by startTime descending and removed limit to ensure all recent records are fetched for filtering.
     return query(collection(firestore, 'site_visits'), orderBy('startTime', 'desc'));
   }, [firestore, user, isProfileLoading]);
 
@@ -297,7 +296,7 @@ export default function SiteVisitsHistoryPage() {
         </div>
 
         <div className="hidden md:block">
-          <Card className="rounded-sm overflow-hidden border-primary/10">
+          <Card className="rounded-sm overflow-hidden border-primary/10 shadow-lg">
             <CardContent className="p-0">
               <ScrollArea className="w-full">
                 <div className="min-w-[800px]">
@@ -319,20 +318,20 @@ export default function SiteVisitsHistoryPage() {
                           <TableCell className="font-mono text-xs font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
                           <TableCell className="font-black text-sm">
                             <div className="flex items-center gap-2">
-                              {visit.locationType === 'other' ? <Globe className="h-3 w-3 text-primary/40" /> : <Building2 className="h-3 w-3 text-primary/40" />}
+                              {visit.locationType === 'other' ? <Globe className="h-3.5 w-3.5 text-primary/40" /> : <Building2 className="h-3.5 w-3.5 text-primary/40" />}
                               {visit.siteName}
                             </div>
                           </TableCell>
                           {(isAdmin || isManager) && (
                             <TableCell>
                               <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2 text-xs font-bold"><User className="h-3 w-3 text-primary" />{visit.managerName}</div>
+                                <div className="flex items-center gap-2 text-xs font-bold"><User className="h-3.5 w-3.5 text-primary" />{visit.managerName}</div>
                                 {visit.department && (<Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1 px-1.5"><Building2 className="h-3 w-3" /> {visit.department}</Badge>)}
                               </div>
                             </TableCell>
                           )}
                           <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
-                          <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3 w-3" />{calculateDurationStr(calculateDurationMins(visit.startTime, visit.endTime))}</div></TableCell>
+                          <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3.5 w-3.5" />{calculateDurationStr(calculateDurationMins(visit.startTime, visit.endTime))}</div></TableCell>
                           <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
                           <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Report</Link></Button></TableCell>
                         </TableRow>
@@ -360,78 +359,91 @@ export default function SiteVisitsHistoryPage() {
         <p className="text-muted-foreground">Historical records of presence logs from authorized locations.</p>
       </div>
 
-      <div className="bg-card p-4 border rounded-sm shadow-sm no-print space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-          <div className="md:col-span-2 space-y-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Context</Label>
+      <div className="bg-card p-3 border rounded-sm shadow-sm no-print">
+        <div className="flex flex-wrap items-end gap-2 md:gap-3">
+          {/* Search Box - Flex-grow to fill remaining space */}
+          <div className="flex-1 min-w-[200px] space-y-1.5">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Search Context</Label>
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input placeholder="Search personnel or location..." className="pl-10 h-11 rounded-sm border-primary/10 bg-background text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input 
+                placeholder="Personnel/Location..." 
+                className="pl-8 h-9 text-xs rounded-sm border-primary/10 bg-background" 
+                value={searchTerm} 
+                onChange={(e) => setSearchTerm(e.target.value)} 
+              />
             </div>
           </div>
-          <div className="space-y-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Quick Filter</Label>
+          
+          {/* Time Filter - Standard size */}
+          <div className="w-[110px] sm:w-[130px] space-y-1.5">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Time</Label>
             <Select value={dateFilter} onValueChange={setDateFilter}>
-              <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase"><Calendar className="h-4 w-4 mr-2 opacity-50" /><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
+                <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent>
-                <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
-                <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
-                <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
-                <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
-                <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
-                <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom</SelectItem>
+                <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
+                <SelectItem value="7days" className="text-[10px] font-bold uppercase">7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-[10px] font-bold uppercase">Month</SelectItem>
+                <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All</SelectItem>
+                <SelectItem value="custom" className="text-[10px] font-bold uppercase text-primary">Custom</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="flex items-end gap-2">
-            <div className="flex-1 space-y-1.5">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Filter by Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
-                  <ListFilter className="h-4 w-4 mr-2 opacity-50" />
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
-                  <SelectItem value="ongoing" className="text-xs font-bold uppercase">Ongoing</SelectItem>
-                  <SelectItem value="completed" className="text-xs font-bold uppercase">Completed</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button variant="ghost" size="icon" onClick={clearFilters} title="Clear Filters" className="h-11 w-11 rounded-sm border border-transparent hover:border-primary/10">
-              <FilterX className="h-4 w-4" />
-            </Button>
-          </div>
-        </div>
 
-        <div className="flex flex-col md:flex-row gap-4 items-end">
-          <div className="w-full md:w-64 space-y-1.5">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Filter by Department</Label>
-            <Select value={deptFilter} onValueChange={setDeptFilter}>
-              <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
-                <Building2 className="h-4 w-4 mr-2 opacity-50" />
-                <SelectValue placeholder="All Departments" />
+          {/* Status Filter - Standard size */}
+          <div className="w-[100px] sm:w-[120px] space-y-1.5">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
+                <ListFilter className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all" className="text-xs font-bold uppercase">All Departments</SelectItem>
+                <SelectItem value="all" className="text-[10px] font-bold uppercase">All</SelectItem>
+                <SelectItem value="ongoing" className="text-[10px] font-bold uppercase">Active</SelectItem>
+                <SelectItem value="completed" className="text-[10px] font-bold uppercase">Done</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Dept Filter - Standard size */}
+          <div className="w-[100px] sm:w-[130px] space-y-1.5">
+            <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Dept</Label>
+            <Select value={deptFilter} onValueChange={setDeptFilter}>
+              <SelectTrigger className="h-9 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
+                <Building2 className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-[10px] font-bold uppercase">All</SelectItem>
                 {allDepts?.map(dept => (
-                  <SelectItem key={dept.name} value={dept.name} className="text-xs font-bold uppercase">{dept.name}</SelectItem>
+                  <SelectItem key={dept.name} value={dept.name} className="text-[10px] font-bold uppercase">{dept.name}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
+
+          {/* Reset Button */}
+          <Button variant="ghost" size="icon" onClick={clearFilters} title="Reset" className="h-9 w-9 rounded-sm text-muted-foreground border border-transparent hover:border-primary/10 shrink-0">
+            <FilterX className="h-4 w-4" />
+          </Button>
         </div>
         
+        {/* Custom Range Expansion */}
         {dateFilter === 'custom' && (
-          <div className="flex items-center gap-4 pt-4 border-t border-border/50 mt-4 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-3 pt-3 border-t border-border/50 mt-3 animate-in fade-in slide-in-from-top-2 duration-200">
             <div className="flex-1 space-y-1">
-              <Label className="text-[10px] font-black uppercase text-primary tracking-widest px-1">Start Range</Label>
-              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
+              <Label className="text-[9px] font-black uppercase text-primary tracking-widest px-1">Start Range</Label>
+              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 text-[10px] rounded-sm border-primary/20" />
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground mt-4 shrink-0" />
+            <ArrowRight className="h-3.5 w-3.5 text-muted-foreground mt-4 shrink-0" />
             <div className="flex-1 space-y-1">
-              <Label className="text-[10px] font-black uppercase text-primary tracking-widest px-1">End Range</Label>
-              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-10 rounded-sm border-primary/20 text-xs" />
+              <Label className="text-[9px] font-black uppercase text-primary tracking-widest px-1">End Range</Label>
+              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 text-[10px] rounded-sm border-primary/20" />
             </div>
           </div>
         )}
