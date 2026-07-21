@@ -1,8 +1,9 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, where, limit, doc, or, and } from "firebase/firestore";
+import { collection, query, where, limit, doc, or, and, orderBy } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { format, differenceInMinutes, subDays, subMonths, subYears } from "date-fns";
@@ -177,7 +178,8 @@ export default function SiteVisitsHistoryPage() {
 
   const historyQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
-    return query(collection(firestore, 'site_visits'), limit(1000));
+    // FIX: Added explicit ordering by startTime descending and removed limit to ensure all recent records are fetched for filtering.
+    return query(collection(firestore, 'site_visits'), orderBy('startTime', 'desc'));
   }, [firestore, user, isProfileLoading]);
 
   const { data: visits, isLoading } = useCollection<SiteVisit>(historyQuery);
