@@ -337,7 +337,7 @@ export default function HTConductorChecklistPage() {
                           )}
                         >
                           <Plus className="h-3.5 w-3.5 mr-2" /> 
-                          <span className="text-[10px] font-black uppercase tracking-widest">+ Remark</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest">Remark</span>
                         </Button>
 
                         {index > 2 && (

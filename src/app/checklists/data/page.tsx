@@ -56,11 +56,12 @@ export default function ChecklistsDataProjectListPage() {
     const fetchAuditCounts = async () => {
       setIsCountsLoading(true);
       try {
+        // REMOVED: limit(5000) to ensure accurate "all time" counts across high-volume sites
         const [mmsSnap, invSnap, htSnap, htCondSnap] = await Promise.all([
-          getDocs(query(collection(firestore, 'installation_checklists'), limit(5000))),
-          getDocs(query(collection(firestore, 'inverter_checklists'), limit(5000))),
-          getDocs(query(collection(firestore, 'ht_line_checklists'), limit(5000))),
-          getDocs(query(collection(firestore, 'ht_conductor_checklists'), limit(5000)))
+          getDocs(collection(firestore, 'installation_checklists')),
+          getDocs(collection(firestore, 'inverter_checklists')),
+          getDocs(collection(firestore, 'ht_line_checklists')),
+          getDocs(collection(firestore, 'ht_conductor_checklists'))
         ]);
 
         setMmsSiteIds(mmsSnap.docs.map(doc => doc.data().siteId as string));
