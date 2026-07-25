@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -17,8 +17,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Search, Check, ChevronsUpDown, Loader2, PieChart, Calendar, CheckCircle2, Building2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isSuperAdmin } from "@/lib/auth-constants";
-import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { slugifyRole } from "@/lib/access-control";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -253,6 +251,28 @@ export default function RecordUtilisationPage() {
 
   if (isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
+  if (isSuccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] px-4 animate-in fade-in zoom-in-95 duration-500">
+        <Card className="max-w-md w-full rounded-sm shadow-2xl border-emerald-500/20">
+          <CardHeader className="text-center pt-8">
+            <div className="flex justify-center mb-6">
+              <div className="bg-emerald-500/10 p-6 rounded-full"><CheckCircle2 className="h-16 w-16 text-emerald-600" /></div>
+            </div>
+            <CardTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Utilisation Logged</CardTitle>
+            <CardDescription className="text-base font-medium text-emerald-800/70 mt-2">
+              The material consumption report for <strong>{selectedItemName}</strong> has been successfully archived.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4 pb-8 px-8">
+            <Button className="w-full h-12 text-sm font-black uppercase bg-emerald-600 shadow-lg" onClick={() => router.push("/inventory/utilisation/data")}>View Utilisation Data</Button>
+            <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase text-muted-foreground" onClick={() => { setIsSuccess(false); form.reset(); setItemSearchQuery(""); }}>Record New Entry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 max-w-2xl mx-auto pb-20">
       <div className="flex flex-col gap-1">
@@ -305,12 +325,12 @@ export default function RecordUtilisationPage() {
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button variant="outline" disabled={!selectedSiteId} className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
-                          <span className="truncate">{field.value || "Choose authorized material..."}</span>
+                          <span className="truncate">{field.value ? `${field.value} (Stock: ${selectedItem?.stockLevel.toLocaleString()} ${getFriendlyUnit(selectedItem?.unit || "")})` : "Choose authorized material..."}</span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                    <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0">
                       <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search authorized items..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
                       <ScrollArea className="h-[250px]">
                         <div className="p-1">
@@ -373,4 +393,9 @@ export default function RecordUtilisationPage() {
       </Card>
     </div>
   );
+}
+
+function isSuperAdmin(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ['khalil@adityagreenenergy.com'].includes(email.toLowerCase());
 }
