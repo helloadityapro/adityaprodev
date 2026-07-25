@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc, and } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, getDocs, and } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -20,6 +20,9 @@ import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { useRouter } from "next/navigation";
+import { slugifyRole } from "@/lib/access-control";
+import { Skeleton } from "@/components/ui/skeleton";
+import { sendNotification } from "@/lib/notifications";
 
 const utilisationSchema = z.object({
   siteId: z.string().min(1, "Site is required"),
@@ -33,6 +36,7 @@ const utilisationSchema = z.object({
 type Site = {
   id: string;
   name: string;
+  projectCompany?: string;
 };
 
 type InventoryItem = {
@@ -57,6 +61,21 @@ type MappingOverride = {
   managerId: string;
 };
 
+type BoMItem = {
+  id: string;
+  itemName: string;
+  unit: string;
+  make: string;
+  status: string;
+  subItems?: { name: string; quantityPerSet: number; unit: string }[];
+};
+
+type PurchaseOrder = {
+  id: string;
+  status: string;
+  items: { itemName: string }[];
+};
+
 export default function RecordUtilisationPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -68,6 +87,9 @@ export default function RecordUtilisationPage() {
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
+
+  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const { data: roleConfigs } = useCollection<any>(roleConfigsQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -88,8 +110,6 @@ export default function RecordUtilisationPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
 
-  const [availableMaterials, setAvailableMaterials] = React.useState<InventoryItem[]>([]);
-
   const form = useForm<z.infer<typeof utilisationSchema>>({
     resolver: zodResolver(utilisationSchema),
     defaultValues: { 
@@ -104,21 +124,63 @@ export default function RecordUtilisationPage() {
 
   const selectedSiteId = form.watch("siteId");
   const selectedItemName = form.watch("itemName");
-  const selectedItem = availableMaterials.find(m => m.itemName === selectedItemName);
 
-  React.useEffect(() => {
-    if (selectedSiteId) {
-      const fetchAvailable = async () => {
-        const q = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId));
-        const snap = await getDocs(q);
-        const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as InventoryItem));
-        setAvailableMaterials(results.filter(m => m.stockLevel > 0));
-      };
-      fetchAvailable();
-    } else {
-      setAvailableMaterials([]);
-    }
-  }, [selectedSiteId, firestore]);
+  // Real-time data hub for selected site
+  const inventoryQuery = useMemoFirebase(() => {
+    if (!selectedSiteId) return null;
+    return query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId));
+  }, [firestore, selectedSiteId]);
+  const { data: projectInventory } = useCollection<InventoryItem>(inventoryQuery);
+
+  const bomQuery = useMemoFirebase(() => {
+    if (!selectedSiteId) return null;
+    return query(collection(firestore, 'project_boms'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
+  }, [firestore, selectedSiteId]);
+  const { data: approvedBomItems } = useCollection<BoMItem>(bomQuery);
+
+  const poQuery = useMemoFirebase(() => {
+    if (!selectedSiteId) return null;
+    return query(collection(firestore, 'project_pos'), where('siteId', '==', selectedSiteId), where('status', '==', 'Accepted'));
+  }, [firestore, selectedSiteId]);
+  const { data: acceptedPOs } = useCollection<PurchaseOrder>(poQuery);
+
+  const filteredMaterials = React.useMemo(() => {
+    if (!selectedSiteId || !approvedBomItems || !acceptedPOs) return [];
+    
+    const poItemNames = new Set<string>();
+    acceptedPOs.forEach(po => po.items?.forEach(it => poItemNames.add(it.itemName)));
+
+    const list: { itemName: string; unit: string; stockLevel: number; id: string }[] = [];
+
+    approvedBomItems.forEach(bom => {
+      if (poItemNames.has(bom.itemName)) {
+        if (bom.subItems && bom.subItems.length > 0) {
+          bom.subItems.forEach(sub => {
+            const fullName = `${bom.itemName} - ${sub.name}`;
+            const inv = projectInventory?.find(i => i.itemName === fullName);
+            list.push({
+              id: inv?.id || `new-${fullName}`,
+              itemName: fullName,
+              unit: sub.unit,
+              stockLevel: inv?.stockLevel || 0
+            });
+          });
+        } else {
+          const inv = projectInventory?.find(i => i.itemName === bom.itemName);
+          list.push({
+            id: inv?.id || `new-${bom.id}`,
+            itemName: bom.itemName,
+            unit: bom.unit,
+            stockLevel: inv?.stockLevel || 0
+          });
+        }
+      }
+    });
+
+    return list.filter(m => m.itemName.toLowerCase().includes(itemSearchQuery.toLowerCase()));
+  }, [selectedSiteId, approvedBomItems, acceptedPOs, projectInventory, itemSearchQuery]);
+
+  const selectedItem = filteredMaterials.find(m => m.itemName === selectedItemName);
 
   const onSubmit = async (values: z.infer<typeof utilisationSchema>) => {
     if (!user || !userProfile || !selectedItem) return;
@@ -130,8 +192,8 @@ export default function RecordUtilisationPage() {
 
     setIsSubmitting(true);
     try {
-      const overridesQuery = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', values.siteId)));
-      const overridesSnap = await getDocs(overridesQuery);
+      const overridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', values.siteId)));
+      const overridesSnap = await getDocs(overridesQ);
       const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
 
       await addDocumentNonBlocking(collection(firestore, 'material_utilisations'), {
@@ -143,12 +205,14 @@ export default function RecordUtilisationPage() {
         createdAt: serverTimestamp()
       });
 
-      const invRef = doc(firestore, 'project_inventory', selectedItem.id);
-      updateDocumentNonBlocking(invRef, {
-        stockLevel: increment(-values.quantity),
-        utilisedQuantity: increment(values.quantity),
-        lastUpdated: serverTimestamp()
-      });
+      // Update physical inventory stock
+      if (!selectedItem.id.startsWith('new-')) {
+        updateDocumentNonBlocking(doc(firestore, 'project_inventory', selectedItem.id), {
+          stockLevel: increment(-values.quantity),
+          utilisedQuantity: increment(values.quantity),
+          lastUpdated: serverTimestamp()
+        });
+      }
 
       setIsSuccess(true);
       toast({ title: "Consumption Logged", description: "Inventory stock levels adjusted successfully." });
@@ -161,9 +225,8 @@ export default function RecordUtilisationPage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
-    if (isAdmin) return allSites;
+    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
 
-    // Sovereignty Logic
     const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager) {
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
@@ -177,32 +240,16 @@ export default function RecordUtilisationPage() {
       }
     }
 
-    return allSites.filter(s => siteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
+    const filtered = allSites.filter(s => siteIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
-  const filteredMaterials = availableMaterials.filter(m => m.itemName.toLowerCase().includes(itemSearchQuery.toLowerCase()));
 
-  if (isSuccess) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
-            <CardTitle className="text-2xl font-bold">Utilisation Recorded</CardTitle>
-            <CardDescription className="text-base">Consumption for <strong>{form.getValues('itemName')}</strong> at <strong>{form.getValues('siteName')}</strong> has been logged.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button variant="outline" className="w-full h-11" onClick={() => router.push(`/projects/${form.getValues('siteId')}?tab=utilisation`)}>View Site Log</Button>
-            <Button className="w-full h-11" onClick={() => { setIsSuccess(false); form.reset(); setAvailableMaterials([]); }}>Record New Entry</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  if (isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto">
+    <div className="space-y-8 max-w-2xl mx-auto pb-20">
       <div className="flex flex-col gap-1">
         <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
           <PieChart className="h-8 w-8" /> Record Utilisation
@@ -221,7 +268,7 @@ export default function RecordUtilisationPage() {
                   <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
-                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
+                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
                           {field.value ? accessibleSites.find(s => s.id === field.value)?.name : "Select site..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
@@ -229,9 +276,17 @@ export default function RecordUtilisationPage() {
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                       <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
-                      <ScrollArea className="h-[200px]">{filteredSites.map(site => (
-                        <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(site.id); form.setValue('siteName', site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", site.id === field.value ? "opacity-100" : "opacity-0")} />{site.name}</Button>
-                      ))}</ScrollArea>
+                      <ScrollArea className="h-[200px]">
+                        {filteredSites.map(site => (
+                          <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { field.onChange(site.id); form.setValue('siteName', site.name); setIsSitePopoverOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4 text-primary", site.id === field.value ? "opacity-100" : "opacity-0")} />
+                            <div className="flex flex-col items-start min-w-0">
+                              <span className="font-bold truncate w-full">{site.name}</span>
+                              <span className="text-[9px] text-muted-foreground uppercase">{site.projectCompany}</span>
+                            </div>
+                          </Button>
+                        ))}
+                      </ScrollArea>
                     </PopoverContent>
                   </Popover>
                   <FormMessage />
@@ -240,27 +295,29 @@ export default function RecordUtilisationPage() {
 
               <FormField control={form.control} name="itemName" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Material to Consume</FormLabel>
+                  <FormLabel>Material to Consume (Authorized & Ordered)</FormLabel>
                   <Popover open={isItemPopoverOpen} onOpenChange={setIsItemPopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
-                        <Button variant="outline" disabled={!selectedSiteId} className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
-                          {field.value || "Choose item from stock..."}
+                        <Button variant="outline" disabled={!selectedSiteId} className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
+                          <span className="truncate">{field.value || "Choose authorized material..."}</span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search stock..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
-                      <ScrollArea className="h-[200px]">
+                      <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search authorized items..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
+                      <ScrollArea className="h-[250px]">
                         {filteredMaterials.length > 0 ? filteredMaterials.map(item => (
-                          <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-12 text-sm" onClick={() => { field.onChange(item.itemName); setIsItemPopoverOpen(false); }}>
-                            <div className="flex flex-col items-start overflow-hidden text-left">
-                              <span className="font-bold truncate">{item.itemName}</span>
-                              <span className="text-[10px] text-muted-foreground uppercase">Available: {item.stockLevel} {item.unit}</span>
+                          <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-auto min-h-12 py-2 px-3 text-sm rounded-sm" onClick={() => { field.onChange(item.itemName); setIsItemPopoverOpen(false); }}>
+                            <div className="flex flex-col items-start overflow-hidden text-left w-full">
+                              <span className="font-bold truncate w-full leading-tight">{item.itemName}</span>
+                              <span className={cn("text-[10px] font-black uppercase tracking-tight mt-1", item.stockLevel > 0 ? "text-emerald-600" : "text-red-500")}>
+                                Stock: {item.stockLevel} {item.unit}
+                              </span>
                             </div>
                           </Button>
-                        )) : <div className="p-4 text-center text-xs text-muted-foreground italic">No available stock found for this site.</div>}
+                        )) : <div className="p-8 text-center text-xs text-muted-foreground italic leading-relaxed">No materials with 'Accepted' POs found for this site.</div>}
                       </ScrollArea>
                     </PopoverContent>
                   </Popover>
@@ -295,12 +352,12 @@ export default function RecordUtilisationPage() {
                 <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 flex items-start gap-3">
                   <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground leading-relaxed">
-                    Submitting this will reduce available <strong>{selectedItem.itemName}</strong> stock by <strong>{form.watch('quantity')} {selectedItem.unit}</strong> and mark it as utilised.
+                    Submitting this will reduce <strong>{selectedItem.itemName}</strong> stock by <strong>{form.watch('quantity')} {selectedItem.unit}</strong>. Current stock: {selectedItem.stockLevel} {selectedItem.unit}.
                   </p>
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-12 text-lg font-black uppercase" disabled={isSubmitting || !selectedItem}>
+              <Button type="submit" className="w-full h-14 text-base font-black uppercase shadow-xl" disabled={isSubmitting || !selectedItem}>
                 {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Publish Utilisation"}
               </Button>
             </form>
