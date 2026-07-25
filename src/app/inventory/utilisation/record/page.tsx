@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, getDocs, and } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, getDocs, and, setDoc } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -76,6 +76,19 @@ type PurchaseOrder = {
   items: { itemName: string }[];
 };
 
+const UNIT_ABBREVIATIONS: Record<string, string> = {
+  "Meters": "m",
+  "Kilograms": "kg",
+  "Liters": "L",
+  "Numbers": "Nos",
+  "Sets": "Sets",
+  "Bundles": "Bndls",
+  "Pairs": "Prs",
+  "Drums": "Drms"
+};
+
+const getFriendlyUnit = (unit: string) => UNIT_ABBREVIATIONS[unit] || unit;
+
 export default function RecordUtilisationPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -103,12 +116,28 @@ export default function RecordUtilisationPage() {
   }, [firestore, user, isManager]);
   const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites || !userProfile) return [];
+    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+    
+    const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
+    const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
+      ? userProfile.ownDataOnly 
+      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
+
+    if (!isOwnDataOnly) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+
+    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
+    const filtered = allSites.filter(s => siteIds.has(s.id));
+    return Array.from(new Map(filtered.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites, userProfile, isAdmin, roleConfigs]);
+
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSuccess, setIsSuccess] = React.useState(false);
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isItemPopoverOpen, setIsItemPopoverOpen] = React.useState(false);
   const [itemSearchQuery, setItemSearchQuery] = React.useState("");
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isSuccess, setIsSuccess] = React.useState(false);
 
   const form = useForm<z.infer<typeof utilisationSchema>>({
     resolver: zodResolver(utilisationSchema),
@@ -125,7 +154,6 @@ export default function RecordUtilisationPage() {
   const selectedSiteId = form.watch("siteId");
   const selectedItemName = form.watch("itemName");
 
-  // Real-time data hub for selected site
   const inventoryQuery = useMemoFirebase(() => {
     if (!selectedSiteId) return null;
     return query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId));
@@ -205,7 +233,6 @@ export default function RecordUtilisationPage() {
         createdAt: serverTimestamp()
       });
 
-      // Update physical inventory stock
       if (!selectedItem.id.startsWith('new-')) {
         updateDocumentNonBlocking(doc(firestore, 'project_inventory', selectedItem.id), {
           stockLevel: increment(-values.quantity),
@@ -218,31 +245,9 @@ export default function RecordUtilisationPage() {
       toast({ title: "Consumption Logged", description: "Inventory stock levels adjusted successfully." });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
-    } finally {
       setIsSubmitting(false);
     }
   };
-
-  const accessibleSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
-    if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
-
-    const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
-    if (isManager) {
-      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
-      if (teamMembers) {
-        teamMembers.forEach(member => {
-          (member.assignedProjectIds || []).forEach(id => {
-            const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === id && o.managerId !== userProfile.id);
-            if (!hasOtherOverride) siteIds.add(id);
-          });
-        });
-      }
-    }
-
-    const filtered = allSites.filter(s => siteIds.has(s.id));
-    return Array.from(new Map(filtered.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
@@ -308,16 +313,18 @@ export default function RecordUtilisationPage() {
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                       <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search authorized items..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
                       <ScrollArea className="h-[250px]">
-                        {filteredMaterials.length > 0 ? filteredMaterials.map(item => (
-                          <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-auto min-h-12 py-2 px-3 text-sm rounded-sm" onClick={() => { field.onChange(item.itemName); setIsItemPopoverOpen(false); }}>
-                            <div className="flex flex-col items-start overflow-hidden text-left w-full">
-                              <span className="font-bold truncate w-full leading-tight">{item.itemName}</span>
-                              <span className={cn("text-[10px] font-black uppercase tracking-tight mt-1", item.stockLevel > 0 ? "text-emerald-600" : "text-red-500")}>
-                                Stock: {item.stockLevel} {item.unit}
-                              </span>
-                            </div>
-                          </Button>
-                        )) : <div className="p-8 text-center text-xs text-muted-foreground italic leading-relaxed">No materials with 'Accepted' POs found for this site.</div>}
+                        <div className="p-1">
+                          {filteredMaterials.length > 0 ? filteredMaterials.map(item => (
+                            <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-auto min-h-12 py-3 px-3 text-sm rounded-sm mb-0.5" onClick={() => { field.onChange(item.itemName); setIsItemPopoverOpen(false); }}>
+                              <div className="flex items-center justify-between w-full gap-4">
+                                <span className="font-bold truncate text-foreground">{item.itemName}</span>
+                                <span className={cn("text-[10px] font-black uppercase whitespace-nowrap shrink-0", item.stockLevel > 0 ? "text-primary" : "text-red-500")}>
+                                  (Stock: {item.stockLevel.toLocaleString()} {getFriendlyUnit(item.unit)})
+                                </span>
+                              </div>
+                            </Button>
+                          )) : <div className="p-8 text-center text-xs text-muted-foreground italic leading-relaxed">No materials found for this site.</div>}
+                        </div>
                       </ScrollArea>
                     </PopoverContent>
                   </Popover>
@@ -332,7 +339,7 @@ export default function RecordUtilisationPage() {
                     <FormControl>
                       <div className="relative">
                         <Input type="number" step="0.01" {...field} className="h-11 font-mono font-bold" />
-                        {selectedItem && <span className="absolute right-3 top-3 text-[10px] font-black uppercase text-muted-foreground">{selectedItem.unit}</span>}
+                        {selectedItem && <span className="absolute right-3 top-3 text-[10px] font-black uppercase text-muted-foreground">{getFriendlyUnit(selectedItem.unit)}</span>}
                       </div>
                     </FormControl>
                     <FormMessage />
