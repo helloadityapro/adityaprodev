@@ -79,6 +79,7 @@ const requestSchema = z.object({
 type Site = {
   id: string;
   name: string;
+  projectCompany: string;
 };
 
 type UserProfile = {
@@ -142,6 +143,11 @@ export default function RequestVehiclePage() {
   const [isPassengerPopoverOpen, setIsPassengerPopoverOpen] = React.useState(false);
   const [passengerSearchQuery, setPassengerSearchQuery] = React.useState("");
 
+  // Time States
+  const [timeHours, setTimeHours] = React.useState("09");
+  const [timeMinutes, setTimeMinutes] = React.useState("00");
+  const [timePeriod, setTimePeriod] = React.useState("AM");
+
   const form = useForm<z.infer<typeof requestSchema>>({
     resolver: zodResolver(requestSchema),
     defaultValues: { 
@@ -166,6 +172,13 @@ export default function RequestVehiclePage() {
   const pickupLocation = form.watch('pickupLocation');
   const dropType = form.watch('dropType');
   const coPassengers = form.watch('coPassengers');
+
+  // Sync time state to form
+  React.useEffect(() => {
+    const formattedHours = timeHours.length === 1 ? `0${timeHours}` : (timeHours || "00");
+    const formattedMinutes = timeMinutes.length === 1 ? `0${timeMinutes}` : (timeMinutes || "00");
+    form.setValue('reportingTime', `${formattedHours}:${formattedMinutes} ${timePeriod}`);
+  }, [timeHours, timeMinutes, timePeriod, form]);
 
   const makeRoundTrip = () => {
     form.setValue('dropType', pickupType);
@@ -283,7 +296,7 @@ export default function RequestVehiclePage() {
   if (isSuccess && submittedData) {
     return (
       <div className="flex items-center justify-center min-h-[60vh] p-4">
-        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
           <CardHeader className="text-center">
             <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
             <CardTitle className="text-xl sm:text-2xl font-bold">Request Submitted</CardTitle>
@@ -346,7 +359,7 @@ export default function RequestVehiclePage() {
                   <FormField
                     control={form.control}
                     name="reportingTime"
-                    render={({ field }) => (
+                    render={() => (
                       <FormItem>
                         <FormLabel className="text-[10px] font-bold uppercase tracking-wider">Reporting Time</FormLabel>
                         <FormControl>
@@ -355,10 +368,11 @@ export default function RequestVehiclePage() {
                               className="h-11 rounded-sm w-full text-center font-bold" 
                               placeholder="HH"
                               maxLength={2}
-                              value={field.value?.split(':')[0] || "09"}
-                              onChange={(e) => {
-                                const h = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                field.onChange(`${h}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${field.value?.split(' ')[1] || "AM"}`);
+                              value={timeHours}
+                              onChange={(e) => setTimeHours(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                              onBlur={(e) => {
+                                const val = e.target.value;
+                                if (val && val.length === 1) setTimeHours(`0${val}`);
                               }}
                             />
                             <span className="font-bold">:</span>
@@ -366,15 +380,16 @@ export default function RequestVehiclePage() {
                               className="h-11 rounded-sm w-full text-center font-bold" 
                               placeholder="MM"
                               maxLength={2}
-                              value={field.value?.split(':')[1]?.split(' ')[0] || "00"}
-                              onChange={(e) => {
-                                const m = e.target.value.replace(/\D/g, '').slice(0, 2);
-                                field.onChange(`${field.value?.split(':')[0] || "09"}:${m} ${field.value?.split(' ')[1] || "AM"}`);
+                              value={timeMinutes}
+                              onChange={(e) => setTimeMinutes(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                              onBlur={(e) => {
+                                const val = e.target.value;
+                                if (val && val.length === 1) setTimeMinutes(`0${val}`);
                               }}
                             />
                             <Select 
-                              value={field.value?.split(' ')[1] || "AM"} 
-                              onValueChange={(p) => field.onChange(`${field.value?.split(':')[0] || "09"}:${field.value?.split(':')[1]?.split(' ')[0] || "00"} ${p}`)}
+                              value={timePeriod} 
+                              onValueChange={setTimePeriod}
                             >
                               <SelectTrigger className="h-11 rounded-sm w-full min-w-[70px]"><SelectValue /></SelectTrigger>
                               <SelectContent>
@@ -472,7 +487,7 @@ export default function RequestVehiclePage() {
                                       key={site.id}
                                       type="button"
                                       variant="ghost"
-                                      className="w-full justify-start font-normal h-10 text-xs"
+                                      className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm"
                                       onClick={() => {
                                         field.onChange(site.name);
                                         setIsPickupPopoverOpen(false);
@@ -480,7 +495,10 @@ export default function RequestVehiclePage() {
                                       }}
                                     >
                                       <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />
-                                      {site.name}
+                                      <div className="flex flex-col items-start min-w-0">
+                                        <span className="font-bold truncate w-full">{site.name}</span>
+                                        <span className="text-[9px] text-muted-foreground uppercase">{site.projectCompany}</span>
+                                      </div>
                                     </Button>
                                   ))
                                 ) : (
@@ -595,7 +613,7 @@ export default function RequestVehiclePage() {
                                           key={site.id}
                                           type="button"
                                           variant="ghost"
-                                          className="w-full justify-start font-normal h-10 text-xs"
+                                          className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm"
                                           onClick={() => {
                                             locField.onChange(site.name);
                                             setOpenStopPopoverIndex(null);
@@ -603,7 +621,10 @@ export default function RequestVehiclePage() {
                                           }}
                                         >
                                           <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === locField.value ? "opacity-100" : "opacity-0")} />
-                                          {site.name}
+                                          <div className="flex flex-col items-start min-w-0">
+                                            <span className="font-bold truncate w-full">{site.name}</span>
+                                            <span className="text-[9px] text-muted-foreground uppercase">{site.projectCompany}</span>
+                                          </div>
                                         </Button>
                                       ))}
                                     </div>
@@ -733,7 +754,7 @@ export default function RequestVehiclePage() {
                                     key={site.id}
                                     type="button"
                                     variant="ghost"
-                                    className="w-full justify-start font-normal h-10 text-xs"
+                                    className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm"
                                     onClick={() => {
                                       field.onChange(site.name);
                                       setIsDropPopoverOpen(false);
@@ -741,7 +762,10 @@ export default function RequestVehiclePage() {
                                     }}
                                   >
                                     <Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />
-                                    {site.name}
+                                    <div className="flex flex-col items-start min-w-0">
+                                      <span className="font-bold truncate w-full">{site.name}</span>
+                                      <span className="text-[9px] text-muted-foreground uppercase">{site.projectCompany}</span>
+                                    </div>
                                   </Button>
                                 ))}
                               </div>
