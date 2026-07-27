@@ -64,7 +64,8 @@ import {
   PieChart,
   AlertCircle,
   Calendar,
-  Cpu
+  Cpu,
+  FilterX
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -920,6 +921,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }
   };
 
+  const handleCloseDetail = () => {
+    setViewingPO(null);
+    setViewingWO(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
+  };
+
   if (projectLoading || isProfileLoading) return (
     <div className="space-y-8 p-6 animate-pulse">
       <Skeleton className="h-12 w-1/3" />
@@ -1267,6 +1276,39 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             )}
 
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                <Input 
+                  placeholder="Search materials, make or specs..." 
+                  className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
+                  value={bomTableSearch} 
+                  onChange={e => setBomTableSearch(e.target.value)} 
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Select value={bomStatusFilter} onValueChange={setBomStatusFilter}>
+                  <SelectTrigger className="w-[140px] h-9 text-[10px] font-bold uppercase tracking-tight rounded-sm border-primary/20">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all" className="text-[10px] font-bold uppercase">All Status</SelectItem>
+                    <SelectItem value="Pending" className="text-[10px] font-bold uppercase text-amber-600">Pending</SelectItem>
+                    <SelectItem value="Approved" className="text-[10px] font-bold uppercase text-green-600">Approved</SelectItem>
+                    <SelectItem value="Rejected" className="text-[10px] font-bold uppercase text-red-600">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => { setBomTableSearch(""); setBomStatusFilter("all"); setBomCategoryFilter("all"); }} 
+                  className="h-9 w-9 text-muted-foreground"
+                >
+                  <FilterX className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardContent className="p-0">
                 <div className="overflow-x-auto">
@@ -1389,7 +1431,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableRow>
                         <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('poNumber')}><div className="flex items-center">PO Number <POSortIcon column="poNumber" /></div></TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('supplier')}><div className="flex items-center">Supplier <POSortIcon column="supplier" /></div></TableHead>
-                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}><div className="flex items-center">Date <POSortIcon column="date" /></div></TableHead>
+                        <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}><div className="flex items-center">Date <POSortIcon column="date" /></div></TableHead>
                         <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}><div className="flex items-center">Status <POSortIcon column="status" /></div></TableHead>
                         <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}><div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div></TableHead>
                         <TableHead>Recorded By</TableHead>
@@ -2013,7 +2055,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 </div>
               )}
               <Label className="text-xs font-bold pt-2 block">Remarks</Label>
-              <Textarea id="action-remarks" placeholder="Provide reason..." className="min-h-[100px] rounded-sm" />
+              <Textarea id="action-remarks" placeholder="Provide reason..." className="min-h-[120px] rounded-sm" />
             </div>
           </div>
           <DialogFooter>
