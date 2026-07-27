@@ -516,7 +516,7 @@
         "poleType": { "type": "string", "enum": ["Two Pole", "Four Pole"] },
         "poleNumber": { "type": "string" },
         "poleSize": { "type": "string" },
-        "cutPointType": { "type": "string", "enum": ["Single Cut Point", "Double Cut Point"] },
+        "cutPointType": { "type": "string", "enum": ["Single Cut Point", "Double Cut Point", "V-Cross", "Horizontal Channel (One Side channel)"] },
         "checks": {
           "type": "array",
           "items": {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -74,7 +75,7 @@ const htLineSchema = z.object({
   poleNumber: z.string().min(1, "Required").regex(/^\d{1,2}$/, "Max 2 digits allowed."),
   poleSize: z.string().min(1, "Please select pole size."),
   studSize: z.string().optional(),
-  cutPointType: z.enum(['Single Cut Point', 'Double Cut Point']),
+  cutPointType: z.enum(['Single Cut Point', 'Double Cut Point', 'V-Cross', 'Horizontal Channel (One Side channel)']),
   checks: z.record(pointSchema),
   additionalRemarks: z.string().optional(),
   generalPhotos: z.array(z.any()).default([]),
@@ -357,6 +358,8 @@ export default function HTLineChecklistPage() {
                       <SelectContent>
                         <SelectItem value="Single Cut Point" className="text-xs uppercase font-medium">Single Cut Point</SelectItem>
                         <SelectItem value="Double Cut Point" className="text-xs uppercase font-medium">Double Cut Point</SelectItem>
+                        <SelectItem value="V-Cross" className="text-xs uppercase font-medium">V-Cross</SelectItem>
+                        <SelectItem value="Horizontal Channel (One Side channel)" className="text-xs uppercase font-medium">Horizontal Channel (One Side channel)</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormItem>
@@ -463,7 +466,7 @@ export default function HTLineChecklistPage() {
           <Card className="rounded-sm shadow-md border-primary/10">
             <CardHeader className="bg-muted/5 border-b py-4">
               <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-                <FileText className="h-4 w-4" /> Additional Observations
+                <FileText className="h-4 w-4 text-primary" /> Additional Observations
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
