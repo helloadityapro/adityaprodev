@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,7 +14,7 @@ import {
   addDocumentNonBlocking, 
   useFirebaseApp 
 } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, getDocs, increment } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -45,9 +44,10 @@ import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, parse } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Progress } from "@/components/ui/progress";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 const poItemSchema = z.object({
   bomItemId: z.string().min(1, 'Please select a material.'),
@@ -184,6 +184,7 @@ export default function CreatePOPage() {
 
   const totalAmount = React.useMemo(() => {
     return watchedItems.reduce((sum, item) => {
+      if (!item) return sum;
       const qty = Number(item.quantity) || 0;
       const rate = Number(item.rate) || 0;
       const gst = Number(item.gstPercent) || 0;
@@ -194,6 +195,7 @@ export default function CreatePOPage() {
 
   React.useEffect(() => {
     watchedItems.forEach((item, index) => {
+      if (!item) return;
       const qty = Number(item.quantity) || 0;
       const rate = Number(item.rate) || 0;
       const gst = Number(item.gstPercent) || 0;
@@ -331,7 +333,7 @@ export default function CreatePOPage() {
                         <FormControl>
                           <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11", !field.value && "text-muted-foreground")}>
                             {field.value ? allSites?.find(s => s.id === field.value)?.name : "Select site..."}
-                            <Building2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
                         </FormControl>
                       </PopoverTrigger>
@@ -412,14 +414,16 @@ export default function CreatePOPage() {
             <div className="space-y-4">
               {fields.map((field, index) => {
                 const item = watchedItems[index];
-                const qty = Number(item?.quantity) || 0;
-                const rate = Number(item?.rate) || 0;
-                const gst = Number(item?.gstPercent) || 0;
+                if (!item) return <div key={field.id} className="p-4 bg-muted/5 border rounded-sm"><Loader2 className="h-4 w-4 animate-spin mx-auto opacity-20" /></div>;
+
+                const qty = Number(item.quantity) || 0;
+                const rate = Number(item.rate) || 0;
+                const gst = Number(item.gstPercent) || 0;
                 const lineTotal = (qty * rate) * (1 + (gst / 100));
-                const selectedBomItem = filteredBomItems?.find(i => i.id === item?.bomItemId);
+                const selectedBomItem = filteredBomItems?.find(i => i.id === item.bomItemId);
                 const maxRemaining = selectedBomItem ? (selectedBomItem.remaining * (item.ratio || 1)) : 0;
 
-                const isFirstOfSet = item?.isSet && (index === 0 || watchedItems[index-1]?.bomItemId !== item.bomItemId);
+                const isFirstOfSet = item.isSet && (index === 0 || (watchedItems[index-1] && watchedItems[index-1].bomItemId !== item.bomItemId));
 
                 return (
                   <React.Fragment key={field.id}>
@@ -462,7 +466,7 @@ export default function CreatePOPage() {
                       </div>
                     )}
 
-                    <div className={cn("p-6 border rounded-sm relative animate-in fade-in duration-300", item?.isSet ? "bg-primary/[0.02] border-primary/5 ml-4 sm:ml-8" : "bg-muted/5")}>
+                    <div className={cn("p-6 border rounded-sm relative animate-in fade-in duration-300", item.isSet ? "bg-primary/[0.02] border-primary/5 ml-4 sm:ml-8" : "bg-muted/5")}>
                       {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>)}
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                         <div className="md:col-span-4">
@@ -582,8 +586,7 @@ export default function CreatePOPage() {
             <div className="flex gap-3 w-full sm:w-auto">
               <Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button>
               <Button type="submit" disabled={isSubmitting || totalAmount <= 0} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}
-              </Button>
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}</Button>
             </div>
           </div>
         </form>
@@ -591,4 +594,3 @@ export default function CreatePOPage() {
     </div>
   );
 }
-
