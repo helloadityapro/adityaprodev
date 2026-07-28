@@ -47,10 +47,13 @@ type HTLineChecklist = {
   projectCompany?: string;
   poleNumber: string;
   poleType: string;
+  poleSize: string;
+  cutPointType: string;
   userName: string;
   userId: string;
   status: string;
   createdAt: any;
+  checks: any[];
 };
 
 export default function ProjectHTLineDataPage({ params }: { params: Promise<{ siteId: string }> }) {
@@ -62,6 +65,8 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [deletingRecord, setDeletingRecord] = React.useState<HTLineChecklist | null>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [generationProgress, setGenerationProgress] = React.useState(0);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -80,6 +85,98 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
       r.userName.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => a.poleNumber.localeCompare(b.poleNumber, undefined, { numeric: true, sensitivity: 'base' }));
   }, [records, searchTerm]);
+
+  const handleExportPDF = async (items: HTLineChecklist[]) => {
+    if (items.length === 0) return;
+    setIsExporting(true);
+    setGenerationProgress(0);
+
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      
+      for (let index = 0; index < items.length; index++) {
+        const record = items[index];
+        if (index > 0) doc.addPage();
+        
+        setGenerationProgress(Math.round(((index + 1) / items.length) * 100));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        const margin = 15;
+        let currY = 40;
+        const colWidthLabel = 65;
+        const colWidthValue = 115;
+        const rowHeight = 8;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('HT LINE QUALITY CHECKLIST', margin, currY - 10);
+        
+        const drawRow = (label: string, value: string) => {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.rect(margin, currY, colWidthLabel, rowHeight);
+          doc.text(label, margin + 2, currY + 5.5);
+          doc.setFont('helvetica', 'normal');
+          doc.rect(margin + colWidthLabel, currY, colWidthValue, rowHeight);
+          doc.text(String(value || '—'), margin + colWidthLabel + 2, currY + 5.5);
+          currY += rowHeight;
+        };
+
+        drawRow('PROJECT COMPANY', record.projectCompany || 'Aditya Green Energy');
+        drawRow('PROJECT NAME', record.siteName);
+        drawRow('POLE NUMBER', record.poleNumber);
+        drawRow('POLE TYPE', record.poleType);
+        drawRow('POLE SIZE', record.poleSize);
+        drawRow('CUT POINT TYPE', record.cutPointType);
+        drawRow('STATUS', record.status);
+
+        currY += 5;
+        const col1 = 60; const colStatus = 25; const colRemarks = 65; const colMedia = 20;
+        doc.setFont('helvetica', 'bold');
+        doc.rect(margin, currY, col1, rowHeight);
+        doc.text('VERIFICATION POINT', margin + 2, currY + 5.5);
+        doc.rect(margin + col1, currY, colStatus, rowHeight);
+        doc.text('STATUS', margin + col1 + 2, currY + 5.5);
+        doc.rect(margin + col1 + colStatus, currY, colRemarks, rowHeight);
+        doc.text('REMARKS', margin + col1 + colStatus + 2, currY + 5.5);
+        doc.rect(margin + col1 + colStatus + colRemarks, currY, colMedia, rowHeight);
+        doc.text('MEDIA', margin + col1 + colStatus + colRemarks + 2, currY + 5.5);
+        currY += rowHeight;
+
+        doc.setFont('helvetica', 'normal');
+        for (const check of record.checks) {
+          const remarksLines = doc.splitTextToSize(check.remarks || '—', colRemarks - 4);
+          const attachments = check.attachments || [];
+          const h = Math.max(rowHeight, remarksLines.length * 4 + 4, attachments.length * 5 + 4);
+          
+          if (currY + h > 270) { doc.addPage(); currY = 30; }
+          
+          doc.rect(margin, currY, col1, h);
+          doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
+          doc.rect(margin + col1, currY, colStatus, h);
+          doc.text(check.status || '—', margin + col1 + 2, currY + 5.5);
+          doc.rect(margin + col1 + colStatus, currY, colRemarks, h);
+          doc.text(remarksLines, margin + col1 + colStatus + 2, currY + 5.5);
+          doc.rect(margin + col1 + colStatus + colRemarks, currY, colMedia, h);
+          if (attachments.length > 0) {
+            doc.setTextColor(0, 0, 255);
+            doc.text('View', margin + col1 + colStatus + colRemarks + 2, currY + 5.5);
+            doc.link(margin + col1 + colStatus + colRemarks + 2, currY + 1, 15, 5, { url: attachments[0].url });
+            doc.setTextColor(0, 0, 0);
+          }
+          currY += h;
+        }
+      }
+      doc.save(`HT_Line_Audit_Export_${site?.name.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: 'Export Complete' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
+    } finally {
+      setIsExporting(false);
+      setGenerationProgress(0);
+    }
+  };
 
   const handleDelete = () => {
     if (!deletingRecord) return;
@@ -110,9 +207,28 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
                   <LayoutGrid className="h-3.5 w-3.5 mr-1.5" /> View Matrix
                 </Link>
              </Button>
+             <Button 
+                onClick={() => handleExportPDF(filteredRecords)} 
+                disabled={isExporting || filteredRecords.length === 0} 
+                variant="outline" size="sm" 
+                className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary"
+             >
+                {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />}
+                Export All
+             </Button>
           </div>
         </div>
       </div>
+
+      {isExporting && (
+        <div className="space-y-1.5 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
+            <span>Rendering PDF Documents</span>
+            <span>{generationProgress}%</span>
+          </div>
+          <Progress value={generationProgress} className="h-1 rounded-none" />
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
         <div className="relative w-full md:w-96">
@@ -153,10 +269,14 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
                       )}>{record.status}</Badge>
                     </TableCell>
                     <TableCell className="text-right px-6">
-                      <div className="flex justify-end gap-1">
+                      <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => handleExportPDF([record])} title="Export PDF"><FileDown className="h-4 w-4" /></Button>
+                        {(isAdmin || record.userId === user?.uid) && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/ht-line/edit/${record.id}`}><Pencil className="h-4 w-4" /></Link></Button>
+                        )}
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/ht-line/view/${record.id}`}><Eye className="h-4 w-4" /></Link></Button>
                         {isAdmin && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecord(record)}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); setDeletingRecord(record); }}><Trash2 className="h-4 w-4" /></Button>
                         )}
                       </div>
                     </TableCell>
