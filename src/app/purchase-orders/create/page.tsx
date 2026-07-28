@@ -378,7 +378,7 @@ export default function CreatePOPage() {
 
                 <FormField control={form.control} name="supplierId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel>
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -486,8 +486,10 @@ export default function CreatePOPage() {
                             <FormItem className="flex flex-col">
                               <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel>
                               {item.isSet ? (
-                                <div className="h-10 px-3 bg-muted/20 border border-primary/10 rounded-sm flex items-center shadow-inner cursor-not-allowed">
-                                  <span className="text-xs font-bold truncate text-muted-foreground">{item.itemName}</span>
+                                <div className="min-h-10 flex items-center">
+                                  <p className="text-xs font-bold text-foreground leading-snug break-words">
+                                    {item.itemName}
+                                  </p>
                                 </div>
                               ) : (
                                 <Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}>
@@ -542,7 +544,7 @@ export default function CreatePOPage() {
                                             setBomSearch(""); 
                                           }}>
                                             <Check className={cn("mr-2 h-4 w-4 text-primary", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
-                                            <div className="flex flex-col items-start overflow-hidden">
+                                            <div className="flex flex-col items-start overflow-hidden text-left">
                                               <span className="font-bold truncate w-full">{bi.itemName}</span>
                                               <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Remaining: {bi.remaining.toFixed(2)} / {bi.authorized} {bi.unit}</span>
                                             </div>
