@@ -1,10 +1,10 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { useForm, useFieldArray, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { useRouter } from "next/navigation";
+import * as React from 'react';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
+import { useRouter } from 'next/navigation';
 import { 
   useFirestore, 
   useUser, 
@@ -14,14 +14,14 @@ import {
   addDocumentNonBlocking, 
   updateDocumentNonBlocking,
   useFirebaseApp 
-} from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, getDocs, increment } from "firebase/firestore";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+} from '@/firebase';
+import { collection, doc, serverTimestamp, query, where, getDocs, increment } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { 
   ShoppingBag, 
   Plus, 
@@ -47,11 +47,11 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { isSuperAdmin } from '@/lib/auth-constants';
 
 const poItemSchema = z.object({
@@ -118,7 +118,7 @@ export default function CreatePOPage() {
   const [bomSearch, setBomSearch] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
-  const [uploadProgress, setUploadProgress] = React.useState<Record<number, number>>({});
+  const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
   const [finalTotal, setFinalTotal] = React.useState(0);
   
   const [expandedAssociated, setExpandedAssociated] = React.useState<Set<number>>(new Set());
@@ -335,15 +335,15 @@ export default function CreatePOPage() {
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary"><ArrowLeft className="mr-2 h-4 w-4" /> Cancel</Button>
-        <h1 className="flex items-center gap-2"><ShoppingBag className="h-8 w-8 text-primary" /> Create Purchase Order</h1>
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors"><ArrowLeft className="mr-2 h-4 w-4" /> Cancel</Button>
+        <h1 className="flex items-center gap-2 text-primary"><ShoppingBag className="h-8 w-8" /> Create Purchase Order</h1>
         <p className="text-muted-foreground font-medium">Link procurement line items to authorized site materials.</p>
       </div>
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
-            <CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader>
+            <CardHeader className="bg-primary/5 border-b py-4"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader>
             <CardContent className="pt-6 space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="siteId" render={({ field }) => (
@@ -352,7 +352,7 @@ export default function CreatePOPage() {
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal rounded-sm h-11 text-left", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
                             {field.value ? allSites?.find(s => s.id === field.value)?.name : "Select site..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -439,7 +439,7 @@ export default function CreatePOPage() {
                 <Truck className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Order Line Items</h3>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, isAssociated: false })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, isAssociated: false })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 px-4 shadow-sm">
                 <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Row
               </Button>
             </div>
@@ -457,7 +457,7 @@ export default function CreatePOPage() {
                   <div key={field.id} className="space-y-2">
                     <div className={cn(
                       "p-4 sm:p-6 border rounded-sm relative animate-in fade-in duration-300", 
-                      item.isAssociated ? "bg-primary/[0.01] border-primary/5 ml-4 sm:ml-12" : "bg-muted/5"
+                      item.isAssociated ? "bg-primary/[0.01] border-primary/5 ml-4 sm:ml-12" : "bg-muted/5 border-primary/10 shadow-sm"
                     )}>
                       {fields.length > 1 && (
                         <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}>
@@ -469,17 +469,17 @@ export default function CreatePOPage() {
                         <div className="md:col-span-3">
                           <FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (
                             <FormItem className="flex flex-col">
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Material</FormLabel>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Material Selection</FormLabel>
                               {item.isAssociated ? (
                                 <div className="h-10 flex items-center">
-                                  <p className="text-xs font-bold text-primary truncate" title={item.itemName}>{item.itemName}</p>
+                                  <p className="text-xs font-bold text-primary leading-snug break-words pr-2" title={item.itemName}>{item.itemName}</p>
                                 </div>
                               ) : (
                                 <Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}>
                                   <PopoverTrigger asChild>
                                     <FormControl>
                                       <Button variant="outline" role="combobox" disabled={!watchSiteId} className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}>
-                                        <span className="truncate">{bomField.value ? item.itemName : "Select Item..."}</span>
+                                        <span className="truncate">{bomField.value ? item.itemName : "Select authorized material..."}</span>
                                         <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                       </Button>
                                     </FormControl>
@@ -505,7 +505,7 @@ export default function CreatePOPage() {
                                               <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Limit: {bi.authorized.toFixed(2)} {bi.unit} (Left: {bi.remaining.toFixed(2)})</span>
                                             </div>
                                           </Button>
-                                        )) : <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground">No matches</p>}
+                                        )) : <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground">No matches found</p>}
                                       </div>
                                     </ScrollArea>
                                   </PopoverContent>
@@ -576,7 +576,7 @@ export default function CreatePOPage() {
                             variant="ghost" 
                             size="sm" 
                             onClick={() => toggleAssociated(index)}
-                            className="h-8 rounded-sm font-bold text-primary hover:bg-primary/5 gap-2 px-3"
+                            className="h-8 rounded-sm font-bold text-primary hover:bg-primary/5 gap-2 px-3 transition-colors"
                           >
                             {expandedAssociated.has(index) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                             <span className="text-[10px] font-black uppercase tracking-widest">View Associated Items</span>
@@ -587,8 +587,7 @@ export default function CreatePOPage() {
                               {selectedBomItem.subItems.map((sub, sIdx) => (
                                 <div key={sIdx} className="flex items-center justify-between p-3 rounded-sm border bg-background group shadow-sm hover:border-primary/20 transition-all">
                                   <div className="flex flex-col min-w-0">
-                                    <span className="text-xs font-bold truncate pr-4">{sub.name}</span>
-                                    <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">Standard: {sub.quantityPerSet} {sub.unit}</span>
+                                    <span className="text-xs font-bold text-foreground leading-snug break-words pr-2">{sub.name}</span>
                                   </div>
                                   <Button 
                                     type="button" 
@@ -622,7 +621,7 @@ export default function CreatePOPage() {
 
           <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2">
             <div className="flex items-center gap-4">
-              <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><CheckCircle2 className="h-8 w-8" /></div>
+              <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5 shadow-inner"><CheckCircle2 className="h-8 w-8" /></div>
               <div className="flex flex-col">
                 <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Final PO Value (Incl. Taxes)</span>
                 <span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
