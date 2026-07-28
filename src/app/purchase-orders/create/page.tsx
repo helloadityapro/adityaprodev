@@ -42,16 +42,17 @@ import {
   RefreshCw,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Activity
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format, parse } from 'date-fns';
-import { isSuperAdmin } from '@/lib/auth-constants';
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 
 const poItemSchema = z.object({
   bomItemId: z.string().min(1, 'Please select a material.'),
@@ -180,7 +181,7 @@ export default function CreatePOPage() {
     existingPOs.forEach(po => {
       if (po.status !== 'Cancelled') {
         po.items.forEach(item => {
-          if (item.ratio === 1) { // Standard item or parent set item
+          if (!item.isSet || item.isParent) { // Standard item or parent set item counts against limit
             counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) || 0);
           }
         });
@@ -217,7 +218,7 @@ export default function CreatePOPage() {
   const syncSetGroup = (groupId: string, setQuantity: number, setRate: number, setGst: number) => {
     const currentItems = form.getValues('items');
     currentItems.forEach((item, idx) => {
-      if (item.groupId === groupId && item.isSet) {
+      if (item.groupId === groupId && !item.isParent) {
         const ratio = item.ratio || 1;
         form.setValue(`items.${idx}.quantity`, setQuantity * ratio);
         form.setValue(`items.${idx}.rate`, setRate);
@@ -228,7 +229,7 @@ export default function CreatePOPage() {
 
   const toggleSetCollapse = (groupId: string) => {
     const next = new Set(collapsedSets);
-    if (next.has(groupId)) next.delete(groupId);
+    if (next.has(groupId)) next.delete(id);
     else next.add(groupId);
     setCollapsedSets(next);
   };
@@ -238,7 +239,7 @@ export default function CreatePOPage() {
     
     const newOrderCounts: Record<string, number> = {};
     for (const item of values.items) {
-      if (item.isSet) continue; 
+      if (item.isSet && !item.isParent) continue; 
 
       const original = approvedBomItems?.find(i => i.id === item.bomItemId);
       const authorized = original?.approvedQuantity || original?.plannedQuantity || 0;
@@ -308,6 +309,26 @@ export default function CreatePOPage() {
     }).filter(i => i.remaining > 0 && i.itemName.toLowerCase().includes(bomSearch.toLowerCase()));
   }, [approvedBomItems, consumedQuantities, bomSearch]);
 
+  if (isProfileLoading || sitesLoading || suppliersLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
+
+  if (isSuccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
+            <CardTitle className="text-2xl font-bold uppercase tracking-tight">PO Generated</CardTitle>
+            <CardDescription className="text-base leading-relaxed">Purchase Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated successfully.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push('/purchase-orders/manage')}>Manage All POs</Button>
+            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); setFinalTotal(0); }}>Create Another PO</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
@@ -365,7 +386,7 @@ export default function CreatePOPage() {
 
                 <FormField control={form.control} name="supplierId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel>
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -430,9 +451,7 @@ export default function CreatePOPage() {
                 const lineTotal = (qty * rate) * (1 + (gst / 100));
                 const selectedBomItem = filteredBomItems?.find(i => i.id === item.bomItemId);
                 
-                // For sub-items, we don't apply strict BoM limits on individual row basis
-                const maxRemaining = selectedBomItem ? (selectedBomItem.remaining * (item.ratio || 1)) : 0;
-                
+                const maxRemaining = selectedBomItem ? selectedBomItem.remaining : 0;
                 const isMinimized = item.isSet && item.groupId && collapsedSets.has(item.groupId);
 
                 return (
@@ -673,4 +692,9 @@ export default function CreatePOPage() {
       </Form>
     </div>
   );
+}
+
+function isSuperAdmin(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return ['khalil@adityagreenenergy.com'].includes(email.toLowerCase());
 }
