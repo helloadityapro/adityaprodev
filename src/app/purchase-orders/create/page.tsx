@@ -12,6 +12,7 @@ import {
   useMemoFirebase, 
   useCollection, 
   addDocumentNonBlocking, 
+  updateDocumentNonBlocking,
   useFirebaseApp 
 } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, getDocs, increment } from 'firebase/firestore';
@@ -38,7 +39,8 @@ import {
   ShieldCheck,
   AlertCircle,
   Layers,
-  RefreshCw
+  RefreshCw,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -101,6 +103,17 @@ type PurchaseOrder = {
   items: { bomItemId: string; quantity: number; ratio?: number }[];
 };
 
+const formatTo12Hr = (time?: string) => {
+  if (!time) return '';
+  if (time.toLowerCase().includes('am') || time.toLowerCase().includes('pm')) return time;
+  try {
+    const date = parse(time, 'HH:mm', new Date());
+    return format(date, 'hh:mm a');
+  } catch (e) {
+    return time;
+  }
+};
+
 export default function CreatePOPage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
@@ -123,7 +136,6 @@ export default function CreatePOPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const isProcurement = isAdmin || userProfile?.department === 'Procurement and Supply-chain';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -293,7 +305,7 @@ export default function CreatePOPage() {
     }
   };
 
-  if (isProfileLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
+  if (isProfileLoading || poLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
 
   if (isSuccess) {
     return (
@@ -473,70 +485,76 @@ export default function CreatePOPage() {
                           <FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (
                             <FormItem className="flex flex-col">
                               <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel>
-                              <Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}>
-                                <PopoverTrigger asChild>
-                                  <FormControl>
-                                    <Button variant="outline" role="combobox" disabled={!watchSiteId} className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}>
-                                      <span className="truncate">{bomField.value ? item.itemName : "Select Item..."}</span>
-                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                    </Button>
-                                  </FormControl>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
-                                  <div className="flex items-center border-b px-3">
-                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                    <Input placeholder="Filter materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} />
-                                  </div>
-                                  <ScrollArea className="h-[250px]">
-                                    <div className="p-1">
-                                      {filteredBomItems.length > 0 ? filteredBomItems.map((bi) => (
-                                        <Button key={bi.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { 
-                                          const subItems = bi.subItems || [];
-                                          if (bi.unit === 'Sets' && subItems.length > 0) {
-                                            const sub0 = subItems[0];
-                                            form.setValue(`items.${index}.bomItemId`, bi.id);
-                                            form.setValue(`items.${index}.itemName`, `${bi.itemName} - ${sub0.name}`);
-                                            form.setValue(`items.${index}.ratio`, sub0.quantityPerSet);
-                                            form.setValue(`items.${index}.isSet`, true);
-                                            form.setValue(`items.${index}.parentName`, bi.itemName);
-                                            form.setValue(`items.${index}.quantity`, sub0.quantityPerSet);
-                                            
-                                            for (let i = 1; i < subItems.length; i++) {
-                                              const sub = subItems[i];
-                                              append({
-                                                bomItemId: bi.id,
-                                                itemName: `${bi.itemName} - ${sub.name}`,
-                                                quantity: sub.quantityPerSet,
-                                                rate: 0,
-                                                gstPercent: 18,
-                                                amount: 0,
-                                                ratio: sub.quantityPerSet,
-                                                isSet: true,
-                                                parentName: bi.itemName
-                                              });
-                                            }
-                                          } else {
-                                            bomField.onChange(bi.id); 
-                                            form.setValue(`items.${index}.itemName`, bi.itemName); 
-                                            form.setValue(`items.${index}.ratio`, 1);
-                                            form.setValue(`items.${index}.isSet`, false);
-                                          }
-                                          setOpenBomIndex(null); 
-                                          setBomSearch(""); 
-                                        }}>
-                                          <Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
-                                          <div className="flex flex-col items-start overflow-hidden">
-                                            <span className="font-bold truncate w-full">{bi.itemName}</span>
-                                            <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Remaining: {bi.remaining.toFixed(2)} / {bi.authorized} {bi.unit}</span>
-                                          </div>
-                                        </Button>
-                                      )) : (
-                                        <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No matching materials found.</div>
-                                      )}
+                              {item.isSet ? (
+                                <div className="h-10 px-3 bg-muted/20 border border-primary/10 rounded-sm flex items-center shadow-inner cursor-not-allowed">
+                                  <span className="text-xs font-bold truncate text-muted-foreground">{item.itemName}</span>
+                                </div>
+                              ) : (
+                                <Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button variant="outline" role="combobox" disabled={!watchSiteId} className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}>
+                                        <span className="truncate">{bomField.value ? item.itemName : "Select Item..."}</span>
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
+                                    <div className="flex items-center border-b px-3">
+                                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                      <Input placeholder="Filter materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} />
                                     </div>
-                                  </ScrollArea>
-                                </PopoverContent>
-                              </Popover>
+                                    <ScrollArea className="h-[250px]">
+                                      <div className="p-1">
+                                        {filteredBomItems.length > 0 ? filteredBomItems.map((bi) => (
+                                          <Button key={bi.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { 
+                                            const subItems = bi.subItems || [];
+                                            if (bi.unit === 'Sets' && subItems.length > 0) {
+                                              const sub0 = subItems[0];
+                                              form.setValue(`items.${index}.bomItemId`, bi.id);
+                                              form.setValue(`items.${index}.itemName`, `${bi.itemName} - ${sub0.name}`);
+                                              form.setValue(`items.${index}.ratio`, sub0.quantityPerSet);
+                                              form.setValue(`items.${index}.isSet`, true);
+                                              form.setValue(`items.${index}.parentName`, bi.itemName);
+                                              form.setValue(`items.${index}.quantity`, sub0.quantityPerSet);
+                                              
+                                              for (let i = 1; i < subItems.length; i++) {
+                                                const sub = subItems[i];
+                                                append({
+                                                  bomItemId: bi.id,
+                                                  itemName: `${bi.itemName} - ${sub.name}`,
+                                                  quantity: sub.quantityPerSet,
+                                                  rate: 0,
+                                                  gstPercent: 18,
+                                                  amount: 0,
+                                                  ratio: sub.quantityPerSet,
+                                                  isSet: true,
+                                                  parentName: bi.itemName
+                                                });
+                                              }
+                                            } else {
+                                              bomField.onChange(bi.id); 
+                                              form.setValue(`items.${index}.itemName`, bi.itemName); 
+                                              form.setValue(`items.${index}.ratio`, 1);
+                                              form.setValue(`items.${index}.isSet`, false);
+                                            }
+                                            setOpenBomIndex(null); 
+                                            setBomSearch(""); 
+                                          }}>
+                                            <Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
+                                            <div className="flex flex-col items-start overflow-hidden">
+                                              <span className="font-bold truncate w-full">{bi.itemName}</span>
+                                              <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Remaining: {bi.remaining.toFixed(2)} / {bi.authorized} {bi.unit}</span>
+                                            </div>
+                                          </Button>
+                                        )) : (
+                                          <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No matching materials found.</div>
+                                        )}
+                                      </div>
+                                    </ScrollArea>
+                                  </PopoverContent>
+                                </Popover>
+                              )}
                               <FormMessage />
                             </FormItem>
                           )} />
@@ -594,3 +612,4 @@ export default function CreatePOPage() {
     </div>
   );
 }
+
