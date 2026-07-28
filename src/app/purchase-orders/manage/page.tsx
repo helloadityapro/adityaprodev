@@ -78,6 +78,9 @@ type POItem = {
   rate: number;
   gstPercent: number;
   amount: number;
+  ratio?: number;
+  isSet?: boolean;
+  isParent?: boolean;
 };
 
 type PurchaseOrder = {
@@ -111,6 +114,27 @@ const formatTimestamp = (ts: any) => {
   const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
   return format(date, 'dd/MM/yyyy HH:mm');
 };
+
+/**
+ * Filter items for display in view or export.
+ * Hides children of sets if they match the parent's defaults.
+ */
+function getDisplayItems(items: POItem[]) {
+  return items.filter(item => {
+    // Always show standard items and parents
+    if (!item.isSet || item.isParent) return true;
+    
+    // Find parent for this sub-item
+    const parent = items.find(p => p.isParent && p.bomItemId === item.bomItemId);
+    if (!parent) return true; // Show if parent context is missing
+
+    // Check for customization
+    const expectedQty = parent.quantity * (item.ratio || 1);
+    const isCustomized = Math.abs(item.quantity - expectedQty) > 0.001 || item.rate !== parent.rate || item.gstPercent !== parent.gstPercent;
+    
+    return isCustomized;
+  });
+}
 
 export default function GlobalManagePOsPage() {
   const firestore = useFirestore();
@@ -268,6 +292,8 @@ export default function GlobalManagePOsPage() {
       const margin = 20;
       let currY = 30;
 
+      const displayItems = getDisplayItems(po.items);
+
       // Header
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(22);
@@ -319,7 +345,7 @@ export default function GlobalManagePOsPage() {
       currY += 10;
       doc.setFont('helvetica', 'normal');
       
-      po.items.forEach((item) => {
+      displayItems.forEach((item) => {
         if (currY > 260) { doc.addPage(); currY = 30; }
         const basicTotal = item.quantity * item.rate;
         const gstAmount = basicTotal * (item.gstPercent / 100);
@@ -444,8 +470,8 @@ export default function GlobalManagePOsPage() {
         {filteredPOs.length > 0 ? filteredPOs.map((po) => (
           <Card key={po.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden cursor-pointer" onClick={() => setViewingPO(po)}>
             <CardContent className="p-4 space-y-4">
-              <div className="flex justify-between items-start gap-4">
-                <div className="flex flex-col gap-1 min-w-0">
+              <div className="flex justify-between items-start gap-4" onClick={(e) => e.stopPropagation()}>
+                <div className="flex flex-col gap-1 min-w-0" onClick={() => setViewingPO(po)}>
                   <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{po.orderDate}</span>
                   <h3 className="font-bold text-sm leading-tight text-foreground truncate">{po.poNumber}</h3>
                 </div>
@@ -538,9 +564,7 @@ export default function GlobalManagePOsPage() {
                             po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
                             po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
                             "bg-muted text-muted-foreground"
-                          )}>
-                            {po.status || 'Pending'}
-                          </Badge>
+                          )}>{po.status || 'Pending'}</Badge>
                         </TableCell>
                         <TableCell className="text-right font-black text-sm font-mono text-foreground">
                           ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -587,7 +611,7 @@ export default function GlobalManagePOsPage() {
                                 <span className="text-[10px] font-black uppercase tracking-widest text-primary">Order Item Breakdown</span>
                               </div>
                               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {po.items.map((item, idx) => (
+                                {getDisplayItems(po.items).map((item, idx) => (
                                   <div key={idx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
                                     <div className="flex justify-between items-start">
                                       <span className="text-xs font-black text-foreground">{item.itemName}</span>
@@ -695,12 +719,17 @@ export default function GlobalManagePOsPage() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {viewingPO.items.map((item, idx) => {
+                        {getDisplayItems(viewingPO.items).map((item, idx) => {
                           const basic = item.quantity * item.rate;
                           const gstAmt = basic * (item.gstPercent / 100);
                           return (
-                            <TableRow key={idx} className="bg-background hover:bg-muted/5 transition-colors">
-                              <TableCell className="px-4 text-xs font-bold leading-tight max-w-[200px]">{item.itemName}</TableCell>
+                            <TableRow key={idx} className={cn("bg-background hover:bg-muted/5 transition-colors", item.isSet && !item.isParent && "bg-primary/[0.01]")}>
+                              <TableCell className="px-4 text-xs font-bold leading-tight max-w-[200px]">
+                                <div className="flex items-center gap-2">
+                                  {item.isSet && !item.isParent && <ArrowRight className="h-3 w-3 text-primary/40 shrink-0" />}
+                                  {item.itemName}
+                                </div>
+                              </TableCell>
                               <TableCell className="text-xs font-mono font-bold text-center">{item.quantity}</TableCell>
                               <TableCell className="text-xs font-mono font-medium text-center">₹{item.rate.toLocaleString()}</TableCell>
                               <TableCell className="text-xs font-mono font-bold text-center">₹{basic.toLocaleString()}</TableCell>
@@ -799,7 +828,7 @@ export default function GlobalManagePOsPage() {
           <div className="py-6 space-y-4">
             <div className="space-y-2 text-left">
               <Label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Decision Remarks</Label>
-              <Textarea id="po-action-remarks-global" placeholder="Provide feedback for the procurement request..." className="min-h-[120px] rounded-sm" />
+              <Textarea id="po-action-remarks-global" placeholder="Provide reason for decision..." className="min-h-[120px] rounded-sm" />
             </div>
           </div>
           <DialogFooter>

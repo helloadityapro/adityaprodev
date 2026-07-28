@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -64,7 +63,9 @@ const poItemSchema = z.object({
   // Fields for Sets support
   ratio: z.number().optional().default(1),
   isSet: z.boolean().optional().default(false),
+  isParent: z.boolean().optional().default(false),
   parentName: z.string().optional(),
+  groupId: z.string().optional(),
 });
 
 const poSchema = z.object({
@@ -145,11 +146,11 @@ export default function CreatePOPage() {
       orderDate: format(new Date(), 'yyyy-MM-dd'),
       supplierId: "",
       supplierName: "",
-      items: [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false }]
+      items: [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false, isParent: false }]
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const { fields, append, remove, insert } = useFieldArray({
     control: form.control,
     name: "items"
   });
@@ -179,8 +180,9 @@ export default function CreatePOPage() {
     existingPOs.forEach(po => {
       if (po.status !== 'Cancelled') {
         po.items.forEach(item => {
-          const ratio = item.ratio || 1;
-          counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) / ratio);
+          if (item.ratio === 1) { // Standard item or parent set item
+            counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) || 0);
+          }
         });
       }
     });
@@ -212,41 +214,22 @@ export default function CreatePOPage() {
     });
   }, [watchedItems, form]);
 
-  const filteredSites = allSites?.filter(s => 
-    s.name.toLowerCase().includes(siteSearch.toLowerCase()) ||
-    s.projectCompany.toLowerCase().includes(siteSearch.toLowerCase())
-  ) || [];
-
-  const filteredSuppliers = allSuppliers?.filter(s => 
-    s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
-    s.gstin.toLowerCase().includes(supplierSearch.toLowerCase())
-  ) || [];
-
-  const filteredBomItems = React.useMemo(() => {
-    if (!approvedBomItems) return [];
-    return approvedBomItems.map(item => {
-      const consumed = consumedQuantities[item.id] || 0;
-      const authorized = item.approvedQuantity || item.plannedQuantity || 0;
-      return { ...item, remaining: Math.max(0, authorized - consumed), authorized };
-    }).filter(i => i.remaining > 0 && i.itemName.toLowerCase().includes(bomSearch.toLowerCase()));
-  }, [approvedBomItems, consumedQuantities, bomSearch]);
-
-  const syncSetGroup = (bomItemId: string, setQuantity: number, setRate: number) => {
+  const syncSetGroup = (groupId: string, setQuantity: number, setRate: number, setGst: number) => {
     const currentItems = form.getValues('items');
     currentItems.forEach((item, idx) => {
-      if (item.bomItemId === bomItemId && item.isSet) {
+      if (item.groupId === groupId && item.isSet) {
         const ratio = item.ratio || 1;
         form.setValue(`items.${idx}.quantity`, setQuantity * ratio);
         form.setValue(`items.${idx}.rate`, setRate);
+        form.setValue(`items.${idx}.gstPercent`, setGst);
       }
     });
-    toast({ title: 'Set Synced', description: 'Updated all items in the set with consistent values.' });
   };
 
-  const toggleSetCollapse = (bomItemId: string) => {
+  const toggleSetCollapse = (groupId: string) => {
     const next = new Set(collapsedSets);
-    if (next.has(bomItemId)) next.delete(bomItemId);
-    else next.add(bomItemId);
+    if (next.has(groupId)) next.delete(groupId);
+    else next.add(groupId);
     setCollapsedSets(next);
   };
 
@@ -255,16 +238,14 @@ export default function CreatePOPage() {
     
     const newOrderCounts: Record<string, number> = {};
     for (const item of values.items) {
-      if (item.isSet) continue; // Skip quantity limit validation for associated set items
+      if (item.isSet) continue; 
 
       const original = approvedBomItems?.find(i => i.id === item.bomItemId);
       const authorized = original?.approvedQuantity || original?.plannedQuantity || 0;
       const consumed = consumedQuantities[item.bomItemId] || 0;
       const remaining = authorized - consumed;
       
-      const ratio = item.ratio || 1;
-      const setEquivalent = item.quantity / ratio;
-      newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + setEquivalent;
+      newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + item.quantity;
       
       if (newOrderCounts[item.bomItemId] > remaining + 0.001) {
         toast({ variant: 'destructive', title: 'Authorization Exceeded', description: `Line item "${item.itemName}" exceeds remaining approved quantity (${remaining.toFixed(2)} ${original?.unit}).` });
@@ -308,29 +289,29 @@ export default function CreatePOPage() {
     }
   };
 
-  if (isProfileLoading || sitesLoading || suppliersLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
+  const filteredSites = allSites?.filter(s => 
+    s.name.toLowerCase().includes(siteSearch.toLowerCase()) ||
+    s.projectCompany.toLowerCase().includes(siteSearch.toLowerCase())
+  ) || [];
 
-  if (isSuccess) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
-            <CardTitle className="text-2xl font-bold uppercase tracking-tight">PO Generated</CardTitle>
-            <CardDescription className="text-base leading-relaxed">Purchase Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated successfully.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push(`/purchase-orders/manage`)}>View PO Hub</Button>
-            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>Create Another PO</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  const filteredSuppliers = allSuppliers?.filter(s => 
+    s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+    s.gstin.toLowerCase().includes(supplierSearch.toLowerCase())
+  ) || [];
+
+  const filteredBomItems = React.useMemo(() => {
+    if (!approvedBomItems) return [];
+    return approvedBomItems.map(item => {
+      const consumed = consumedQuantities[item.id] || 0;
+      const authorized = item.approvedQuantity || item.plannedQuantity || 0;
+      return { ...item, remaining: Math.max(0, authorized - consumed), authorized };
+    }).filter(i => i.remaining > 0 && i.itemName.toLowerCase().includes(bomSearch.toLowerCase()));
+  }, [approvedBomItems, consumedQuantities, bomSearch]);
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary"><ArrowLeft className="mr-2 h-4 w-4" /> Cancel</Button>
         <h1 className="flex items-center gap-2"><ShoppingBag className="h-8 w-8 text-primary" /> Create Purchase Order</h1>
         <p className="text-muted-foreground font-medium">Link procurement line items to authorized site materials.</p>
       </div>
@@ -365,7 +346,7 @@ export default function CreatePOPage() {
                                 form.setValue('siteName', s.name); 
                                 setIsSitePopoverOpen(false); 
                                 setSiteSearch("");
-                                form.setValue('items', [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false }]);
+                                form.setValue('items', [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false, isParent: false }]);
                               }}>
                                 <Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} />
                                 <div className="flex flex-col items-start overflow-hidden">
@@ -428,7 +409,16 @@ export default function CreatePOPage() {
           </Card>
 
           <div className="space-y-6">
-            <div className="flex items-center justify-between border-b pb-2 px-1"><div className="flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /><h3 className="text-sm font-black uppercase tracking-widest text-foreground">Order Line Items</h3></div><Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Row</Button></div>
+            <div className="flex items-center justify-between border-b pb-2 px-1">
+              <div className="flex items-center gap-2">
+                <Truck className="h-4 w-4 text-primary" />
+                <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Order Line Items</h3>
+              </div>
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false, isParent: false })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+                <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Row
+              </Button>
+            </div>
+
             <div className="space-y-4">
               {fields.map((field, index) => {
                 const item = watchedItems[index];
@@ -439,73 +429,45 @@ export default function CreatePOPage() {
                 const gst = Number(item.gstPercent) || 0;
                 const lineTotal = (qty * rate) * (1 + (gst / 100));
                 const selectedBomItem = filteredBomItems?.find(i => i.id === item.bomItemId);
+                
+                // For sub-items, we don't apply strict BoM limits on individual row basis
                 const maxRemaining = selectedBomItem ? (selectedBomItem.remaining * (item.ratio || 1)) : 0;
-
-                const isFirstOfSet = item.isSet && (index === 0 || (watchedItems[index-1] && watchedItems[index-1].bomItemId !== item.bomItemId));
-                const isMinimized = item.isSet && collapsedSets.has(item.bomItemId);
+                
+                const isMinimized = item.isSet && item.groupId && collapsedSets.has(item.groupId);
 
                 return (
                   <React.Fragment key={field.id}>
-                    {isFirstOfSet && (
-                      <div className="p-4 bg-primary/10 border-l-4 border-primary rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in slide-in-from-left-2 duration-300">
-                        <div className="flex items-center gap-3">
-                          <div className="bg-primary/20 p-1.5 rounded-sm"><Layers className="h-4 w-4 text-primary" /></div>
-                          <div className="flex flex-col">
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Set Bulk Synchronizer</span>
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase">{item.parentName}</span>
-                          </div>
-                        </div>
-                        <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
-                          <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                            <Label className="text-[9px] font-black uppercase text-muted-foreground">Sets:</Label>
-                            <Input 
-                              type="number" step="0.1" placeholder="Qty" 
-                              className="h-8 w-24 text-xs font-bold rounded-sm border-primary/20"
-                              onFocus={(e) => e.target.select()}
-                              onBlur={(e) => {
-                                const setQty = parseFloat(e.target.value);
-                                if (!isNaN(setQty)) syncSetGroup(item.bomItemId, setQty, parseFloat(String(item.rate)));
-                              }}
-                            />
-                          </div>
-                          <div className="flex items-center gap-2 flex-1 sm:flex-none">
-                            <Label className="text-[9px] font-black uppercase text-muted-foreground">Rate:</Label>
-                            <Input 
-                              type="number" step="0.1" placeholder="Rate" 
-                              className="h-8 w-24 text-xs font-bold rounded-sm border-primary/20"
-                              onFocus={(e) => e.target.select()}
-                              onBlur={(e) => {
-                                const setRate = parseFloat(e.target.value);
-                                if (!isNaN(setRate)) syncSetGroup(item.bomItemId, qty / (item.ratio || 1), setRate);
-                              }}
-                            />
-                          </div>
-                          <div className="flex gap-2">
-                             <div className="p-1.5 rounded-sm bg-primary/20" title="Synchronize all sub-items.">
-                               <RefreshCw className="h-3.5 w-3.5 text-primary" />
-                             </div>
+                    {!isMinimized && (
+                      <div className={cn(
+                        "p-6 border rounded-sm relative animate-in fade-in duration-300", 
+                        item.isParent ? "bg-primary/[0.05] border-primary/20 ring-1 ring-primary/10" : 
+                        item.isSet ? "bg-primary/[0.01] border-primary/5 ml-4 sm:ml-8" : "bg-muted/5"
+                      )}>
+                        {fields.length > 1 && (
+                          <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        
+                        {item.isParent && (
+                           <div className="absolute top-2 left-6 flex items-center gap-2">
+                             <Badge className="bg-primary text-white text-[7px] h-4 font-black uppercase tracking-tighter">Bulk Sync Active</Badge>
                              <Button 
                                 variant="ghost" size="icon" 
-                                className="h-7 w-7 rounded-sm hover:bg-primary/20 text-primary border border-primary/10" 
-                                onClick={() => toggleSetCollapse(item.bomItemId)}
-                                title={isMinimized ? "Expand List" : "Minimize List"}
+                                className="h-6 w-6 rounded-sm text-primary hover:bg-primary/10" 
+                                onClick={(e) => { e.stopPropagation(); item.groupId && toggleSetCollapse(item.groupId); }}
                               >
-                                {isMinimized ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+                                {item.groupId && collapsedSets.has(item.groupId) ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
                              </Button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
+                           </div>
+                        )}
 
-                    {!isMinimized && (
-                      <div className={cn("p-6 border rounded-sm relative animate-in fade-in duration-300", item.isSet ? "bg-primary/[0.02] border-primary/5 ml-4 sm:ml-8" : "bg-muted/5")}>
-                        {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>)}
                         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                           <div className="md:col-span-3">
                             <FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (
                               <FormItem className="flex flex-col">
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel>
-                                {item.isSet ? (
+                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Material Description</FormLabel>
+                                {item.isSet && !item.isParent ? (
                                   <div className="min-h-10 flex items-center">
                                     <p className="text-xs font-bold text-foreground leading-snug break-words">
                                       {item.itemName}
@@ -531,18 +493,22 @@ export default function CreatePOPage() {
                                           {filteredBomItems.length > 0 ? filteredBomItems.map((bi) => (
                                             <Button key={bi.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { 
                                               const subItems = bi.subItems || [];
+                                              const gid = `group_${Date.now()}`;
+                                              
                                               if (bi.unit === 'Sets' && subItems.length > 0) {
-                                                const sub0 = subItems[0];
+                                                // 1. Set current as Parent
                                                 form.setValue(`items.${index}.bomItemId`, bi.id);
-                                                form.setValue(`items.${index}.itemName`, sub0.name);
-                                                form.setValue(`items.${index}.ratio`, sub0.quantityPerSet);
+                                                form.setValue(`items.${index}.itemName`, bi.itemName);
+                                                form.setValue(`items.${index}.ratio`, 1);
                                                 form.setValue(`items.${index}.isSet`, true);
-                                                form.setValue(`items.${index}.parentName`, bi.itemName);
-                                                form.setValue(`items.${index}.quantity`, sub0.quantityPerSet);
+                                                form.setValue(`items.${index}.isParent`, true);
+                                                form.setValue(`items.${index}.groupId`, gid);
+                                                form.setValue(`items.${index}.quantity`, 1);
+                                                form.setValue(`items.${index}.rate`, 0);
                                                 
-                                                for (let i = 1; i < subItems.length; i++) {
-                                                  const sub = subItems[i];
-                                                  append({
+                                                // 2. Insert Children
+                                                subItems.forEach((sub, sIdx) => {
+                                                  insert(index + 1 + sIdx, {
                                                     bomItemId: bi.id,
                                                     itemName: sub.name,
                                                     quantity: sub.quantityPerSet,
@@ -551,14 +517,17 @@ export default function CreatePOPage() {
                                                     amount: 0,
                                                     ratio: sub.quantityPerSet,
                                                     isSet: true,
+                                                    isParent: false,
+                                                    groupId: gid,
                                                     parentName: bi.itemName
                                                   });
-                                                }
+                                                });
                                               } else {
                                                 bomField.onChange(bi.id); 
                                                 form.setValue(`items.${index}.itemName`, bi.itemName); 
                                                 form.setValue(`items.${index}.ratio`, 1);
                                                 form.setValue(`items.${index}.isSet`, false);
+                                                form.setValue(`items.${index}.isParent`, false);
                                               }
                                               setOpenBomIndex(null); 
                                               setBomSearch(""); 
@@ -570,7 +539,7 @@ export default function CreatePOPage() {
                                               </div>
                                             </Button>
                                           )) : (
-                                            <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No matching materials found.</div>
+                                            <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No materials found.</div>
                                           )}
                                         </div>
                                       </ScrollArea>
@@ -581,34 +550,89 @@ export default function CreatePOPage() {
                               </FormItem>
                             )} />
                           </div>
+                          
                           <div className="md:col-span-2">
                             <div className="space-y-2">
-                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-primary" /> Bal Limit</Label>
+                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5">
+                                {item.isSet && !item.isParent ? <Activity className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
+                                {item.isSet && !item.isParent ? 'Multiplier' : 'Limit'}
+                              </Label>
                               <div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
-                                <span>{maxRemaining.toFixed(2)}</span>
-                                <span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit === 'Sets' ? 'Units' : selectedBomItem?.unit}</span>
+                                {item.isSet && !item.isParent ? (
+                                  <><span>x {item.ratio}</span><span className="opacity-50 uppercase text-[8px]">Per Set</span></>
+                                ) : (
+                                  <><span>{maxRemaining.toFixed(2)}</span><span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span></>
+                                )}
                               </div>
                             </div>
                           </div>
+
                           <div className="md:col-span-2">
                             <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Qty</FormLabel>
-                                <FormControl><div className="relative"><Input type="number" step="0.01" {...field} onFocus={(e) => e.target.select()} className={cn("h-10 rounded-sm bg-background font-mono font-bold", !item.isSet && selectedBomItem && qty > maxRemaining + 0.001 && "border-destructive text-destructive")} />{!item.isSet && selectedBomItem && qty > maxRemaining + 0.001 && (<div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Over limit</div>)}</div></FormControl>
+                                <FormControl>
+                                  <div className="relative">
+                                    <Input 
+                                      type="number" step="0.01" {...field} 
+                                      onFocus={(e) => e.target.select()} 
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        if (item.isParent && item.groupId) {
+                                          syncSetGroup(item.groupId, parseFloat(e.target.value) || 0, Number(item.rate), Number(item.gstPercent));
+                                        }
+                                      }}
+                                      className={cn("h-10 rounded-sm bg-background font-mono font-bold", !item.isSet && selectedBomItem && qty > maxRemaining + 0.001 && "border-destructive text-destructive")} 
+                                    />
+                                    {!item.isSet && selectedBomItem && qty > maxRemaining + 0.001 && (
+                                      <div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Over limit</div>
+                                    )}
+                                  </div>
+                                </FormControl>
                                 <FormMessage />
                               </FormItem>
                             )} />
                           </div>
+
                           <div className="md:col-span-2">
-                            <FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} onFocus={(e) => e.target.select()} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} />
+                            <FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel>
+                                <FormControl>
+                                  <Input 
+                                    type="number" step="0.01" {...field} 
+                                    onFocus={(e) => e.target.select()} 
+                                    onChange={(e) => {
+                                      field.onChange(e);
+                                      if (item.isParent && item.groupId) {
+                                        syncSetGroup(item.groupId, Number(item.quantity), parseFloat(e.target.value) || 0, Number(item.gstPercent));
+                                      }
+                                    }}
+                                    className="h-10 rounded-sm bg-background font-mono font-bold" 
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
                           </div>
+
                           <div className="md:col-span-1">
                             <FormField control={form.control} name={`items.${index}.gstPercent`} render={({ field }) => (
                               <FormItem>
                                 <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Tax %</FormLabel>
                                 <FormControl>
                                   <div className="relative">
-                                    <Input type="number" {...field} onFocus={(e) => e.target.select()} className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-2 text-center" />
+                                    <Input 
+                                      type="number" {...field} 
+                                      onFocus={(e) => e.target.select()} 
+                                      onChange={(e) => {
+                                        field.onChange(e);
+                                        if (item.isParent && item.groupId) {
+                                          syncSetGroup(item.groupId, Number(item.quantity), Number(item.rate), parseFloat(e.target.value) || 0);
+                                        }
+                                      }}
+                                      className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-1 text-center" 
+                                    />
                                     <span className="absolute right-1.5 top-2.5 text-[10px] font-bold text-muted-foreground">%</span>
                                   </div>
                                 </FormControl>
@@ -616,9 +640,10 @@ export default function CreatePOPage() {
                               </FormItem>
                             )} />
                           </div>
+
                           <div className="md:col-span-2">
                             <div className="space-y-2">
-                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Line Total (₹)</Label>
+                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Total (₹)</Label>
                               <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                             </div>
                           </div>
@@ -649,4 +674,3 @@ export default function CreatePOPage() {
     </div>
   );
 }
-
