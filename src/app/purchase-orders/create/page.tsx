@@ -514,7 +514,7 @@ export default function CreatePOPage() {
                                             if (bi.unit === 'Sets' && subItems.length > 0) {
                                               const sub0 = subItems[0];
                                               form.setValue(`items.${index}.bomItemId`, bi.id);
-                                              form.setValue(`items.${index}.itemName`, `${bi.itemName} - ${sub0.name}`);
+                                              form.setValue(`items.${index}.itemName`, sub0.name);
                                               form.setValue(`items.${index}.ratio`, sub0.quantityPerSet);
                                               form.setValue(`items.${index}.isSet`, true);
                                               form.setValue(`items.${index}.parentName`, bi.itemName);
@@ -524,7 +524,7 @@ export default function CreatePOPage() {
                                                 const sub = subItems[i];
                                                 append({
                                                   bomItemId: bi.id,
-                                                  itemName: `${bi.itemName} - ${sub.name}`,
+                                                  itemName: sub.name,
                                                   quantity: sub.quantityPerSet,
                                                   rate: 0,
                                                   gstPercent: 18,
