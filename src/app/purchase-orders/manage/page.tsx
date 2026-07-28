@@ -481,13 +481,18 @@ export default function GlobalManagePOsPage() {
                   <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{po.orderDate}</span>
                   <h3 className="font-bold text-sm leading-tight text-foreground truncate">{po.poNumber}</h3>
                 </div>
-                <Badge variant="outline" className={cn(
-                  "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                  po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
-                  po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                  po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                  "bg-muted text-muted-foreground"
-                )}>{po.status || 'Pending'}</Badge>
+                <div className="flex flex-col items-end gap-1">
+                  <Badge variant="outline" className={cn(
+                    "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                    po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                    po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                    po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                    "bg-muted text-muted-foreground"
+                  )}>{po.status || 'Pending'}</Badge>
+                  {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
+                    <span className="text-[7px] font-black text-muted-foreground uppercase">By: {po.processedByName}</span>
+                  )}
+                </div>
               </div>
 
               <div className="flex flex-col gap-2">
@@ -577,13 +582,20 @@ export default function GlobalManagePOsPage() {
                         </TableCell>
                         <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                         <TableCell>
-                          <Badge variant="outline" className={cn(
-                            "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                            po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
-                            po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                            po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                            "bg-muted text-muted-foreground"
-                          )}>{po.status || 'Pending'}</Badge>
+                          <div className="flex flex-col gap-1">
+                            <Badge variant="outline" className={cn(
+                              "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                              po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                              po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                              po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                              "bg-muted text-muted-foreground"
+                            )}>{po.status || 'Pending'}</Badge>
+                            {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
+                              <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
+                                {po.status === 'Accepted' ? 'Approved' : 'Rejected'} by {po.processedByName}
+                              </span>
+                            )}
+                          </div>
                         </TableCell>
                         <TableCell className="text-right font-black text-sm font-mono text-foreground">
                           ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
