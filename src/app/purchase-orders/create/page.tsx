@@ -1,10 +1,10 @@
-'use client';
+"use client";
 
-import * as React from 'react';
-import { useForm, useFieldArray, useWatch } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { useRouter } from 'next/navigation';
+import * as React from "react";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { useRouter } from "next/navigation";
 import { 
   useFirestore, 
   useUser, 
@@ -14,14 +14,14 @@ import {
   addDocumentNonBlocking, 
   updateDocumentNonBlocking,
   useFirebaseApp 
-} from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, getDocs, increment } from 'firebase/firestore';
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+} from "@/firebase";
+import { collection, doc, query, where, serverTimestamp, getDocs, increment } from "firebase/firestore";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { 
   ShoppingBag, 
   Plus, 
@@ -110,6 +110,28 @@ export default function CreatePOPage() {
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+
+  // State Management - Moved to top for consistency
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearch, setSiteSearch] = React.useState("");
+  const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
+  const [supplierSearch, setSupplierSearch] = React.useState("");
+  const [openBomIndex, setOpenBomIndex] = React.useState<number | null>(null);
+  const [bomSearch, setBomSearch] = React.useState("");
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSuccess, setIsSuccess] = React.useState(false);
+  const [uploadProgress, setUploadProgress] = React.useState<Record<number, number>>({});
+  const [finalTotal, setFinalTotal] = React.useState(0);
+  
+  // Set Interaction State
+  const [expandedAssociated, setExpandedAssociated] = React.useState<Set<number>>(new Set());
+
+  const toggleAssociated = (index: number) => {
+    const next = new Set(expandedAssociated);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    setExpandedAssociated(next);
+  };
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -252,6 +274,33 @@ export default function CreatePOPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const uploadProof = async (file: File, userId: string, index: number): Promise<string | null> => {
+    if (!file) return null;
+    const storage = getStorage(firebaseApp);
+    const timestamp = Date.now();
+    const storagePath = `expenses/${userId}/${timestamp}_item_${index}_${file.name.replace(/\s+/g, '_')}`;
+    const storageRef = ref(storage, storagePath);
+    
+    const uploadTask = uploadBytesResumable(storageRef, file);
+    
+    return new Promise((resolve, reject) => {
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(prev => ({ ...prev, [index]: progress }));
+        }, 
+        (error) => {
+          console.error("Proof upload failed:", error);
+          reject(error);
+        }, 
+        async () => {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+          resolve(url);
+        }
+      );
+    });
   };
 
   const filteredSites = allSites?.filter(s => 
