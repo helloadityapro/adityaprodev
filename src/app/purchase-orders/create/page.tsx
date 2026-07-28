@@ -42,8 +42,7 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
-  X,
-  ListPlus
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -213,6 +212,22 @@ export default function CreatePOPage() {
       i.itemName.toLowerCase().includes(bomSearch.toLowerCase())
     );
   }, [bomWithBalances, bomSearch]);
+
+  const filteredSites = React.useMemo(() => {
+    if (!allSites) return [];
+    return allSites.filter(s => 
+      s.name.toLowerCase().includes(siteSearch.toLowerCase()) ||
+      (s.projectCompany || "").toLowerCase().includes(siteSearch.toLowerCase())
+    ).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites, siteSearch]);
+
+  const filteredSuppliers = React.useMemo(() => {
+    if (!allSuppliers) return [];
+    return allSuppliers.filter(s => 
+      s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
+      (s.gstin || "").toLowerCase().includes(supplierSearch.toLowerCase())
+    ).sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSuppliers, supplierSearch]);
 
   const totalAmount = React.useMemo(() => {
     return watchedItems.reduce((sum, item) => {
