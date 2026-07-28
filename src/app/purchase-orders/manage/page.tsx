@@ -107,7 +107,7 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
-type POSortKey = 'poNumber' | 'site' | 'supplier' | 'status' | 'date' | 'total';
+type POSortKey = 'poNumber' | 'site' | 'supplier' | 'status' | 'date' | 'total' | 'createdBy';
 
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
@@ -163,6 +163,9 @@ export default function GlobalManagePOsPage() {
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
+  const isProcurement = userProfile?.department === 'Purchase & Supply Chain';
+
+  const canApprove = isAdmin || isProcurement;
 
   const posQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -212,7 +215,8 @@ export default function GlobalManagePOsPage() {
       const matchesSearch = 
         po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        po.supplierName.toLowerCase().includes(searchTerm.toLowerCase());
+        po.supplierName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (po.createdByName || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
       
@@ -230,6 +234,7 @@ export default function GlobalManagePOsPage() {
       else if (key === 'status') { valA = a.status; valB = b.status; }
       else if (key === 'date') { valA = new Date(a.orderDate).getTime(); valB = new Date(b.orderDate).getTime(); }
       else if (key === 'total') { valA = a.totalAmount || 0; valB = b.totalAmount || 0; }
+      else if (key === 'createdBy') { valA = (a.createdByName || "").toLowerCase(); valB = (b.createdByName || "").toLowerCase(); }
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -389,6 +394,7 @@ export default function GlobalManagePOsPage() {
       'PO Number': po.poNumber,
       'Site': po.siteName,
       'Supplier': po.supplierName,
+      'Created by': po.createdByName || '—',
       'Date': po.orderDate,
       'Status': po.status,
       'Amount (INR)': po.totalAmount
@@ -440,7 +446,7 @@ export default function GlobalManagePOsPage() {
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search PO, Site or Supplier..." 
+            placeholder="Search PO, Site, Supplier or User..." 
             className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -493,6 +499,10 @@ export default function GlobalManagePOsPage() {
                   <Truck className="h-3.5 w-3.5" />
                   {po.supplierName}
                 </div>
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                  <User className="h-3.5 w-3.5" />
+                  {po.createdByName || '—'}
+                </div>
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-primary/5">
@@ -530,6 +540,9 @@ export default function GlobalManagePOsPage() {
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('supplier')}>
                       <div className="flex items-center">Supplier <SortIcon column="supplier" /></div>
                     </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('createdBy')}>
+                      <div className="flex items-center">Created by <SortIcon column="createdBy" /></div>
+                    </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                       <div className="flex items-center">Order Date <SortIcon column="date" /></div>
                     </TableHead>
@@ -545,7 +558,7 @@ export default function GlobalManagePOsPage() {
                 <TableBody>
                   {filteredPOs.length > 0 ? filteredPOs.map((po) => (
                     <React.Fragment key={po.id}>
-                      <TableRow className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => setViewingPO(po)}>
+                      <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer group" onClick={() => setViewingPO(po)}>
                         <TableCell className="px-6 py-4">
                           <div className="flex items-center gap-2">
                             <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(po.id); }}>
@@ -556,6 +569,12 @@ export default function GlobalManagePOsPage() {
                         </TableCell>
                         <TableCell className="text-sm font-semibold">{po.siteName}</TableCell>
                         <TableCell className="text-xs font-medium text-muted-foreground">{po.supplierName}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-xs font-medium">
+                            <User className="h-3.5 w-3.5 text-primary opacity-40" />
+                            {po.createdByName || '—'}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                         <TableCell>
                           <Badge variant="outline" className={cn(
@@ -571,17 +590,17 @@ export default function GlobalManagePOsPage() {
                         </TableCell>
                         <TableCell className="text-right px-6">
                           <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            {isAdmin && po.status === 'Pending' && (
+                            {canApprove && po.status === 'Pending' && (
                               <div className="flex gap-1 mr-2">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setPoActionState({ po, type: 'Accepted' })} title="Accept PO">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setPoActionState({ po: po, type: 'Accepted' })} title="Accept PO">
                                   <CircleCheck className="h-4 w-4" />
                                 </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setPoActionState({ po, type: 'Rejected' })} title="Reject PO">
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setPoActionState({ po: po, type: 'Rejected' })} title="Reject PO">
                                   <CircleX className="h-4 w-4" />
                                 </Button>
                               </div>
                             )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => triggerWhatsApp(po)}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => triggerWhatsApp(po)}>
                               <MessageCircle className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}>
@@ -604,7 +623,7 @@ export default function GlobalManagePOsPage() {
                       </TableRow>
                       {expandedRows.has(po.id) && po.items && (
                         <TableRow className="bg-muted/20">
-                          <TableCell colSpan={7} className="p-0 border-b">
+                          <TableCell colSpan={8} className="p-0 border-b">
                             <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
                               <div className="flex items-center gap-2 mb-2">
                                 <Layers className="h-3.5 w-3.5 text-primary" />
@@ -636,7 +655,7 @@ export default function GlobalManagePOsPage() {
                       )}
                     </React.Fragment>
                   )) : (
-                    <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No purchase orders discovered in registry.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic">No purchase orders discovered in registry.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -689,6 +708,13 @@ export default function GlobalManagePOsPage() {
                         <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Project Context</Label>
                         <p className="text-sm font-black flex items-center gap-1.5 text-primary"><Building2 className="h-3.5 w-3.5" /> {viewingPO.siteName}</p>
                       </div>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Created by</Label>
+                      <p className="text-sm font-bold flex items-center gap-2">
+                        <User className="h-4 w-4 text-primary opacity-40" />
+                        {viewingPO.createdByName || '—'}
+                      </p>
                     </div>
                   </div>
                   
@@ -807,7 +833,7 @@ export default function GlobalManagePOsPage() {
             </div>
             
             <div className="flex gap-2 items-center">
-              {isAdmin && viewingPO?.status === 'Pending' && (
+              {canApprove && viewingPO?.status === 'Pending' && (
                 <div className="flex gap-2">
                   <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-8" onClick={() => { setPoActionState({ po: viewingPO!, type: 'Accepted' }); setViewingPO(null); }}>Approve PO</Button>
                   <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setPoActionState({ po: viewingPO!, type: 'Rejected' }); setViewingPO(null); }}>Reject PO</Button>
