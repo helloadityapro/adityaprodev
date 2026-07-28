@@ -138,10 +138,10 @@ export default function CreatePOPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
-  const { data: allSites } = useCollection<Site>(sitesQuery);
+  const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
-  const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
+  const { data: allSuppliers, isLoading: suppliersLoading } = useCollection<Supplier>(suppliersQuery);
 
   const form = useForm<z.infer<typeof poSchema>>({
     resolver: zodResolver(poSchema),
@@ -305,7 +305,7 @@ export default function CreatePOPage() {
     }
   };
 
-  if (isProfileLoading || poLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
+  if (isProfileLoading || sitesLoading || suppliersLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
 
   if (isSuccess) {
     return (
@@ -541,7 +541,7 @@ export default function CreatePOPage() {
                                             setOpenBomIndex(null); 
                                             setBomSearch(""); 
                                           }}>
-                                            <Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
+                                            <Check className={cn("mr-2 h-4 w-4 text-primary", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
                                             <div className="flex flex-col items-start overflow-hidden">
                                               <span className="font-bold truncate w-full">{bi.itemName}</span>
                                               <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Remaining: {bi.remaining.toFixed(2)} / {bi.authorized} {bi.unit}</span>
@@ -612,4 +612,3 @@ export default function CreatePOPage() {
     </div>
   );
 }
-
