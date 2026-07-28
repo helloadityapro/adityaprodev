@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -35,24 +36,24 @@ import {
   Truck,
   CheckCircle2,
   Calendar,
+  FileUp,
   Send,
   ShieldCheck,
   AlertCircle,
   Layers,
-  RefreshCw,
-  X,
   ChevronDown,
   ChevronUp,
-  Activity
+  X,
+  ListPlus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
-import { format, parse } from 'date-fns';
+import { format } from 'date-fns';
 import { Progress } from "@/components/ui/progress";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { isSuperAdmin } from '@/lib/auth-constants';
 
 const poItemSchema = z.object({
@@ -62,11 +63,7 @@ const poItemSchema = z.object({
   rate: z.coerce.number().min(0.01, 'Unit price is required.'),
   gstPercent: z.coerce.number().min(0, 'GST is required.'),
   amount: z.number(),
-  ratio: z.number().optional().default(1),
-  isSet: z.boolean().optional().default(false),
-  isParent: z.boolean().optional().default(false),
-  parentName: z.string().optional(),
-  groupId: z.string().optional(),
+  isAssociated: z.boolean().optional().default(false),
 });
 
 const poSchema = z.object({
@@ -105,7 +102,7 @@ type PurchaseOrder = {
   id: string;
   siteId: string;
   status: string;
-  items: { bomItemId: string; quantity: number; ratio?: number }[];
+  items: { bomItemId: string; quantity: number; isAssociated?: boolean }[];
 };
 
 export default function CreatePOPage() {
@@ -125,7 +122,7 @@ export default function CreatePOPage() {
   const [supplierSearch, setSupplierSearch] = React.useState("");
   const [openBomIndex, setOpenBomIndex] = React.useState<number | null>(null);
   const [bomSearch, setBomSearch] = React.useState("");
-  const [collapsedSets, setCollapsedSets] = React.useState<Set<string>>(new Set());
+  const [expandedAssociated, setExpandedAssociated] = React.useState<Set<number>>(new Set());
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -147,11 +144,11 @@ export default function CreatePOPage() {
       orderDate: format(new Date(), 'yyyy-MM-dd'),
       supplierId: "",
       supplierName: "",
-      items: [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false, isParent: false }]
+      items: [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, isAssociated: false }]
     },
   });
 
-  const { fields, append, remove, insert } = useFieldArray({
+  const { fields, append, remove } = useFieldArray({
     control: form.control,
     name: "items"
   });
@@ -181,7 +178,7 @@ export default function CreatePOPage() {
     existingPOs.forEach(po => {
       if (po.status !== 'Cancelled') {
         po.items.forEach(item => {
-          if (!item.isSet || item.isParent) {
+          if (!item.isAssociated) {
             counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) || 0);
           }
         });
@@ -215,23 +212,11 @@ export default function CreatePOPage() {
     });
   }, [watchedItems, form]);
 
-  const syncSetGroup = (groupId: string, setQuantity: number, setRate: number, setGst: number) => {
-    const currentItems = form.getValues('items');
-    currentItems.forEach((item, idx) => {
-      if (item.groupId === groupId && !item.isParent) {
-        const ratio = item.ratio || 1;
-        form.setValue(`items.${idx}.quantity`, setQuantity * ratio);
-        form.setValue(`items.${idx}.rate`, setRate);
-        form.setValue(`items.${idx}.gstPercent`, setGst);
-      }
-    });
-  };
-
-  const toggleSetCollapse = (groupId: string) => {
-    const next = new Set(collapsedSets);
-    if (next.has(groupId)) next.delete(groupId);
-    else next.add(groupId);
-    setCollapsedSets(next);
+  const toggleAssociated = (index: number) => {
+    const next = new Set(expandedAssociated);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    setExpandedAssociated(next);
   };
 
   const onSubmit = async (values: z.infer<typeof poSchema>) => {
@@ -239,7 +224,7 @@ export default function CreatePOPage() {
     
     const newOrderCounts: Record<string, number> = {};
     for (const item of values.items) {
-      if (item.isSet && !item.isParent) continue; 
+      if (item.isAssociated) continue; 
 
       const original = approvedBomItems?.find(i => i.id === item.bomItemId);
       const authorized = original?.approvedQuantity || original?.plannedQuantity || 0;
@@ -309,25 +294,7 @@ export default function CreatePOPage() {
     }).filter(i => i.remaining > 0 && i.itemName.toLowerCase().includes(bomSearch.toLowerCase()));
   }, [approvedBomItems, consumedQuantities, bomSearch]);
 
-  if (isProfileLoading || sitesLoading || suppliersLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
-
-  if (isSuccess) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh]">
-        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
-            <CardTitle className="text-2xl font-bold uppercase tracking-tight">PO Generated</CardTitle>
-            <CardDescription className="text-base leading-relaxed">Purchase Order for <strong className="text-primary font-black">₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated successfully.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push('/purchase-orders/manage')}>Manage All POs</Button>
-            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); setFinalTotal(0); }}>Create Another PO</Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
+  if (isProfileLoading || isUserLoading || sitesLoading || suppliersLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
@@ -336,12 +303,13 @@ export default function CreatePOPage() {
         <h1 className="flex items-center gap-2"><ShoppingBag className="h-8 w-8 text-primary" /> Create Purchase Order</h1>
         <p className="text-muted-foreground font-medium">Link procurement line items to authorized site materials.</p>
       </div>
+
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-10">
           <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
             <CardHeader className="bg-primary/5 border-b"><CardTitle className="text-sm font-black uppercase tracking-widest">Order Context</CardTitle></CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <CardContent className="pt-6 space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="siteId" render={({ field }) => (
                   <FormItem className="flex flex-col">
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Target Project Site</FormLabel>
@@ -367,7 +335,7 @@ export default function CreatePOPage() {
                                 form.setValue('siteName', s.name); 
                                 setIsSitePopoverOpen(false); 
                                 setSiteSearch("");
-                                form.setValue('items', [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false, isParent: false }]);
+                                form.setValue('items', [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, isAssociated: false }]);
                               }}>
                                 <Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} />
                                 <div className="flex flex-col items-start overflow-hidden">
@@ -435,7 +403,7 @@ export default function CreatePOPage() {
                 <Truck className="h-4 w-4 text-primary" />
                 <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Order Line Items</h3>
               </div>
-              <Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false, isParent: false })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+              <Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, isAssociated: false })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
                 <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Row
               </Button>
             </div>
@@ -443,233 +411,180 @@ export default function CreatePOPage() {
             <div className="space-y-4">
               {fields.map((field, index) => {
                 const item = watchedItems[index];
-                if (!item) return <div key={field.id} className="p-4 bg-muted/5 border rounded-sm"><Loader2 className="h-4 w-4 animate-spin mx-auto opacity-20" /></div>;
+                if (!item) return <div key={field.id} className="h-20 bg-muted/5 animate-pulse" />;
 
-                const qty = Number(item.quantity) || 0;
-                const rate = Number(item.rate) || 0;
-                const gst = Number(item.gstPercent) || 0;
-                const lineTotal = (qty * rate) * (1 + (gst / 100));
-                const selectedBomItem = filteredBomItems?.find(i => i.id === item.bomItemId);
-                
-                const maxRemaining = selectedBomItem ? selectedBomItem.remaining : 0;
-                const isMinimized = item.isSet && !item.isParent && item.groupId && collapsedSets.has(item.groupId);
+                const selectedBomItem = approvedBomItems?.find(i => i.id === item.bomItemId);
+                const maxRemaining = selectedBomItem ? (selectedBomItem.remaining || 0) : 0;
+                const isSet = selectedBomItem?.unit === 'Sets';
 
                 return (
-                  <React.Fragment key={field.id}>
-                    {!isMinimized && (
-                      <div className={cn(
-                        "p-6 border rounded-sm relative animate-in fade-in duration-300", 
-                        item.isParent ? "bg-primary/[0.05] border-primary/20 ring-1 ring-primary/10 shadow-sm" : 
-                        item.isSet ? "bg-primary/[0.01] border-primary/5 ml-4 sm:ml-8" : "bg-muted/5"
-                      )}>
-                        {fields.length > 1 && (
-                          <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}>
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                        )}
-                        
-                        {item.isParent && (
-                           <div className="absolute top-2 left-6 flex items-center gap-2">
-                             <Badge className="bg-primary text-white text-[7px] h-4 font-black uppercase tracking-tighter">Bulk Sync Active</Badge>
-                             <Button 
-                                variant="ghost" size="icon" 
-                                className="h-6 w-6 rounded-sm text-primary hover:bg-primary/10" 
-                                onClick={(e) => { e.stopPropagation(); item.groupId && toggleSetCollapse(item.groupId); }}
-                              >
-                                {item.groupId && collapsedSets.has(item.groupId) ? <ChevronDown className="h-3.5 w-3.5" /> : <ChevronUp className="h-3.5 w-3.5" />}
-                             </Button>
-                           </div>
-                        )}
+                  <div key={field.id} className="space-y-2">
+                    <div className={cn(
+                      "p-4 sm:p-6 border rounded-sm relative animate-in fade-in duration-300", 
+                      item.isAssociated ? "bg-primary/[0.01] border-primary/5 ml-4 sm:ml-12" : "bg-muted/5"
+                    )}>
+                      {fields.length > 1 && (
+                        <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}>
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      )}
 
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                          <div className="md:col-span-3">
-                            <FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (
-                              <FormItem className="flex flex-col">
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Material Description</FormLabel>
-                                {item.isSet && !item.isParent ? (
-                                  <div className="min-h-10 flex items-center">
-                                    <p className="text-xs font-bold text-foreground leading-snug break-words">
-                                      {item.itemName}
-                                    </p>
-                                  </div>
-                                ) : (
-                                  <Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}>
-                                    <PopoverTrigger asChild>
-                                      <FormControl>
-                                        <Button variant="outline" role="combobox" disabled={!watchSiteId} className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}>
-                                          <span className="truncate">{bomField.value ? item.itemName : "Select Item..."}</span>
-                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                      </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
-                                      <div className="flex items-center border-b px-3">
-                                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                        <Input placeholder="Filter materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} />
-                                      </div>
-                                      <ScrollArea className="h-[200px]">
-                                        <div className="p-1">
-                                          {filteredBomItems.length > 0 ? filteredBomItems.map((bi) => (
-                                            <Button key={bi.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { 
-                                              const subItems = bi.subItems || [];
-                                              const gid = `group_${Date.now()}`;
-                                              
-                                              if (bi.unit === 'Sets' && subItems.length > 0) {
-                                                form.setValue(`items.${index}.bomItemId`, bi.id);
-                                                form.setValue(`items.${index}.itemName`, bi.itemName);
-                                                form.setValue(`items.${index}.ratio`, 1);
-                                                form.setValue(`items.${index}.isSet`, true);
-                                                form.setValue(`items.${index}.isParent`, true);
-                                                form.setValue(`items.${index}.groupId`, gid);
-                                                form.setValue(`items.${index}.quantity`, 1);
-                                                form.setValue(`items.${index}.rate`, 0);
-                                                
-                                                subItems.forEach((sub, sIdx) => {
-                                                  insert(index + 1 + sIdx, {
-                                                    bomItemId: bi.id,
-                                                    itemName: sub.name,
-                                                    quantity: sub.quantityPerSet,
-                                                    rate: 0,
-                                                    gstPercent: 18,
-                                                    amount: 0,
-                                                    ratio: sub.quantityPerSet,
-                                                    isSet: true,
-                                                    isParent: false,
-                                                    groupId: gid,
-                                                    parentName: bi.itemName
-                                                  });
-                                                });
-                                              } else {
-                                                bomField.onChange(bi.id); 
-                                                form.setValue(`items.${index}.itemName`, bi.itemName); 
-                                                form.setValue(`items.${index}.ratio`, 1);
-                                                form.setValue(`items.${index}.isSet`, false);
-                                                form.setValue(`items.${index}.isParent`, false);
-                                              }
-                                              setOpenBomIndex(null); 
-                                              setBomSearch(""); 
-                                            }}>
-                                              <Check className={cn("mr-2 h-4 w-4 text-primary", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
-                                              <div className="flex flex-col items-start overflow-hidden text-left">
-                                                <span className="font-bold truncate w-full">{bi.itemName}</span>
-                                                <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Remaining: {bi.remaining.toFixed(2)} / {bi.authorized} {bi.unit}</span>
-                                              </div>
-                                            </Button>
-                                          )) : (
-                                            <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No materials found.</div>
-                                          )}
-                                        </div>
-                                      </ScrollArea>
-                                    </PopoverContent>
-                                  </Popover>
-                                )}
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                          </div>
-                          
-                          <div className="md:col-span-2">
-                            {(!item.isSet || item.isParent) && (
-                              <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5">
-                                  <ShieldCheck className="h-3 w-3 text-primary" /> Limit
-                                </Label>
-                                <div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
-                                  <span>{maxRemaining.toFixed(2)}</span>
-                                  <span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span>
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                        <div className="md:col-span-3">
+                          <FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Material</FormLabel>
+                              {item.isAssociated ? (
+                                <div className="h-10 flex items-center">
+                                  <p className="text-xs font-bold text-primary truncate" title={item.itemName}>{item.itemName}</p>
                                 </div>
-                              </div>
-                            )}
-                          </div>
+                              ) : (
+                                <Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}>
+                                  <PopoverTrigger asChild>
+                                    <FormControl>
+                                      <Button variant="outline" role="combobox" disabled={!watchSiteId} className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}>
+                                        <span className="truncate">{bomField.value ? item.itemName : "Select Item..."}</span>
+                                        <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                      </Button>
+                                    </FormControl>
+                                  </PopoverTrigger>
+                                  <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
+                                    <div className="flex items-center border-b px-3">
+                                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                      <Input placeholder="Filter materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} />
+                                    </div>
+                                    <ScrollArea className="h-[200px]">
+                                      <div className="p-1">
+                                        {filteredBomItems.length > 0 ? filteredBomItems.map((bi) => (
+                                          <Button key={bi.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { 
+                                            bomField.onChange(bi.id); 
+                                            form.setValue(`items.${index}.itemName`, bi.itemName); 
+                                            form.setValue(`items.${index}.isAssociated`, false);
+                                            setOpenBomIndex(null); 
+                                            setBomSearch(""); 
+                                          }}>
+                                            <Check className={cn("mr-2 h-4 w-4 text-primary", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
+                                            <div className="flex flex-col items-start overflow-hidden text-left">
+                                              <span className="font-bold truncate w-full">{bi.itemName}</span>
+                                              <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Limit: {bi.authorized} {bi.unit} (Left: {bi.remaining.toFixed(2)})</span>
+                                            </div>
+                                          </Button>
+                                        )) : <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground">No matches</p>}
+                                      </div>
+                                    </ScrollArea>
+                                  </PopoverContent>
+                                </Popover>
+                              )}
+                            </FormItem>
+                          )} />
+                        </div>
 
-                          <div className="md:col-span-2">
-                            <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Qty</FormLabel>
-                                <FormControl>
-                                  <div className="relative">
-                                    <Input 
-                                      type="number" step="0.01" {...field} 
-                                      onFocus={(e) => e.target.select()} 
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        if (item.isParent && item.groupId) {
-                                          syncSetGroup(item.groupId, parseFloat(e.target.value) || 0, Number(item.rate), Number(item.gstPercent));
-                                        }
-                                      }}
-                                      className={cn("h-10 rounded-sm bg-background font-mono font-bold", !item.isSet && selectedBomItem && qty > maxRemaining + 0.001 && "border-destructive text-destructive")} 
-                                    />
-                                    {!item.isSet && selectedBomItem && qty > maxRemaining + 0.001 && (
-                                      <div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Over limit</div>
-                                    )}
-                                  </div>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                          </div>
-
-                          <div className="md:col-span-2">
-                            <FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel>
-                                <FormControl>
-                                  <Input 
-                                    type="number" step="0.01" {...field} 
-                                    onFocus={(e) => e.target.select()} 
-                                    onChange={(e) => {
-                                      field.onChange(e);
-                                      if (item.isParent && item.groupId) {
-                                        syncSetGroup(item.groupId, Number(item.quantity), parseFloat(e.target.value) || 0, Number(item.gstPercent));
-                                      }
-                                    }}
-                                    className="h-10 rounded-sm bg-background font-mono font-bold" 
-                                  />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                          </div>
-
-                          <div className="md:col-span-1">
-                            <FormField control={form.control} name={`items.${index}.gstPercent`} render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Tax %</FormLabel>
-                                <FormControl>
-                                  <div className="relative">
-                                    <Input 
-                                      type="number" {...field} 
-                                      onFocus={(e) => e.target.select()} 
-                                      onChange={(e) => {
-                                        field.onChange(e);
-                                        if (item.isParent && item.groupId) {
-                                          syncSetGroup(item.groupId, Number(item.quantity), Number(item.rate), parseFloat(e.target.value) || 0);
-                                        }
-                                      }}
-                                      className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-1 text-center" 
-                                    />
-                                    <span className="absolute right-1.5 top-2.5 text-[10px] font-bold text-muted-foreground">%</span>
-                                  </div>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                          </div>
-
-                          <div className="md:col-span-2">
+                        <div className="md:col-span-2">
+                          {!item.isAssociated && (
                             <div className="space-y-2">
-                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Total (₹)</Label>
-                              <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3" /> Balance</Label>
+                              <div className="h-10 px-3 bg-muted/20 border rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                                <span>{maxRemaining.toFixed(2)}</span>
+                                <span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span>
+                              </div>
                             </div>
+                          )}
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Qty</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input type="number" step="0.01" {...field} onFocus={e => e.target.select()} className={cn("h-10 rounded-sm bg-background font-mono font-bold", !item.isAssociated && selectedBomItem && Number(field.value) > maxRemaining + 0.001 && "border-destructive text-destructive")} />
+                                  {!item.isAssociated && selectedBomItem && Number(field.value) > maxRemaining + 0.001 && (
+                                    <div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Over limit</div>
+                                  )}
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          )} />
+                        </div>
+
+                        <div className="md:col-span-2">
+                          <FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel>
+                              <FormControl><Input type="number" step="0.01" {...field} onFocus={e => e.target.select()} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl>
+                            </FormItem>
+                          )} />
+                        </div>
+
+                        <div className="md:col-span-1">
+                          <FormField control={form.control} name={`items.${index}.gstPercent`} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Tax %</FormLabel>
+                              <FormControl><div className="relative"><Input type="number" {...field} onFocus={e => e.target.select()} className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-1 text-center" /><span className="absolute right-1.5 top-2.5 text-[10px] font-bold text-muted-foreground">%</span></div></FormControl>
+                            </FormItem>
+                          )} />
+                        </div>
+
+                        <div className="md:col-span-2 text-right">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Total (₹)</Label>
+                            <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                           </div>
                         </div>
                       </div>
-                    )}
-                  </React.Fragment>
+
+                      {/* Associated Items Control for Sets */}
+                      {isSet && !item.isAssociated && (
+                        <div className="mt-4 pt-4 border-t border-primary/10">
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => toggleAssociated(index)}
+                            className="h-8 rounded-sm font-bold text-primary hover:bg-primary/5 gap-2 px-3"
+                          >
+                            {expandedAssociated.has(index) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            <span className="text-[10px] font-black uppercase tracking-widest">View Associated Items</span>
+                          </Button>
+
+                          {expandedAssociated.has(index) && selectedBomItem?.subItems && (
+                            <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 animate-in slide-in-from-top-2 duration-300">
+                              {selectedBomItem.subItems.map((sub, sIdx) => (
+                                <div key={sIdx} className="flex items-center justify-between p-3 rounded-sm border bg-background group shadow-sm hover:border-primary/20 transition-all">
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-xs font-bold truncate pr-4">{sub.name}</span>
+                                    <span className="text-[9px] font-black text-muted-foreground uppercase opacity-60">Standard: {sub.quantityPerSet} {sub.unit}</span>
+                                  </div>
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-7 text-[8px] font-black uppercase tracking-widest border-primary/20 text-primary hover:bg-primary hover:text-white shrink-0"
+                                    onClick={() => append({ 
+                                      bomItemId: selectedBomItem.id, 
+                                      itemName: sub.name, 
+                                      quantity: item.quantity * sub.quantityPerSet, 
+                                      rate: 0, 
+                                      gstPercent: 18, 
+                                      amount: 0, 
+                                      isAssociated: true 
+                                    })}
+                                  >
+                                    <Plus className="h-3 w-3 mr-1" /> Add to New Row
+                                  </Button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })}
             </div>
           </div>
+
           <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2">
             <div className="flex items-center gap-4">
               <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><CheckCircle2 className="h-8 w-8" /></div>
@@ -681,16 +596,12 @@ export default function CreatePOPage() {
             <div className="flex gap-3 w-full sm:w-auto">
               <Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button>
               <Button type="submit" disabled={isSubmitting || totalAmount <= 0} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}</Button>
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}
+              </Button>
             </div>
           </div>
         </form>
       </Form>
     </div>
   );
-}
-
-function isSuperAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return ['khalil@adityagreenenergy.com'].includes(email.toLowerCase());
 }
