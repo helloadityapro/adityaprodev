@@ -103,17 +103,6 @@ type PurchaseOrder = {
   items: { bomItemId: string; quantity: number; ratio?: number }[];
 };
 
-const formatTo12Hr = (time?: string) => {
-  if (!time) return '';
-  if (time.toLowerCase().includes('am') || time.toLowerCase().includes('pm')) return time;
-  try {
-    const date = parse(time, 'HH:mm', new Date());
-    return format(date, 'hh:mm a');
-  } catch (e) {
-    return time;
-  }
-};
-
 export default function CreatePOPage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
@@ -254,6 +243,8 @@ export default function CreatePOPage() {
     
     const newOrderCounts: Record<string, number> = {};
     for (const item of values.items) {
+      if (item.isSet) continue; // Skip quantity limit validation for associated set items
+
       const original = approvedBomItems?.find(i => i.id === item.bomItemId);
       const authorized = original?.approvedQuantity || original?.plannedQuantity || 0;
       const consumed = consumedQuantities[item.bomItemId] || 0;
@@ -264,7 +255,7 @@ export default function CreatePOPage() {
       newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + setEquivalent;
       
       if (newOrderCounts[item.bomItemId] > remaining + 0.001) {
-        toast({ variant: 'destructive', title: 'Authorization Exceeded', description: `Line item "${item.itemName}" exceeds remaining approved quantity for the set (${remaining.toFixed(2)} ${original?.unit}).` });
+        toast({ variant: 'destructive', title: 'Authorization Exceeded', description: `Line item "${item.itemName}" exceeds remaining approved quantity (${remaining.toFixed(2)} ${original?.unit}).` });
         return;
       }
     }
@@ -279,7 +270,7 @@ export default function CreatePOPage() {
         details: `Initial order generated for ₹${totalAmount.toLocaleString('en-IN')}`
       };
 
-      addDocumentNonBlocking(collection(firestore, 'project_pos'), {
+      await addDocumentNonBlocking(collection(firestore, 'project_pos'), {
         siteId: values.siteId,
         siteName: values.siteName,
         poNumber: values.poNumber,
@@ -481,7 +472,7 @@ export default function CreatePOPage() {
                     <div className={cn("p-6 border rounded-sm relative animate-in fade-in duration-300", item.isSet ? "bg-primary/[0.02] border-primary/5 ml-4 sm:ml-8" : "bg-muted/5")}>
                       {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>)}
                       <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                        <div className="md:col-span-4">
+                        <div className="md:col-span-3">
                           <FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (
                             <FormItem className="flex flex-col">
                               <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel>
@@ -574,7 +565,7 @@ export default function CreatePOPage() {
                           <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Qty</FormLabel>
-                              <FormControl><div className="relative"><Input type="number" step="0.01" max={maxRemaining} {...field} className={cn("h-10 rounded-sm bg-background font-mono font-bold", qty > maxRemaining + 0.001 && "border-destructive text-destructive")} />{qty > maxRemaining + 0.001 && (<div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Over limit</div>)}</div></FormControl>
+                              <FormControl><div className="relative"><Input type="number" step="0.01" {...field} className={cn("h-10 rounded-sm bg-background font-mono font-bold", !item.isSet && qty > maxRemaining + 0.001 && "border-destructive text-destructive")} />{!item.isSet && qty > maxRemaining + 0.001 && (<div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Over limit</div>)}</div></FormControl>
                               <FormMessage />
                             </FormItem>
                           )} />
@@ -582,9 +573,23 @@ export default function CreatePOPage() {
                         <div className="md:col-span-2">
                           <FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} />
                         </div>
+                        <div className="md:col-span-1">
+                          <FormField control={form.control} name={`items.${index}.gstPercent`} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Tax %</FormLabel>
+                              <FormControl>
+                                <div className="relative">
+                                  <Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-2 text-center" />
+                                  <span className="absolute right-1.5 top-2.5 text-[10px] font-bold text-muted-foreground">%</span>
+                                </div>
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        </div>
                         <div className="md:col-span-2">
                           <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Line Total (₹)</Label>
+                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Line Total (₹)</Label>
                             <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                           </div>
                         </div>
