@@ -15,7 +15,7 @@ import {
   updateDocumentNonBlocking,
   useFirebaseApp 
 } from "@/firebase";
-import { collection, doc, query, where, serverTimestamp, getDocs, increment } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, getDocs, increment } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -111,7 +111,6 @@ export default function CreatePOPage() {
   const { toast } = useToast();
   const router = useRouter();
 
-  // State Management - Moved to top for consistency
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
   const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
@@ -123,7 +122,6 @@ export default function CreatePOPage() {
   const [uploadProgress, setUploadProgress] = React.useState<Record<number, number>>({});
   const [finalTotal, setFinalTotal] = React.useState(0);
   
-  // Set Interaction State
   const [expandedAssociated, setExpandedAssociated] = React.useState<Set<number>>(new Set());
 
   const toggleAssociated = (index: number) => {
@@ -196,6 +194,26 @@ export default function CreatePOPage() {
     return counts;
   }, [existingPOs]);
 
+  const bomWithBalances = React.useMemo(() => {
+    if (!approvedBomItems) return [];
+    return approvedBomItems.map(item => {
+      const consumed = consumedQuantities[item.id] || 0;
+      const authorized = item.approvedQuantity || item.plannedQuantity || 0;
+      return { 
+        ...item, 
+        remaining: Math.max(0, authorized - consumed), 
+        authorized 
+      };
+    });
+  }, [approvedBomItems, consumedQuantities]);
+
+  const filteredBomItems = React.useMemo(() => {
+    return bomWithBalances.filter(i => 
+      i.remaining > 0 && 
+      i.itemName.toLowerCase().includes(bomSearch.toLowerCase())
+    );
+  }, [bomWithBalances, bomSearch]);
+
   const totalAmount = React.useMemo(() => {
     return watchedItems.reduce((sum, item) => {
       if (!item) return sum;
@@ -228,15 +246,18 @@ export default function CreatePOPage() {
     for (const item of values.items) {
       if (item.isAssociated) continue; 
 
-      const original = approvedBomItems?.find(i => i.id === item.bomItemId);
-      const authorized = original?.approvedQuantity || original?.plannedQuantity || 0;
-      const consumed = consumedQuantities[item.bomItemId] || 0;
-      const remaining = authorized - consumed;
-      
+      const original = bomWithBalances.find(i => i.id === item.bomItemId);
+      if (!original) continue;
+
+      const remaining = original.remaining;
       newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + item.quantity;
       
       if (newOrderCounts[item.bomItemId] > remaining + 0.001) {
-        toast({ variant: 'destructive', title: 'Authorization Exceeded', description: `Line item "${item.itemName}" exceeds remaining approved quantity (${remaining.toFixed(2)} ${original?.unit}).` });
+        toast({ 
+          variant: 'destructive', 
+          title: 'Authorization Exceeded', 
+          description: `Line item "${item.itemName}" exceeds remaining approved quantity (${remaining.toFixed(2)} ${original.unit}).` 
+        });
         return;
       }
     }
@@ -275,52 +296,6 @@ export default function CreatePOPage() {
       setIsSubmitting(false);
     }
   };
-
-  const uploadProof = async (file: File, userId: string, index: number): Promise<string | null> => {
-    if (!file) return null;
-    const storage = getStorage(firebaseApp);
-    const timestamp = Date.now();
-    const storagePath = `expenses/${userId}/${timestamp}_item_${index}_${file.name.replace(/\s+/g, '_')}`;
-    const storageRef = ref(storage, storagePath);
-    
-    const uploadTask = uploadBytesResumable(storageRef, file);
-    
-    return new Promise((resolve, reject) => {
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(prev => ({ ...prev, [index]: progress }));
-        }, 
-        (error) => {
-          console.error("Proof upload failed:", error);
-          reject(error);
-        }, 
-        async () => {
-          const url = await getDownloadURL(uploadTask.snapshot.ref);
-          resolve(url);
-        }
-      );
-    });
-  };
-
-  const filteredSites = allSites?.filter(s => 
-    s.name.toLowerCase().includes(siteSearch.toLowerCase()) ||
-    s.projectCompany.toLowerCase().includes(siteSearch.toLowerCase())
-  ) || [];
-
-  const filteredSuppliers = allSuppliers?.filter(s => 
-    s.name.toLowerCase().includes(supplierSearch.toLowerCase()) ||
-    s.gstin.toLowerCase().includes(supplierSearch.toLowerCase())
-  ) || [];
-
-  const filteredBomItems = React.useMemo(() => {
-    if (!approvedBomItems) return [];
-    return approvedBomItems.map(item => {
-      const consumed = consumedQuantities[item.id] || 0;
-      const authorized = item.approvedQuantity || item.plannedQuantity || 0;
-      return { ...item, remaining: Math.max(0, authorized - consumed), authorized };
-    }).filter(i => i.remaining > 0 && i.itemName.toLowerCase().includes(bomSearch.toLowerCase()));
-  }, [approvedBomItems, consumedQuantities, bomSearch]);
 
   if (isProfileLoading || isUserLoading || sitesLoading || suppliersLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
 
@@ -385,7 +360,7 @@ export default function CreatePOPage() {
                               }}>
                                 <Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} />
                                 <div className="flex flex-col items-start overflow-hidden">
-                                  <span className="font-bold truncate w-full">{s.name}</span>
+                                  <span className="font-bold truncate w-full text-foreground">{s.name}</span>
                                   <span className="text-[9px] text-muted-foreground uppercase">{s.projectCompany}</span>
                                 </div>
                               </Button>
@@ -459,7 +434,7 @@ export default function CreatePOPage() {
                 const item = watchedItems[index];
                 if (!item) return <div key={field.id} className="h-20 bg-muted/5 animate-pulse" />;
 
-                const selectedBomItem = approvedBomItems?.find(i => i.id === item.bomItemId);
+                const selectedBomItem = bomWithBalances.find(i => i.id === item.bomItemId);
                 const maxRemaining = selectedBomItem ? (selectedBomItem.remaining || 0) : 0;
                 const isSet = selectedBomItem?.unit === 'Sets';
 
@@ -511,8 +486,8 @@ export default function CreatePOPage() {
                                           }}>
                                             <Check className={cn("mr-2 h-4 w-4 text-primary", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
                                             <div className="flex flex-col items-start overflow-hidden text-left">
-                                              <span className="font-bold truncate w-full">{bi.itemName}</span>
-                                              <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Limit: {bi.authorized} {bi.unit} (Left: {bi.remaining.toFixed(2)})</span>
+                                              <span className="font-bold truncate w-full text-foreground">{bi.itemName}</span>
+                                              <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Limit: {bi.authorized.toFixed(2)} {bi.unit} (Left: {bi.remaining.toFixed(2)})</span>
                                             </div>
                                           </Button>
                                         )) : <p className="p-4 text-center text-[10px] uppercase font-bold text-muted-foreground">No matches</p>}
@@ -528,10 +503,10 @@ export default function CreatePOPage() {
                         <div className="md:col-span-2">
                           {!item.isAssociated && (
                             <div className="space-y-2">
-                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3" /> Balance</Label>
-                              <div className="h-10 px-3 bg-muted/20 border rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3" /> Remaining Limit</Label>
+                              <div className="h-10 px-3 bg-muted/20 border border-primary/10 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground shadow-inner">
                                 <span>{maxRemaining.toFixed(2)}</span>
-                                <span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span>
+                                <span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit || 'Units'}</span>
                               </div>
                             </div>
                           )}
@@ -556,7 +531,7 @@ export default function CreatePOPage() {
                         <div className="md:col-span-2">
                           <FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (
                             <FormItem>
-                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Unit Rate (₹)</FormLabel>
                               <FormControl><Input type="number" step="0.01" {...field} onFocus={e => e.target.select()} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl>
                             </FormItem>
                           )} />
@@ -573,13 +548,12 @@ export default function CreatePOPage() {
 
                         <div className="md:col-span-2 text-right">
                           <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Total (₹)</Label>
+                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Line Total (₹)</Label>
                             <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{(item.amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
                           </div>
                         </div>
                       </div>
 
-                      {/* Associated Items Control for Sets */}
                       {isSet && !item.isAssociated && (
                         <div className="mt-4 pt-4 border-t border-primary/10">
                           <Button 
