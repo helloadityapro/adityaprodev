@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,7 @@ import {
   addDocumentNonBlocking, 
   useFirebaseApp 
 } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, serverTimestamp, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -36,7 +37,9 @@ import {
   Calendar,
   Send,
   ShieldCheck,
-  AlertCircle
+  AlertCircle,
+  Layers,
+  RefreshCw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -44,6 +47,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { Progress } from "@/components/ui/progress";
 
 const poItemSchema = z.object({
   bomItemId: z.string().min(1, 'Please select a material.'),
@@ -52,6 +56,10 @@ const poItemSchema = z.object({
   rate: z.coerce.number().min(0.01, 'Unit price is required.'),
   gstPercent: z.coerce.number().min(0, 'GST is required.'),
   amount: z.number(),
+  // Fields for Sets support
+  ratio: z.number().optional().default(1),
+  isSet: z.boolean().optional().default(false),
+  parentName: z.string().optional(),
 });
 
 const poSchema = z.object({
@@ -83,13 +91,14 @@ type BoMItem = {
   approvedQuantity?: number;
   plannedQuantity: number;
   status: string;
+  subItems?: { name: string; quantityPerSet: number; unit: string }[];
 };
 
 type PurchaseOrder = {
   id: string;
   siteId: string;
   status: string;
-  items: { bomItemId: string; quantity: number }[];
+  items: { bomItemId: string; quantity: number; ratio?: number }[];
 };
 
 export default function CreatePOPage() {
@@ -131,7 +140,7 @@ export default function CreatePOPage() {
       orderDate: format(new Date(), 'yyyy-MM-dd'),
       supplierId: "",
       supplierName: "",
-      items: [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }]
+      items: [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false }]
     },
   });
 
@@ -165,7 +174,8 @@ export default function CreatePOPage() {
     existingPOs.forEach(po => {
       if (po.status !== 'Cancelled') {
         po.items.forEach(item => {
-          counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) || 0);
+          const ratio = item.ratio || 1;
+          counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) / ratio);
         });
       }
     });
@@ -213,6 +223,18 @@ export default function CreatePOPage() {
     }).filter(i => i.remaining > 0 && i.itemName.toLowerCase().includes(bomSearch.toLowerCase()));
   }, [approvedBomItems, consumedQuantities, bomSearch]);
 
+  const syncSetGroup = (bomItemId: string, setQuantity: number, setRate: number) => {
+    const currentItems = form.getValues('items');
+    currentItems.forEach((item, idx) => {
+      if (item.bomItemId === bomItemId && item.isSet) {
+        const ratio = item.ratio || 1;
+        form.setValue(`items.${idx}.quantity`, setQuantity * ratio);
+        form.setValue(`items.${idx}.rate`, setRate);
+      }
+    });
+    toast({ title: 'Set Synced', description: 'Updated all items in the set with consistent values.' });
+  };
+
   const onSubmit = async (values: z.infer<typeof poSchema>) => {
     if (!user || !userProfile) return;
     
@@ -222,10 +244,13 @@ export default function CreatePOPage() {
       const authorized = original?.approvedQuantity || original?.plannedQuantity || 0;
       const consumed = consumedQuantities[item.bomItemId] || 0;
       const remaining = authorized - consumed;
-      newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + item.quantity;
       
-      if (newOrderCounts[item.bomItemId] > remaining) {
-        toast({ variant: 'destructive', title: 'Authorization Exceeded', description: `Line item "${item.itemName}" exceeds remaining approved quantity (${remaining.toFixed(2)} ${original?.unit}).` });
+      const ratio = item.ratio || 1;
+      const setEquivalent = item.quantity / ratio;
+      newOrderCounts[item.bomItemId] = (newOrderCounts[item.bomItemId] || 0) + setEquivalent;
+      
+      if (newOrderCounts[item.bomItemId] > remaining + 0.001) {
+        toast({ variant: 'destructive', title: 'Authorization Exceeded', description: `Line item "${item.itemName}" exceeds remaining approved quantity for the set (${remaining.toFixed(2)} ${original?.unit}).` });
         return;
       }
     }
@@ -300,7 +325,7 @@ export default function CreatePOPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <FormField control={form.control} name="siteId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Target Project Site</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Target Project Site</FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -323,8 +348,7 @@ export default function CreatePOPage() {
                                 form.setValue('siteName', s.name); 
                                 setIsSitePopoverOpen(false); 
                                 setSiteSearch("");
-                                // Reset items if site changes
-                                form.setValue('items', [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 }]);
+                                form.setValue('items', [{ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false }]);
                               }}>
                                 <Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} />
                                 {s.name}
@@ -340,7 +364,7 @@ export default function CreatePOPage() {
 
                 <FormField control={form.control} name="supplierId" render={({ field }) => (
                   <FormItem className="flex flex-col">
-                    <FormLabel className="text-[10px] font-black uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Supplier</FormLabel>
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
@@ -384,40 +408,187 @@ export default function CreatePOPage() {
           </Card>
 
           <div className="space-y-6">
-            <div className="flex items-center justify-between border-b pb-2 px-1"><div className="flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /><h3 className="text-sm font-black uppercase tracking-widest text-foreground">Order Line Items</h3></div><Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Row</Button></div>
+            <div className="flex items-center justify-between border-b pb-2 px-1"><div className="flex items-center gap-2"><Truck className="h-4 w-4 text-primary" /><h3 className="text-sm font-black uppercase tracking-widest text-foreground">Order Line Items</h3></div><Button type="button" variant="outline" size="sm" onClick={() => append({ bomItemId: "", itemName: "", quantity: 0, rate: 0, gstPercent: 18, amount: 0, ratio: 1, isSet: false })} className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"><Plus className="h-3.5 w-3.5 mr-1.5" /> Add Row</Button></div>
             <div className="space-y-4">
               {fields.map((field, index) => {
-                const qty = Number(watchedItems[index]?.quantity) || 0;
-                const rate = Number(watchedItems[index]?.rate) || 0;
-                const gst = Number(watchedItems[index]?.gstPercent) || 0;
+                const item = watchedItems[index];
+                const qty = Number(item?.quantity) || 0;
+                const rate = Number(item?.rate) || 0;
+                const gst = Number(item?.gstPercent) || 0;
                 const lineTotal = (qty * rate) * (1 + (gst / 100));
-                const selectedBomItem = filteredBomItems?.find(i => i.id === watchedItems[index]?.bomItemId);
-                const maxRemaining = selectedBomItem?.remaining || 0;
+                const selectedBomItem = filteredBomItems?.find(i => i.id === item?.bomItemId);
+                const maxRemaining = selectedBomItem ? (selectedBomItem.remaining * (item.ratio || 1)) : 0;
+
+                const isFirstOfSet = item?.isSet && (index === 0 || watchedItems[index-1]?.bomItemId !== item.bomItemId);
+
                 return (
-                  <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
-                    {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>)}
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                      <div className="md:col-span-3"><FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (<FormItem className="flex flex-col"><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel><Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}><PopoverTrigger asChild><FormControl><Button variant="outline" role="combobox" disabled={!watchSiteId} className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}><span className="truncate">{bomField.value ? approvedBomItems?.find(i => i.id === bomField.value)?.itemName : "Select Item..."}</span><ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl></PopoverTrigger><PopoverContent className="w-[350px] p-0" align="start"><div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter available authorized materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} /></div><ScrollArea className="h-[200px]"><div className="p-1">{filteredBomItems.length > 0 ? filteredBomItems.map((item) => (<Button key={item.id} type="button" variant="ghost" className="w-full justify-start font-normal h-11 text-xs" onClick={() => { bomField.onChange(item.id); form.setValue(`items.${index}.itemName`, item.itemName); setOpenBomIndex(null); setBomSearch(""); }}><Check className={cn("mr-2 h-4 w-4 text-primary", item.id === bomField.value ? "opacity-100" : "opacity-0")} /><div className="flex flex-col items-start overflow-hidden"><span className="font-bold truncate w-full">{item.itemName}</span><span className="text-[8px] font-black uppercase text-muted-foreground">Remaining: {item.remaining.toFixed(2)} / {item.authorized} {item.unit}</span></div></Button>)) : (<div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No authorized items with remaining balance found for this site.</div>)}</div></ScrollArea></PopoverContent></Popover><FormMessage /></FormItem>)} /></div>
-                      <div className="md:col-span-2"><div className="space-y-2"><Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-primary" /> Remaining Limit</Label><div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground"><span>{maxRemaining.toFixed(2)}</span><span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span></div></div></div>
-                      <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Quantity</FormLabel>
-                          <FormControl><div className="relative"><Input type="number" step="0.01" max={maxRemaining} {...field} className={cn("h-10 rounded-sm bg-background font-mono font-bold", qty > maxRemaining && "border-destructive text-destructive")} />{qty > maxRemaining && (<div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Balance exceeded</div>)}</div></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )} /></div>
-                      <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Unit Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /></div>
-                      <div className="md:col-span-1"><FormField control={form.control} name={`items.${index}.gstPercent`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Tax %</FormLabel><FormControl><div className="relative"><Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold pr-6 px-2 text-center" /><span className="absolute right-1.5 top-2.5 text-[10px] font-bold text-muted-foreground">%</span></div></FormControl><FormMessage /></FormItem>)} /></div>
-                      <div className="md:col-span-2"><div className="space-y-2"><Label className="text-[10px] font-black uppercase text-primary tracking-widest">Line Total (₹)</Label><div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></div></div>
+                  <React.Fragment key={field.id}>
+                    {isFirstOfSet && (
+                      <div className="p-4 bg-primary/10 border-l-4 border-primary rounded-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-in slide-in-from-left-2 duration-300">
+                        <div className="flex items-center gap-3">
+                          <div className="bg-primary/20 p-1.5 rounded-sm"><Layers className="h-4 w-4 text-primary" /></div>
+                          <div className="flex flex-col">
+                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Set Bulk Synchronizer</span>
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase">{item.parentName}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-4 w-full sm:w-auto">
+                          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                            <Label className="text-[9px] font-black uppercase text-muted-foreground">Sets:</Label>
+                            <Input 
+                              type="number" step="0.1" placeholder="Qty" 
+                              className="h-8 w-24 text-xs font-bold rounded-sm border-primary/20"
+                              onBlur={(e) => {
+                                const setQty = parseFloat(e.target.value);
+                                if (!isNaN(setQty)) syncSetGroup(item.bomItemId, setQty, parseFloat(String(item.rate)));
+                              }}
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 flex-1 sm:flex-none">
+                            <Label className="text-[9px] font-black uppercase text-muted-foreground">Rate:</Label>
+                            <Input 
+                              type="number" step="0.1" placeholder="Rate" 
+                              className="h-8 w-24 text-xs font-bold rounded-sm border-primary/20"
+                              onBlur={(e) => {
+                                const setRate = parseFloat(e.target.value);
+                                if (!isNaN(setRate)) syncSetGroup(item.bomItemId, qty / (item.ratio || 1), setRate);
+                              }}
+                            />
+                          </div>
+                          <div className="p-1.5 rounded-sm bg-primary/20" title="Values entered here will apply to all sub-items below.">
+                            <RefreshCw className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={cn("p-6 border rounded-sm relative animate-in fade-in duration-300", item?.isSet ? "bg-primary/[0.02] border-primary/5 ml-4 sm:ml-8" : "bg-muted/5")}>
+                      {fields.length > 1 && (<Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>)}
+                      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                        <div className="md:col-span-4">
+                          <FormField control={form.control} name={`items.${index}.bomItemId`} render={({ field: bomField }) => (
+                            <FormItem className="flex flex-col">
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Authorized Material</FormLabel>
+                              <Popover open={openBomIndex === index} onOpenChange={(o) => setOpenBomIndex(o ? index : null)}>
+                                <PopoverTrigger asChild>
+                                  <FormControl>
+                                    <Button variant="outline" role="combobox" disabled={!watchSiteId} className={cn("w-full justify-between font-normal h-10 rounded-sm bg-background border-primary/10", !bomField.value && "text-muted-foreground")}>
+                                      <span className="truncate">{bomField.value ? item.itemName : "Select Item..."}</span>
+                                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                    </Button>
+                                  </FormControl>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-[450px] p-0 shadow-2xl" align="start">
+                                  <div className="flex items-center border-b px-3">
+                                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                    <Input placeholder="Filter materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} />
+                                  </div>
+                                  <ScrollArea className="h-[250px]">
+                                    <div className="p-1">
+                                      {filteredBomItems.length > 0 ? filteredBomItems.map((bi) => (
+                                        <Button key={bi.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { 
+                                          const subItems = bi.subItems || [];
+                                          if (bi.unit === 'Sets' && subItems.length > 0) {
+                                            const sub0 = subItems[0];
+                                            form.setValue(`items.${index}.bomItemId`, bi.id);
+                                            form.setValue(`items.${index}.itemName`, `${bi.itemName} - ${sub0.name}`);
+                                            form.setValue(`items.${index}.ratio`, sub0.quantityPerSet);
+                                            form.setValue(`items.${index}.isSet`, true);
+                                            form.setValue(`items.${index}.parentName`, bi.itemName);
+                                            form.setValue(`items.${index}.quantity`, sub0.quantityPerSet);
+                                            
+                                            for (let i = 1; i < subItems.length; i++) {
+                                              const sub = subItems[i];
+                                              append({
+                                                bomItemId: bi.id,
+                                                itemName: `${bi.itemName} - ${sub.name}`,
+                                                quantity: sub.quantityPerSet,
+                                                rate: 0,
+                                                gstPercent: 18,
+                                                amount: 0,
+                                                ratio: sub.quantityPerSet,
+                                                isSet: true,
+                                                parentName: bi.itemName
+                                              });
+                                            }
+                                          } else {
+                                            bomField.onChange(bi.id); 
+                                            form.setValue(`items.${index}.itemName`, bi.itemName); 
+                                            form.setValue(`items.${index}.ratio`, 1);
+                                            form.setValue(`items.${index}.isSet`, false);
+                                          }
+                                          setOpenBomIndex(null); 
+                                          setBomSearch(""); 
+                                        }}>
+                                          <Check className={cn("mt-0.5 h-4 w-4 text-primary shrink-0", bi.id === bomField.value ? "opacity-100" : "opacity-0")} />
+                                          <div className="flex flex-col items-start overflow-hidden">
+                                            <span className="font-bold truncate w-full">{bi.itemName}</span>
+                                            <span className="text-[8px] font-black uppercase text-muted-foreground mt-0.5">Remaining: {bi.remaining.toFixed(2)} / {bi.authorized} {bi.unit}</span>
+                                          </div>
+                                        </Button>
+                                      )) : (
+                                        <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic leading-relaxed">No matching materials found.</div>
+                                      )}
+                                    </div>
+                                  </ScrollArea>
+                                </PopoverContent>
+                              </Popover>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        </div>
+                        <div className="md:col-span-2">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3 text-primary" /> Bal Limit</Label>
+                            <div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                              <span>{maxRemaining.toFixed(2)}</span>
+                              <span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit === 'Sets' ? 'Units' : selectedBomItem?.unit}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="md:col-span-2">
+                          <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Order Qty</FormLabel>
+                              <FormControl><div className="relative"><Input type="number" step="0.01" max={maxRemaining} {...field} className={cn("h-10 rounded-sm bg-background font-mono font-bold", qty > maxRemaining + 0.001 && "border-destructive text-destructive")} />{qty > maxRemaining + 0.001 && (<div className="absolute -bottom-5 left-0 text-[8px] font-black text-destructive uppercase tracking-tight flex items-center gap-1"><AlertCircle className="h-2.5 w-2.5" /> Over limit</div>)}</div></FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )} />
+                        </div>
+                        <div className="md:col-span-2">
+                          <FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} />
+                        </div>
+                        <div className="md:col-span-2">
+                          <div className="space-y-2">
+                            <Label className="text-[10px] font-black uppercase text-primary tracking-widest">Line Total (₹)</Label>
+                            <div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  </React.Fragment>
                 );
               })}
             </div>
           </div>
-          <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2"><div className="flex items-center gap-4"><div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><CheckCircle2 className="h-8 w-8" /></div><div className="flex flex-col"><span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Final PO Value (Incl. Taxes)</span><span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div><div className="flex gap-3 w-full sm:w-auto"><Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button><Button type="submit" disabled={isSubmitting || totalAmount <= 0} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">{isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}</Button></div></div>
+          <div className="p-8 bg-primary/5 rounded-sm border-2 border-primary/10 flex flex-col sm:flex-row items-center justify-between gap-6 shadow-xl animate-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-4">
+              <div className="h-14 w-14 rounded-full bg-primary/10 flex items-center justify-center text-primary border-4 border-primary/5"><CheckCircle2 className="h-8 w-8" /></div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] leading-none mb-1">Final PO Value (Incl. Taxes)</span>
+                <span className="text-4xl font-black text-primary tabular-nums">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+            <div className="flex gap-3 w-full sm:w-auto">
+              <Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button>
+              <Button type="submit" disabled={isSubmitting || totalAmount <= 0} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}
+              </Button>
+            </div>
+          </div>
         </form>
       </Form>
     </div>
   );
 }
+
