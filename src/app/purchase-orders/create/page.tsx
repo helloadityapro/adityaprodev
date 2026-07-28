@@ -53,6 +53,7 @@ import { format, parse } from 'date-fns';
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { isSuperAdmin } from '@/lib/auth-constants';
 
 const poItemSchema = z.object({
   bomItemId: z.string().min(1, 'Please select a material.'),
@@ -61,7 +62,6 @@ const poItemSchema = z.object({
   rate: z.coerce.number().min(0.01, 'Unit price is required.'),
   gstPercent: z.coerce.number().min(0, 'GST is required.'),
   amount: z.number(),
-  // Fields for Sets support
   ratio: z.number().optional().default(1),
   isSet: z.boolean().optional().default(false),
   isParent: z.boolean().optional().default(false),
@@ -181,7 +181,7 @@ export default function CreatePOPage() {
     existingPOs.forEach(po => {
       if (po.status !== 'Cancelled') {
         po.items.forEach(item => {
-          if (!item.isSet || item.isParent) { // Standard item or parent set item counts against limit
+          if (!item.isSet || item.isParent) {
             counts[item.bomItemId] = (counts[item.bomItemId] || 0) + (Number(item.quantity) || 0);
           }
         });
@@ -229,7 +229,7 @@ export default function CreatePOPage() {
 
   const toggleSetCollapse = (groupId: string) => {
     const next = new Set(collapsedSets);
-    if (next.has(groupId)) next.delete(id);
+    if (next.has(groupId)) next.delete(groupId);
     else next.add(groupId);
     setCollapsedSets(next);
   };
@@ -452,14 +452,14 @@ export default function CreatePOPage() {
                 const selectedBomItem = filteredBomItems?.find(i => i.id === item.bomItemId);
                 
                 const maxRemaining = selectedBomItem ? selectedBomItem.remaining : 0;
-                const isMinimized = item.isSet && item.groupId && collapsedSets.has(item.groupId);
+                const isMinimized = item.isSet && !item.isParent && item.groupId && collapsedSets.has(item.groupId);
 
                 return (
                   <React.Fragment key={field.id}>
                     {!isMinimized && (
                       <div className={cn(
                         "p-6 border rounded-sm relative animate-in fade-in duration-300", 
-                        item.isParent ? "bg-primary/[0.05] border-primary/20 ring-1 ring-primary/10" : 
+                        item.isParent ? "bg-primary/[0.05] border-primary/20 ring-1 ring-primary/10 shadow-sm" : 
                         item.isSet ? "bg-primary/[0.01] border-primary/5 ml-4 sm:ml-8" : "bg-muted/5"
                       )}>
                         {fields.length > 1 && (
@@ -507,7 +507,7 @@ export default function CreatePOPage() {
                                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                                         <Input placeholder="Filter materials..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={bomSearch} onChange={(e) => setBomSearch(e.target.value)} />
                                       </div>
-                                      <ScrollArea className="h-[250px]">
+                                      <ScrollArea className="h-[200px]">
                                         <div className="p-1">
                                           {filteredBomItems.length > 0 ? filteredBomItems.map((bi) => (
                                             <Button key={bi.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { 
@@ -515,7 +515,6 @@ export default function CreatePOPage() {
                                               const gid = `group_${Date.now()}`;
                                               
                                               if (bi.unit === 'Sets' && subItems.length > 0) {
-                                                // 1. Set current as Parent
                                                 form.setValue(`items.${index}.bomItemId`, bi.id);
                                                 form.setValue(`items.${index}.itemName`, bi.itemName);
                                                 form.setValue(`items.${index}.ratio`, 1);
@@ -525,7 +524,6 @@ export default function CreatePOPage() {
                                                 form.setValue(`items.${index}.quantity`, 1);
                                                 form.setValue(`items.${index}.rate`, 0);
                                                 
-                                                // 2. Insert Children
                                                 subItems.forEach((sub, sIdx) => {
                                                   insert(index + 1 + sIdx, {
                                                     bomItemId: bi.id,
@@ -571,19 +569,17 @@ export default function CreatePOPage() {
                           </div>
                           
                           <div className="md:col-span-2">
-                            <div className="space-y-2">
-                              <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5">
-                                {item.isSet && !item.isParent ? <Activity className="h-3 w-3" /> : <ShieldCheck className="h-3 w-3" />}
-                                {item.isSet && !item.isParent ? 'Multiplier' : 'Limit'}
-                              </Label>
-                              <div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
-                                {item.isSet && !item.isParent ? (
-                                  <><span>x {item.ratio}</span><span className="opacity-50 uppercase text-[8px]">Per Set</span></>
-                                ) : (
-                                  <><span>{maxRemaining.toFixed(2)}</span><span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span></>
-                                )}
+                            {(!item.isSet || item.isParent) && (
+                              <div className="space-y-2">
+                                <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-1.5">
+                                  <ShieldCheck className="h-3 w-3 text-primary" /> Limit
+                                </Label>
+                                <div className="h-10 px-3 bg-muted/20 border border-border/50 rounded-sm flex items-center justify-between text-[11px] font-bold text-muted-foreground">
+                                  <span>{maxRemaining.toFixed(2)}</span>
+                                  <span className="opacity-50 uppercase text-[8px]">{selectedBomItem?.unit}</span>
+                                </div>
                               </div>
-                            </div>
+                            )}
                           </div>
 
                           <div className="md:col-span-2">
