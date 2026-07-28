@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -108,21 +107,9 @@ type PurchaseOrder = {
 export default function CreatePOPage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const router = useRouter();
-
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [isSuccess, setIsSuccess] = React.useState(false);
-  const [finalTotal, setFinalTotal] = React.useState(0);
-
-  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
-  const [siteSearch, setSiteSearch] = React.useState("");
-  const [isSupplierPopoverOpen, setIsSupplierPopoverOpen] = React.useState(false);
-  const [supplierSearch, setSupplierSearch] = React.useState("");
-  const [openBomIndex, setOpenBomIndex] = React.useState<number | null>(null);
-  const [bomSearch, setBomSearch] = React.useState("");
-  const [expandedAssociated, setExpandedAssociated] = React.useState<Set<number>>(new Set());
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -212,13 +199,6 @@ export default function CreatePOPage() {
     });
   }, [watchedItems, form]);
 
-  const toggleAssociated = (index: number) => {
-    const next = new Set(expandedAssociated);
-    if (next.has(index)) next.delete(index);
-    else next.add(index);
-    setExpandedAssociated(next);
-  };
-
   const onSubmit = async (values: z.infer<typeof poSchema>) => {
     if (!user || !userProfile) return;
     
@@ -265,7 +245,6 @@ export default function CreatePOPage() {
         history: [historyEntry]
       });
 
-      setFinalTotal(totalAmount);
       setIsSuccess(true);
       toast({ title: 'PO Created', description: `Purchase Order ${values.poNumber} has been recorded.` });
     } catch (e: any) {
@@ -295,6 +274,24 @@ export default function CreatePOPage() {
   }, [approvedBomItems, consumedQuantities, bomSearch]);
 
   if (isProfileLoading || isUserLoading || sitesLoading || suppliersLoading || !user) return <div className="p-20 text-center"><Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" /></div>;
+
+  if (isSuccess) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <Card className="max-w-md w-full animate-in fade-in zoom-in-95 duration-300 rounded-sm">
+          <CardHeader className="text-center">
+            <div className="flex justify-center mb-4"><div className="bg-primary/10 p-4 rounded-full"><CheckCircle2 className="h-12 w-12 text-primary" /></div></div>
+            <CardTitle className="text-2xl font-bold uppercase tracking-tight">PO Generated</CardTitle>
+            <CardDescription className="text-base leading-relaxed">Purchase Order for <strong className="text-primary font-black">₹{totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</strong> has been generated successfully.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button className="w-full h-12 text-lg font-semibold rounded-sm shadow-md" onClick={() => router.push('/purchase-orders/manage')}>Manage All POs</Button>
+            <Button variant="outline" className="w-full h-11 rounded-sm font-bold" onClick={() => { setIsSuccess(false); form.reset(); }}>Create Another PO</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
@@ -570,7 +567,7 @@ export default function CreatePOPage() {
                                       isAssociated: true 
                                     })}
                                   >
-                                    <Plus className="h-3 w-3 mr-1" /> Add to New Row
+                                    <Plus className="h-3.5 w-3.5 mr-1" /> Add to New Row
                                   </Button>
                                 </div>
                               ))}
@@ -596,8 +593,7 @@ export default function CreatePOPage() {
             <div className="flex gap-3 w-full sm:w-auto">
               <Button type="button" variant="ghost" onClick={() => router.back()} className="h-14 px-8 font-bold uppercase text-xs tracking-widest rounded-sm">Cancel</Button>
               <Button type="submit" disabled={isSubmitting || totalAmount <= 0} className="w-full sm:w-auto h-14 px-12 font-black text-lg rounded-sm shadow-xl transition-all active:scale-95">
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}
-              </Button>
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> VALIDATING...</> : <><Send className="mr-2 h-4 w-4" /> GENERATE PURCHASE ORDER</>}</Button>
             </div>
           </div>
         </form>
