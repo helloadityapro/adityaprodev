@@ -859,7 +859,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                       <div className="flex items-center">Auditor <AuditSortIcon column="user" /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('status')}>
-                      <div className="flex items-center">Status <AuditSortIcon column="status" /></div>
+                      <div className="flex items-center">Approval Status <AuditSortIcon column="status" /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleAuditSort('updatedAt')}>
                       <div className="flex items-center">Last Edited <AuditSortIcon column="updatedAt" /></div>

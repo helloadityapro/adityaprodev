@@ -68,6 +68,7 @@ type Attachment = { url: string; contentType: string; name: string; };
 type HTLineChecklist = {
   id: string;
   poleNumber: string;
+  poleConfiguration: string;
   poleType: string;
   poleSize: string;
   cutPointType: string;
@@ -114,10 +115,16 @@ export default function HTLineMatrixPage({ params }: { params: Promise<{ siteId:
   }, [records]);
 
   const columnTotals = React.useMemo(() => {
-    const totals: Record<string, number> = {};
+    const totals: Record<string, number> = {
+      poleQty: 0
+    };
     CHECK_KEYS.forEach(k => totals[k.key] = 0);
 
     filteredRecords.forEach(record => {
+      // Calculate physical pole quantity
+      const qty = record.poleConfiguration === 'Two Pole' ? 2 : 1;
+      totals.poleQty += qty;
+
       CHECK_KEYS.forEach(k => {
         const check = record.checks.find(c => c.key === k.key);
         if (check?.status === 'Yes') {
@@ -138,8 +145,9 @@ export default function HTLineMatrixPage({ params }: { params: Promise<{ siteId:
     const exportData = filteredRecords.map(record => {
       const row: any = {
         'Pole #': record.poleNumber,
-        'Type': record.poleType,
-        'Size': record.poleSize,
+        'Configuration': record.poleConfiguration || 'Single Pole',
+        'Pole Size': record.poleSize,
+        'Pole Qty': record.poleConfiguration === 'Two Pole' ? 2 : 1,
         'Cut Point': record.cutPointType,
       };
 
@@ -155,7 +163,13 @@ export default function HTLineMatrixPage({ params }: { params: Promise<{ siteId:
       return row;
     });
 
-    const totalRow: any = { 'Pole #': 'TOTAL', 'Type': '', 'Size': '', 'Cut Point': '' };
+    const totalRow: any = { 
+      'Pole #': 'TOTAL', 
+      'Configuration': '', 
+      'Pole Size': '', 
+      'Pole Qty': columnTotals.poleQty,
+      'Cut Point': '' 
+    };
     CHECK_KEYS.forEach(k => {
       totalRow[k.label] = columnTotals[k.key];
     });
@@ -207,6 +221,22 @@ export default function HTLineMatrixPage({ params }: { params: Promise<{ siteId:
 
   const handleMouseUp = () => setIsDragging(false);
 
+  const prevFile = () => {
+    if (viewUrls.length <= 1) return;
+    const prevIdx = (currentFileIndex - 1 + viewUrls.length) % viewUrls.length;
+    setCurrentFileIndex(prevIdx);
+    setViewUrl(viewUrls[prevIdx]);
+    resetViewer();
+  };
+
+  const nextFile = () => {
+    if (viewUrls.length <= 1) return;
+    const nextIdx = (currentFileIndex + 1) % viewUrls.length;
+    setCurrentFileIndex(nextIdx);
+    setViewUrl(viewUrls[nextIdx]);
+    resetViewer();
+  };
+
   if (isProfileLoading || siteLoading || htLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
 
   return (
@@ -237,7 +267,9 @@ export default function HTLineMatrixPage({ params }: { params: Promise<{ siteId:
                 <TableHeader className="sticky top-0 z-20 shadow-sm">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[80px] font-black uppercase tracking-widest bg-primary text-white sticky left-0 top-0 z-30 px-3 py-4 border-r border-white/10">Pole #</TableHead>
-                    <TableHead className="w-[120px] font-black uppercase tracking-widest bg-primary text-white border-r border-white/10 px-3 py-4">Config</TableHead>
+                    <TableHead className="w-[120px] font-black uppercase tracking-widest bg-primary text-white border-r border-white/10 px-3 py-4">Configuration</TableHead>
+                    <TableHead className="w-[150px] font-black uppercase tracking-widest bg-primary text-white border-r border-white/10 px-3 py-4">Pole Size</TableHead>
+                    <TableHead className="w-[80px] font-black uppercase tracking-widest bg-primary text-white border-r border-white/10 px-3 py-4 text-center">Pole Qty</TableHead>
                     {CHECK_KEYS.map((k) => (
                       <TableHead key={k.key} className="text-center font-black uppercase tracking-tight leading-tight w-[80px] px-2 py-4 bg-primary text-white border-r border-white/10">{k.label}</TableHead>
                     ))}
@@ -249,11 +281,14 @@ export default function HTLineMatrixPage({ params }: { params: Promise<{ siteId:
                       <TableCell className="px-3 py-4 font-black text-sm border-r border-b bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
                         #{record.poleNumber}
                       </TableCell>
+                      <TableCell className="px-3 py-4 border-r border-b bg-background font-bold text-muted-foreground uppercase">
+                        {record.poleConfiguration || 'Single Pole'}
+                      </TableCell>
                       <TableCell className="px-3 py-4 border-r border-b bg-background font-bold text-muted-foreground">
-                        <div className="flex flex-col gap-0.5">
-                          <span className="truncate">{record.poleType}</span>
-                          <span className="text-[8px] opacity-60 truncate">{record.poleSize}</span>
-                        </div>
+                        {record.poleSize}
+                      </TableCell>
+                      <TableCell className="px-3 py-4 border-r border-b bg-background font-black text-center text-primary text-sm">
+                        {record.poleConfiguration === 'Two Pole' ? 2 : 1}
                       </TableCell>
                       {CHECK_KEYS.map((k) => {
                         const check = record.checks.find(c => c.key === k.key);
@@ -318,6 +353,8 @@ export default function HTLineMatrixPage({ params }: { params: Promise<{ siteId:
                   <TableRow className="bg-muted/50 font-black">
                     <TableCell className="sticky left-0 z-30 bg-muted/90 px-3 py-6 border-r border-b shadow-[2px_0_5px_rgba(0,0,0,0.05)] text-primary">TOTAL</TableCell>
                     <TableCell className="bg-muted/90 border-r border-b"></TableCell>
+                    <TableCell className="bg-muted/90 border-r border-b"></TableCell>
+                    <TableCell className="bg-muted/90 border-r border-b font-black text-center text-primary text-sm">{columnTotals.poleQty}</TableCell>
                     {CHECK_KEYS.map((k) => (
                       <TableCell key={`total-${k.key}`} className="text-center py-6 border-r border-b text-primary text-base font-mono">
                         {columnTotals[k.key]}

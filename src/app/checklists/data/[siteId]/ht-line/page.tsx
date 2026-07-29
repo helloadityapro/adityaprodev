@@ -267,7 +267,7 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
                   <TableHead>Pole #</TableHead>
                   <TableHead>Configuration</TableHead>
                   <TableHead>Auditor</TableHead>
-                  <TableHead>Status</TableHead>
+                  <TableHead>Approval Status</TableHead>
                   <TableHead>Last Edited</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
