@@ -11,10 +11,9 @@ import {
   useDoc, 
   useMemoFirebase, 
   updateDocumentNonBlocking, 
-  useFirebaseApp,
-  useCollection
+  useFirebaseApp 
 } from '@/firebase';
-import { doc, serverTimestamp, collection, arrayUnion } from 'firebase/firestore';
+import { doc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -31,7 +30,6 @@ import {
   ImageIcon, 
   FileImage, 
   Check, 
-  Zap,
   Pencil
 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -52,17 +50,19 @@ const POLE_SIZES = [
 
 const STUD_SIZES = ["08 Meters", "09 Meters", "10 Meters", "11 Meters"];
 
+const attachmentSchema = z.object({
+  url: z.string(),
+  name: z.string().optional().default("File"),
+  contentType: z.string().optional().default("image/jpeg")
+});
+
 const checkItemSchema = z.object({
   key: z.string(),
   label: z.string(),
   status: z.enum(["Yes", "No"]),
   quantity: z.coerce.number().optional().default(0),
   remarks: z.string().default(""),
-  attachments: z.array(z.object({
-    url: z.string(),
-    name: z.string(),
-    contentType: z.string()
-  })).default([]),
+  attachments: z.array(attachmentSchema).default([]),
   localFiles: z.array(z.any()).default([]),
 });
 
@@ -70,11 +70,11 @@ const editSchema = z.object({
   poleNumber: z.string().min(1, "Required").regex(/^\d{1,2}$/, "Max 2 digits allowed."),
   poleType: z.enum(['Two Pole', 'Four Pole']),
   poleSize: z.string().min(1, "Required"),
-  studSize: z.string().optional(),
+  studSize: z.string().optional().or(z.literal("")),
   cutPointType: z.enum(['Single Cut Point', 'Double Cut Point', 'V-Cross', 'Horizontal Channel (One Side channel)']),
   checks: z.array(checkItemSchema),
-  additionalRemarks: z.string().optional(),
-  generalPhotos: z.array(z.object({ url: z.string(), name: z.string(), contentType: z.string() })).default([]),
+  additionalRemarks: z.string().optional().or(z.literal("")),
+  generalPhotos: z.array(attachmentSchema).default([]),
   generalLocalFiles: z.array(z.any()).default([]),
 });
 
@@ -121,7 +121,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
         checks: (audit.checks || []).map((c: any) => ({
           key: c.key || "",
           label: c.label || "",
-          status: c.status || "No",
+          status: c.status === "Yes" ? "Yes" : "No",
           quantity: c.quantity || 0,
           remarks: c.remarks || "",
           attachments: c.attachments || [],
@@ -156,6 +156,8 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
   const onSubmit = async (values: z.infer<typeof editSchema>) => {
     if (!user || !userProfile || !audit) return;
     setIsSubmitting(true);
+    setUploadProgress({});
+
     try {
       // 1. Snapshot current state for history
       const previousValues = {
@@ -192,9 +194,12 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
           }
         }
         
-        const { localFiles, ...checkClean } = check;
         updatedChecks.push({ 
-          ...checkClean, 
+          key: check.key,
+          label: check.label,
+          status: check.status,
+          quantity: check.quantity,
+          remarks: check.remarks,
           attachments: newAttachments 
         });
       }
@@ -209,13 +214,16 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
         }
       }
 
-      const { generalLocalFiles, checks, generalPhotos, ...sanitizedValues } = values;
-
-      // 4. Perform non-blocking update
+      // 4. Perform non-blocking atomic update
       updateDocumentNonBlocking(auditRef, {
-        ...sanitizedValues,
+        poleNumber: values.poleNumber,
+        poleType: values.poleType,
+        poleSize: values.poleSize,
+        studSize: values.studSize || "",
+        cutPointType: values.cutPointType,
         checks: updatedChecks,
         generalPhotos: updatedGeneralPhotos,
+        additionalRemarks: values.additionalRemarks || "",
         updatedAt: serverTimestamp(),
         updatedBy: user.uid,
         updatedByName: userProfile.username || user.email,
@@ -228,7 +236,6 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
         description: `Audit record for Pole ${values.poleNumber} updated and returned to Pending status.` 
       });
       
-      // Delay navigation slightly to ensure Firestore cache is ready
       setTimeout(() => {
         router.back();
       }, 300);
@@ -248,7 +255,13 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} disabled={isSubmitting} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          onClick={() => router.back()} 
+          disabled={isSubmitting} 
+          className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors"
+        >
           <ArrowLeft className="mr-2 h-4 w-4" /> Cancel & Return
         </Button>
         <div className="flex items-center gap-3">
@@ -277,7 +290,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="Two Pole">Two Pole</SelectItem>
                         <SelectItem value="Four Pole">Four Pole</SelectItem>
@@ -289,18 +302,19 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Size</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         {POLE_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                       </SelectContent>
                     </Select>
+                    <FormMessage />
                   </FormItem>
                 )} />
                 <FormField control={form.control} name="cutPointType" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Cut Point Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="Single Cut Point">Single Cut Point</SelectItem>
                         <SelectItem value="Double Cut Point">Double Cut Point</SelectItem>
@@ -326,7 +340,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                         {['Yes', 'No'].map(s => (
                           <div key={s} className="flex items-center space-x-1.5">
                             <RadioGroupItem value={s} id={`check-${index}-${s}`} className="sr-only" />
-                            <Label htmlFor={`check-${index}-${s}`} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-sm border-2 cursor-pointer text-[10px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-lg" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
+                            <Label htmlFor={`check-${index}-${s}`} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-sm border-2 cursor-pointer transition-all text-[10px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-lg" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
                           </div>
                         ))}
                       </RadioGroup>
@@ -339,18 +353,18 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                         <FormField control={form.control} name="studSize" render={({ field }) => (
                           <FormItem><FormLabel className="text-[10px] font-bold uppercase">Stud Size</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger className="h-10"><SelectValue placeholder="Choose size" /></SelectTrigger></FormControl>
+                            <FormControl><SelectTrigger className="h-10 rounded-sm bg-background"><SelectValue placeholder="Choose size" /></SelectTrigger></FormControl>
                             <SelectContent>{STUD_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
                           </Select></FormItem>
                         )} />
                       )}
                       <FormField control={form.control} name={`checks.${index}.quantity`} render={({ field }) => (
-                        <FormItem><FormLabel className="text-[10px] font-bold uppercase">Quantity</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 font-bold" /></FormControl></FormItem>
+                        <FormItem><FormLabel className="text-[10px] font-bold uppercase">Quantity</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm font-bold bg-background" /></FormControl></FormItem>
                       )} />
                     </div>
                   )}
 
-                  <FormField control={form.control} name={`checks.${index}.remarks`} render={({ field }) => (<FormControl><Textarea {...field} placeholder="Findings..." className="rounded-sm bg-muted/5" /></FormControl>)} />
+                  <FormField control={form.control} name={`checks.${index}.remarks`} render={({ field }) => (<FormControl><Textarea {...field} placeholder="Findings..." className="rounded-sm bg-muted/5 min-h-[80px]" /></FormControl>)} />
                   
                   <div className="space-y-3">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground flex items-center gap-2"><ImageIcon className="h-3.5 w-3.5" /> Media Evidence</Label>
@@ -358,16 +372,47 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                       {form.watch(`checks.${index}.attachments`)?.map((file, fIdx) => (
                         <div key={fIdx} className="relative aspect-video w-32 rounded-sm overflow-hidden border group">
                           <img src={file.url} className="w-full h-full object-cover" alt="Audit" />
-                          <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full" onClick={() => form.setValue(`checks.${index}.attachments`, form.getValues(`checks.${index}.attachments`).filter((_, i) => i !== fIdx))}><X className="h-3.5 w-3.5" /></Button>
+                          <Button 
+                            type="button" 
+                            variant="destructive" size="icon" 
+                            className="absolute top-1 right-1 h-6 w-6 rounded-full opacity-100 sm:opacity-0 group-hover:opacity-100 transition-opacity shadow-lg" 
+                            onClick={() => {
+                              const current = form.getValues(`checks.${index}.attachments`);
+                              form.setValue(`checks.${index}.attachments`, current.filter((_, i) => i !== fIdx));
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       ))}
                       {form.watch(`checks.${index}.localFiles`)?.map((file: File, fIdx: number) => (
                         <div key={fIdx} className="relative aspect-video w-32 rounded-sm overflow-hidden border border-primary/20 bg-primary/5 flex items-center justify-center group shadow-sm">
+                          <FileImage className="h-6 w-6 text-primary opacity-40" />
                           <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black text-primary p-2 text-center uppercase truncate">{file.name}</span>
-                          <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg" onClick={() => form.setValue(`checks.${index}.localFiles`, form.getValues(`checks.${index}.localFiles`).filter((_, i) => i !== fIdx))}><X className="h-3.5 w-3.5" /></Button>
+                          <Button 
+                            type="button" 
+                            variant="destructive" size="icon" 
+                            className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg" 
+                            onClick={() => {
+                              const current = form.getValues(`checks.${index}.localFiles`);
+                              form.setValue(`checks.${index}.localFiles`, current.filter((_, i) => i !== fIdx));
+                            }}
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
                       ))}
-                      <label className="aspect-video w-32 border-2 border-dashed border-primary/20 rounded-sm flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/5"><Camera className="h-6 w-6 text-primary/40" /><input type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => form.setValue(`checks.${index}.localFiles`, [...(form.getValues(`checks.${index}.localFiles`) || []), ...Array.from(e.target.files || [])])} /></label>
+                      <label className="aspect-video w-32 border-2 border-dashed border-primary/20 rounded-sm flex flex-col items-center justify-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/5 group">
+                        <Camera className="h-6 w-6 text-primary/40 group-hover:text-primary transition-colors" />
+                        <input 
+                          type="file" multiple accept="image/*,video/*" className="hidden" 
+                          onChange={e => {
+                            const newFiles = Array.from(e.target.files || []);
+                            const current = form.getValues(`checks.${index}.localFiles`) || [];
+                            form.setValue(`checks.${index}.localFiles`, [...current, ...newFiles]);
+                          }} 
+                        />
+                      </label>
                     </div>
                   </div>
                 </div>
@@ -385,10 +430,16 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                  <Label className="text-[10px] font-black uppercase text-muted-foreground">General Media Attachments</Label>
                  <div className="flex flex-wrap gap-4">
                    {form.watch('generalPhotos')?.map((file, idx) => (
-                     <div key={idx} className="relative aspect-video w-32 rounded-sm overflow-hidden border group"><img src={file.url} className="w-full h-full object-cover" alt="Audit" /><Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full" onClick={() => form.setValue('generalPhotos', form.getValues('generalPhotos').filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5"/></Button></div>
+                     <div key={idx} className="relative aspect-video w-32 rounded-sm overflow-hidden border group">
+                        <img src={file.url} className="w-full h-full object-cover" alt="Audit" />
+                        <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg" onClick={() => form.setValue('generalPhotos', form.getValues('generalPhotos').filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5"/></Button>
+                     </div>
                    ))}
                    {form.watch('generalLocalFiles')?.map((file: File, idx: number) => (
-                     <div key={idx} className="relative aspect-video w-32 rounded-sm overflow-hidden border border-primary/20 bg-primary/5 flex items-center justify-center group"><span className="text-[7px] font-black uppercase text-primary p-2 text-center truncate">{file.name}</span><Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg" onClick={() => form.setValue('generalLocalFiles', form.getValues('generalLocalFiles').filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5"/></Button></div>
+                     <div key={idx} className="relative aspect-video w-32 rounded-sm overflow-hidden border border-primary/20 bg-primary/5 flex items-center justify-center group shadow-sm">
+                        <span className="text-[7px] font-black uppercase text-primary p-2 text-center truncate">{file.name}</span>
+                        <Button type="button" variant="destructive" size="icon" className="absolute top-1 right-1 h-6 w-6 rounded-full shadow-lg" onClick={() => form.setValue('generalLocalFiles', form.getValues('generalLocalFiles').filter((_, i) => i !== idx))}><X className="h-3.5 w-3.5"/></Button>
+                     </div>
                    ))}
                    <label className="aspect-video w-32 border-2 border-dashed border-primary/20 rounded-sm flex items-center justify-center cursor-pointer hover:bg-primary/5 transition-all bg-muted/5"><Plus className="h-6 w-6 text-primary/40"/><input type="file" multiple accept="image/*,video/*" className="hidden" onChange={(e) => form.setValue('generalLocalFiles', [...form.getValues('generalLocalFiles'), ...Array.from(e.target.files || [])])} /></label>
                  </div>
@@ -399,7 +450,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
           <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-40 md:left-[16rem]">
             <div className="max-w-4xl mx-auto flex items-center justify-end gap-3">
               <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSubmitting} className="rounded-sm font-bold uppercase text-[10px] tracking-widest h-12 px-8">Discard</Button>
-              <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] tracking-widest h-12 px-12 shadow-xl shadow-primary/20">
+              <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] tracking-widest h-12 px-12 shadow-xl shadow-primary/20 flex-1 sm:flex-none">
                 {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Synchronizing...</> : <><Save className="mr-2 h-4 w-4" /> Save Revision</>}
               </Button>
             </div>
