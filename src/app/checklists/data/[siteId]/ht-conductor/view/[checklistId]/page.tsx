@@ -23,7 +23,8 @@ import {
   MessageCircle,
   TrendingUp,
   FileDown,
-  History
+  History,
+  ImageIcon
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -66,8 +67,8 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
   const { siteId, checklistId } = React.use(params);
   const firestore = useFirestore();
   const { user } = useUser();
-  const router = useRouter();
   const { toast } = useToast();
+  const router = useRouter();
 
   const auditRef = useMemoFirebase(() => doc(firestore, 'ht_conductor_checklists', checklistId), [firestore, checklistId]);
   const { data: audit, isLoading: auditLoading } = useDoc<HTConductorChecklist>(auditRef);
@@ -89,11 +90,19 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
 
   const isPointEdited = React.useCallback((idx: number) => {
     if (!audit?.editHistory || audit.editHistory.length === 0) return false;
+    
+    // Compare against the very first version recorded in history
     const originalSpans = audit.editHistory[0].previousValues.spans;
     const currentSpan = audit.spans?.[idx];
     const originalSpan = originalSpans?.[idx];
+    
     if (!originalSpan || !currentSpan) return false;
-    return originalSpan.distance !== currentSpan.distance || originalSpan.remarks !== currentSpan.remarks;
+
+    // Use Number() to ensure strictly numeric comparison and normalize strings
+    const distanceChanged = Number(originalSpan.distance) !== Number(currentSpan.distance);
+    const remarksChanged = (originalSpan.remarks || "").trim() !== (currentSpan.remarks || "").trim();
+
+    return distanceChanged || remarksChanged;
   }, [audit]);
 
   const handleProcessAudit = async (remarks: string) => {
