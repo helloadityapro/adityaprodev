@@ -14,7 +14,7 @@ import {
   useFirebaseApp,
   useCollection
 } from '@/firebase';
-import { doc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, serverTimestamp, collection, arrayUnion } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -92,6 +92,9 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
   const auditRef = useMemoFirebase(() => doc(firestore, 'ht_line_checklists', checklistId), [firestore, checklistId]);
   const { data: audit, isLoading: auditLoading } = useDoc<any>(auditRef);
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
+
   const form = useForm<z.infer<typeof editSchema>>({
     resolver: zodResolver(editSchema),
     defaultValues: {
@@ -151,12 +154,31 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
   };
 
   const onSubmit = async (values: z.infer<typeof editSchema>) => {
-    if (!user || !audit) return;
+    if (!user || !userProfile || !audit) return;
     setIsSubmitting(true);
     try {
+      // 1. Snapshot current state for history
+      const previousValues = {
+        poleNumber: audit.poleNumber,
+        poleType: audit.poleType,
+        poleSize: audit.poleSize,
+        studSize: audit.studSize || "",
+        cutPointType: audit.cutPointType,
+        checks: audit.checks || [],
+        additionalRemarks: audit.additionalRemarks || "",
+        generalPhotos: audit.generalPhotos || [],
+      };
+
+      const historyEntry = {
+        editedBy: userProfile.username || user.email,
+        editedById: user.uid,
+        timestamp: new Date().toISOString(),
+        previousValues
+      };
+
       const timestamp = Date.now();
       
-      // 1. Process point-wise checks
+      // 2. Process point-wise checks
       const updatedChecks = [];
       for (let i = 0; i < values.checks.length; i++) {
         const check = values.checks[i];
@@ -177,7 +199,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
         });
       }
 
-      // 2. Process general photos
+      // 3. Process general photos
       const updatedGeneralPhotos = [...values.generalPhotos];
       if (values.generalLocalFiles && values.generalLocalFiles.length > 0) {
         for (const file of values.generalLocalFiles) {
@@ -189,20 +211,28 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
 
       const { generalLocalFiles, checks, generalPhotos, ...sanitizedValues } = values;
 
+      // 4. Perform non-blocking update
       updateDocumentNonBlocking(auditRef, {
         ...sanitizedValues,
         checks: updatedChecks,
         generalPhotos: updatedGeneralPhotos,
         updatedAt: serverTimestamp(),
-        status: 'Pending'
+        updatedBy: user.uid,
+        updatedByName: userProfile.username || user.email,
+        status: 'Pending',
+        editHistory: arrayUnion(historyEntry)
       });
 
       toast({ 
-        title: "Revision Saved", 
-        description: "Audit record updated and returned to Pending status." 
+        title: "Revision Finalized", 
+        description: `Audit record for Pole ${values.poleNumber} updated and returned to Pending status.` 
       });
       
-      router.back();
+      // Delay navigation slightly to ensure Firestore cache is ready
+      setTimeout(() => {
+        router.back();
+      }, 300);
+
     } catch (e: any) {
       toast({ 
         variant: "destructive", 
@@ -369,8 +399,8 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
           <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-40 md:left-[16rem]">
             <div className="max-w-4xl mx-auto flex items-center justify-end gap-3">
               <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSubmitting} className="rounded-sm font-bold uppercase text-[10px] tracking-widest h-12 px-8">Discard</Button>
-              <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] tracking-widest h-12 px-12 shadow-xl">
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing...</> : <><Save className="mr-2 h-4 w-4" /> Save Revision</>}
+              <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] tracking-widest h-12 px-12 shadow-xl shadow-primary/20">
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Synchronizing...</> : <><Save className="mr-2 h-4 w-4" /> Save Revision</>}
               </Button>
             </div>
           </div>
