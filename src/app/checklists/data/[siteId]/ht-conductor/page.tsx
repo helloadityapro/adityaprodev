@@ -101,6 +101,33 @@ export default function ProjectHTConductorDataPage({ params }: { params: Promise
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
+      const logoUrl = '/icon.png';
+
+      let logoProps: any = null;
+      try {
+        logoProps = await doc.getImageProperties(logoUrl);
+      } catch (e) {
+        console.warn("Logo load failed", e);
+      }
+
+      const addHeaderLogo = (pdfDoc: any) => {
+        if (!logoProps) return;
+        try {
+          const areaSize = 25;
+          const startX = 210 - areaSize - 15; // Right aligned with margin
+          const startY = 10;
+          const ratio = logoProps.width / logoProps.height;
+          let renderW = areaSize;
+          let renderH = areaSize;
+          if (ratio > 1) renderH = areaSize / ratio;
+          else renderW = areaSize * ratio;
+          const x = startX + (areaSize - renderW) / 2;
+          const y = startY + (areaSize - renderH) / 2;
+          pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
+        } catch (e) {
+          pdfDoc.addImage(logoUrl, 'PNG', 170, 10, 25, 25);
+        }
+      };
       
       for (let index = 0; index < items.length; index++) {
         const record = items[index];
@@ -108,6 +135,8 @@ export default function ProjectHTConductorDataPage({ params }: { params: Promise
         
         setGenerationProgress(Math.round(((index + 1) / items.length) * 100));
         await new Promise(resolve => setTimeout(resolve, 0));
+
+        addHeaderLogo(doc);
 
         const margin = 15;
         let currY = 40;
@@ -134,10 +163,9 @@ export default function ProjectHTConductorDataPage({ params }: { params: Promise
         drawRow('PROJECT NAME', record.siteName);
         drawRow('PLANT CONFIGURATION', record.poleConfiguration);
         drawRow('AUDITOR', record.userName);
-        drawRow('STATUS', record.status);
 
         currY += 5;
-        const colDesc = 110; const colDist = 40; const colTotal = 30;
+        const colDesc = 110; const colDist = 40;
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, colDesc, rowHeight);
         doc.text('SPAN DESCRIPTION', margin + 2, currY + 5.5);
@@ -149,7 +177,11 @@ export default function ProjectHTConductorDataPage({ params }: { params: Promise
         let recordTotalDist = 0;
         for (const span of record.spans) {
           const h = rowHeight;
-          if (currY + h > 270) { doc.addPage(); currY = 30; }
+          if (currY + h > 270) { 
+            doc.addPage(); 
+            currY = 30; 
+            addHeaderLogo(doc);
+          }
           
           doc.rect(margin, currY, colDesc, h);
           doc.text(span.label.toUpperCase(), margin + 2, currY + 5.5);
