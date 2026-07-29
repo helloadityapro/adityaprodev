@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -16,7 +15,7 @@ import {
 } from '@/firebase';
 import { doc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -30,7 +29,6 @@ import {
   Camera, 
   ImageIcon, 
   FileImage, 
-  Check, 
   Pencil
 } from 'lucide-react';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
@@ -160,10 +158,14 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
     setUploadProgress({});
 
     try {
-      // 1. Snapshot current state for history
       const previousValues = {
         checks: audit.checks || [],
         additionalRemarks: audit.additionalRemarks || "",
+        poleNumber: audit.poleNumber || "",
+        poleType: audit.poleType || "",
+        poleSize: audit.poleSize || "",
+        studSize: audit.studSize || "",
+        cutPointType: audit.cutPointType || "",
       };
 
       const historyEntry = {
@@ -175,7 +177,6 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
 
       const timestamp = Date.now();
       
-      // 2. Process point-wise checks
       const updatedChecks = [];
       for (let i = 0; i < values.checks.length; i++) {
         const check = values.checks[i];
@@ -199,7 +200,6 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
         });
       }
 
-      // 3. Process general photos
       const updatedGeneralPhotos = [...values.generalPhotos];
       if (values.generalLocalFiles && values.generalLocalFiles.length > 0) {
         for (const file of values.generalLocalFiles) {
@@ -209,7 +209,6 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
         }
       }
 
-      // 4. Perform non-blocking atomic update
       updateDocumentNonBlocking(auditRef, {
         poleNumber: values.poleNumber,
         poleType: values.poleType,
@@ -228,7 +227,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
 
       toast({ 
         title: "Revision Finalized", 
-        description: `Audit record for Pole ${values.poleNumber} updated and returned to Pending status.` 
+        description: `Audit record updated and returned to Pending status.` 
       });
       
       setTimeout(() => {
@@ -285,7 +284,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="Two Pole">Two Pole</SelectItem>
                         <SelectItem value="Four Pole">Four Pole</SelectItem>
@@ -297,7 +296,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Size</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue placeholder="Select size" /></SelectTrigger></FormControl>
                       <SelectContent>
                         {POLE_SIZES.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
                       </SelectContent>
@@ -309,7 +308,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Cut Point Type</FormLabel>
                     <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
+                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="Single Cut Point">Single Cut Point</SelectItem>
                         <SelectItem value="Double Cut Point">Double Cut Point</SelectItem>

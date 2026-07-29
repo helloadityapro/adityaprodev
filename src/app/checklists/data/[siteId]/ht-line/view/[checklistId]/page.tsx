@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { 
   ArrowLeft, 
-  ShieldCheck, 
   Clock, 
   User, 
   Zap, 
@@ -20,6 +19,10 @@ import {
   Loader2, 
   MapPin,
   Building2,
+  Navigation,
+  MessageCircle,
+  TrendingUp,
+  History,
   ZoomIn,
   ZoomOut,
   RotateCcw,
@@ -28,11 +31,8 @@ import {
   ChevronRight,
   ImageIcon,
   Film,
-  PlayCircle,
-  FileImage,
   Download,
-  History,
-  MessageCircle
+  FileImage
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -43,17 +43,19 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 type Attachment = { url: string; contentType: string; name: string; };
 
 type CheckPoint = { label: string; remarks: string; status: string; quantity?: number; attachments?: Attachment[] };
 
-type HTLineChecklist = {
+type HTConductorChecklist = {
   id: string;
   siteId: string;
   siteName: string;
   projectCompany: string;
+  poleConfiguration: string;
   poleNumber: string;
   poleType: string;
   poleSize: string;
@@ -64,9 +66,14 @@ type HTLineChecklist = {
   status: string;
   createdAt: any;
   updatedAt?: any;
+  spans: { label: string; distance: number; remarks?: string }[];
   checks: CheckPoint[];
+  adminRemarks?: string;
   additionalRemarks?: string;
   generalPhotos?: Attachment[];
+  processedBy?: string;
+  processedByName?: string;
+  processedAt?: any;
   editHistory?: {
     editedBy: string;
     editedById: string;
@@ -74,12 +81,13 @@ type HTLineChecklist = {
     previousValues: {
       checks: CheckPoint[];
       additionalRemarks?: string;
+      poleNumber?: string;
+      poleType?: string;
+      poleSize?: string;
+      studSize?: string;
+      cutPointType?: string;
     }
   }[];
-  adminRemarks?: string;
-  processedBy?: string;
-  processedByName?: string;
-  processedAt?: any;
 };
 
 export default function HTLineAuditViewPage({ params }: { params: Promise<{ siteId: string, checklistId: string }> }) {
@@ -90,11 +98,11 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
   const { toast } = useToast();
 
   const auditRef = useMemoFirebase(() => doc(firestore, 'ht_line_checklists', checklistId), [firestore, checklistId]);
-  const { data: audit, isLoading: auditLoading } = useDoc<HTLineChecklist>(auditRef);
+  const { data: audit, isLoading: auditLoading } = useDoc<HTConductorChecklist>(auditRef);
 
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [approvingAction, setApprovingAction] = React.useState<'Approved' | 'Rejected' | null>(null);
-  
+
   // Advanced Media Viewer State
   const [viewFile, setViewFile] = React.useState<Attachment | null>(null);
   const [viewFiles, setViewFiles] = React.useState<Attachment[]>([]);
@@ -134,17 +142,12 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
     }
   };
 
-  // Check if a point was edited by comparing with original values (from first edit history entry)
   const isPointEdited = React.useCallback((label: string) => {
     if (!audit?.editHistory || audit.editHistory.length === 0) return false;
-    
-    // Original values are in the previousValues of the FIRST history entry
     const originalChecks = audit.editHistory[0].previousValues.checks;
-    const originalCheck = originalChecks.find(c => c.label === label);
-    const currentCheck = audit.checks.find(c => c.label === label);
-    
+    const currentCheck = audit.checks?.find(c => c.label === label);
+    const originalCheck = originalChecks?.find(c => c.label === label);
     if (!originalCheck || !currentCheck) return false;
-    
     return originalCheck.status !== currentCheck.status || 
            originalCheck.quantity !== currentCheck.quantity || 
            originalCheck.remarks !== currentCheck.remarks;
@@ -200,7 +203,6 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
   };
 
   const handleMouseUp = () => setIsDragging(false);
-  const handleDoubleClick = () => { if (viewFile && (isVideo(viewFile) || isHeic(viewFile))) return; if (scale > 1) { setScale(1); setPosition({ x: 0, y: 0 }); } else { setScale(2); } };
   const nextFile = () => { if (viewFiles.length <= 1) return; const nextIdx = (currentFileIndex + 1) % viewFiles.length; setCurrentFileIndex(nextIdx); setViewFile(viewFiles[nextIdx]); resetViewer(); };
   const prevFile = () => { if (viewFiles.length <= 1) return; const prevIdx = (currentFileIndex - 1 + viewFiles.length) % viewFiles.length; setCurrentFileIndex(prevIdx); setViewFile(viewFiles[prevIdx]); resetViewer(); };
 
@@ -230,8 +232,9 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
              "rounded-sm text-[10px] font-black uppercase px-3 h-8",
              audit.status === 'Approved' ? "bg-green-100 text-green-700 border-green-200" :
              audit.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-200" :
+             audit.status === 'Draft' ? "bg-amber-100 text-amber-700 border-amber-200" :
              "bg-yellow-50 text-yellow-700 border-yellow-200"
-           )}>{audit.status}</Badge>
+           )}>{audit.status === 'Draft' ? 'In Progress' : audit.status}</Badge>
         </div>
       </div>
 
@@ -239,14 +242,14 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
         <CardHeader className="bg-primary/5 border-b p-6 md:p-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Personnel</Label><p className="text-sm font-bold flex items-center gap-2"><User className="h-3.5 w-3.5 text-primary opacity-50" />{audit.userName}</p></div>
-            <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pole Config</Label><p className="text-sm font-bold">{audit.poleType}</p></div>
+            <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pole Config</Label><p className="text-sm font-bold uppercase">{audit.poleType}</p></div>
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pole Size</Label><p className="text-xs font-bold leading-tight">{audit.poleSize}</p></div>
-            <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Timestamp</Label><p className="text-xs font-mono font-bold text-muted-foreground">{format(audit.createdAt.toDate(), 'dd MMM yy, HH:mm')}</p></div>
+            <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Timestamp</Label><p className="text-xs font-mono font-bold text-muted-foreground">{audit.createdAt ? format(audit.createdAt.toDate(), 'dd MMM yy, HH:mm') : '—'}</p></div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
           <div className="divide-y border-b">
-            {audit.checks.map((check, idx) => (
+            {audit.checks?.map((check, idx) => (
               <div key={idx} className="p-6 md:p-8 space-y-4 hover:bg-primary/[0.01] transition-colors">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
@@ -262,9 +265,6 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
                         check.status === 'Yes' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200"
                       )}>{check.status}</Badge>
                       {check.quantity > 0 && <Badge variant="secondary" className="h-5 rounded-sm text-[10px] font-black">Qty: {check.quantity}</Badge>}
-                      {check.label.includes('Stud') && audit.studSize && check.status === 'Yes' && (
-                        <Badge variant="outline" className="h-5 rounded-sm text-[10px] font-bold border-amber-200 text-amber-700 bg-amber-50">Size: {audit.studSize}</Badge>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -292,23 +292,25 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
           </div>
 
           <div className="p-6 md:p-8 space-y-6 bg-muted/5">
-             <div>
-                <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4 block">Pole Evidence Photos</Label>
-                <div className="flex flex-wrap gap-4">
-                  {audit.generalPhotos?.map((file, fIdx) => (
-                    <div key={fIdx} className="relative aspect-square w-32 md:w-48 rounded-sm overflow-hidden border-2 border-white shadow-xl cursor-pointer group" onClick={() => openViewer(file, allGalleryFiles)}>
-                      {isVideo(file) ? (
-                        <div className="w-full h-full bg-slate-900 flex items-center justify-center">
-                          <Film className="h-8 w-8 text-white/40" />
-                        </div>
-                      ) : (
-                        <img src={file.url} className="w-full h-full object-cover" alt="General" />
-                      )}
-                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Maximize2 className="h-6 w-6 text-white" /></div>
-                    </div>
-                  ))}
-                </div>
-             </div>
+             {audit.generalPhotos && audit.generalPhotos.length > 0 && (
+               <div>
+                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4 block">Pole Evidence Photos</Label>
+                  <div className="flex flex-wrap gap-4">
+                    {audit.generalPhotos.map((file, fIdx) => (
+                      <div key={fIdx} className="relative aspect-square w-32 md:w-48 rounded-sm overflow-hidden border-2 border-white shadow-xl cursor-pointer group" onClick={() => openViewer(file, allGalleryFiles)}>
+                        {isVideo(file) ? (
+                          <div className="w-full h-full bg-slate-900 flex items-center justify-center">
+                            <Film className="h-8 w-8 text-white/40" />
+                          </div>
+                        ) : (
+                          <img src={file.url} className="w-full h-full object-cover" alt="General" />
+                        )}
+                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><Maximize2 className="h-6 w-6 text-white" /></div>
+                      </div>
+                    ))}
+                  </div>
+               </div>
+             )}
              {audit.additionalRemarks && (
                <div className="space-y-2">
                  <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">General Remarks</Label>
@@ -373,10 +375,20 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
                             </div>
                           ))}
                        </div>
-                       {entry.previousValues?.additionalRemarks && (
-                          <div className="p-4 bg-muted/30 border rounded-sm">
-                             <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Previous Observations</Label>
-                             <p className="text-xs italic text-foreground/80 leading-relaxed">"{entry.previousValues.additionalRemarks}"</p>
+                       {(entry.previousValues?.additionalRemarks || entry.previousValues?.poleSize) && (
+                          <div className="p-4 bg-muted/30 border rounded-sm space-y-2">
+                             {entry.previousValues?.poleSize && (
+                               <div className="flex justify-between items-center text-[9px] font-bold uppercase border-b border-border/10 pb-2 mb-2">
+                                  <span className="text-muted-foreground">Original Pole Size:</span>
+                                  <span className="text-primary">{entry.previousValues.poleSize}</span>
+                               </div>
+                             )}
+                             {entry.previousValues?.additionalRemarks && (
+                                <>
+                                  <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Previous Observations</Label>
+                                  <p className="text-xs italic text-foreground/80 leading-relaxed">"{entry.previousValues.additionalRemarks}"</p>
+                                </>
+                             )}
                           </div>
                        )}
                     </CardContent>
@@ -396,9 +408,9 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
       {canApprove && audit.status === 'Pending' && (
         <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-40 md:left-[16rem] animate-in slide-in-from-bottom-full duration-500 shadow-2xl">
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
-             <div className="hidden sm:block">
+             <div className="hidden sm:block text-left">
                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Audit Resolution Center</p>
-                <p className="text-[11px] font-bold text-foreground/60">Choose a decision for this HT pole audit.</p>
+                <p className="text-[11px] font-bold text-foreground/60">Choose a decision for this Conductor audit.</p>
              </div>
              <div className="flex-1 sm:flex-none flex gap-3">
                 <Button className="flex-1 h-12 bg-green-600 hover:bg-green-700 text-white font-black uppercase text-[10px] px-8 shadow-xl" onClick={() => setApprovingAction('Approved')}>Approve Audit</Button>
@@ -412,16 +424,16 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
         <DialogContent className="max-w-md w-[95vw] rounded-sm p-6">
           <DialogHeader className="text-left space-y-2">
             <DialogTitle className="text-xl font-black uppercase tracking-tight">Finalize {approvingAction}</DialogTitle>
-            <DialogDescription className="text-xs font-medium">Archiving quality decision for Pole #{audit.poleNumber}.</DialogDescription>
+            <DialogDescription className="text-xs font-medium">Archiving quality decision for this conductor log.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-3 text-left">
             <Label className="text-[10px] font-bold tracking-widest text-muted-foreground uppercase px-1">Authority Remarks (Optional)</Label>
-            <Textarea id="final-action-remarks-ht" placeholder="Enter feedback..." className="min-h-[120px] rounded-sm" />
+            <Textarea id="final-action-remarks-htc" placeholder="Enter feedback..." className="min-h-[120px] rounded-sm" />
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3">
             <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm text-[10px] uppercase">Cancel</Button></DialogClose>
             <Button className={cn("w-full sm:flex-1 h-12 rounded-sm font-black uppercase text-[10px]", approvingAction === 'Approved' ? 'bg-green-600' : 'bg-red-600')} 
-              onClick={() => handleProcessAudit((document.getElementById('final-action-remarks-ht') as HTMLTextAreaElement)?.value || "")} disabled={isProcessing}>
+              onClick={() => handleProcessAudit((document.getElementById('final-action-remarks-htc') as HTMLTextAreaElement)?.value || "")} disabled={isProcessing}>
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : `Confirm ${approvingAction}`}
             </Button>
           </DialogFooter>
@@ -469,11 +481,10 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
             onMouseMove={handleMouseMove} 
             onMouseUp={handleMouseUp} 
             onMouseLeave={handleMouseUp}
-            onDoubleClick={handleDoubleClick}
           >
             <div 
               ref={mediaRef} 
-              className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} 
+              className={cn("transition-transform duration-200 ease-out flex items-center justify-center pointer-events-none w-fit h-fit", isDragging && "transition-none")} 
               style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}
             >
               {viewFile && (
