@@ -14,7 +14,7 @@ import {
   useFirebaseApp,
   useCollection
 } from '@/firebase';
-import { doc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, serverTimestamp, collection, arrayUnion } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -83,6 +83,9 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
   const auditRef = useMemoFirebase(() => doc(firestore, 'inverter_checklists', checklistId), [firestore, checklistId]);
   const { data: audit, isLoading: auditLoading } = useDoc<any>(auditRef);
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
+
   const makesQuery = useMemoFirebase(() => collection(firestore, 'inverter_makes'), [firestore]);
   const { data: inverterMakes } = useCollection<any>(makesQuery);
 
@@ -148,19 +151,42 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
   };
 
   const onSubmit = async (values: z.infer<typeof editSchema>) => {
-    if (!user || !audit) return;
+    if (!user || !userProfile || !audit) return;
     setIsSubmitting(true);
+    setUploadProgress({});
+
     try {
       const finalInverterNumber = values.inverterNumber.startsWith("INV-") ? values.inverterNumber : `INV-${values.inverterNumber}`;
+      
+      // Capture previous state for history
+      const previousValues = {
+        inverterNumber: audit.inverterNumber || "",
+        inverterMake: audit.inverterMake || "",
+        inverterRating: audit.inverterRating || "",
+        inverterSerialNumber: audit.inverterSerialNumber || "",
+        stringCount: audit.stringCount || 0,
+        checks: (audit.checks || []).map((c: any) => ({
+          label: c.label || "",
+          status: c.status || "Pending",
+          remarks: c.remarks || ""
+        })),
+        otherRemarks: audit.otherRemarks || ""
+      };
+
+      const historyEntry = {
+        editedBy: userProfile.username || user.email,
+        editedById: user.uid,
+        timestamp: new Date().toISOString(),
+        previousValues
+      };
+
       const timestamp = Date.now();
       
-      // 1. Process point-wise checks
       const updatedChecks = [];
       for (let i = 0; i < values.checks.length; i++) {
         const check = values.checks[i];
         const newAttachments = [...check.attachments];
         
-        // Handle local uploads for this check
         if (check.localFiles && check.localFiles.length > 0) {
           for (const file of check.localFiles) {
             const path = `checklists/inverter/${user.uid}/${timestamp}_edit_check_${i}_${file.name.replace(/\s+/g, '_')}`;
@@ -169,7 +195,6 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
           }
         }
         
-        // Omit localFiles from the final Firestore payload
         const { localFiles, ...checkClean } = check;
         updatedChecks.push({ 
           ...checkClean, 
@@ -177,7 +202,6 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
         });
       }
 
-      // 2. Process additional other attachments
       const updatedOtherAttachments = [...values.otherAttachments];
       if (values.otherLocalFiles && values.otherLocalFiles.length > 0) {
         for (const file of values.otherLocalFiles) {
@@ -187,32 +211,31 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
         }
       }
 
-      // 3. Destructure values to omit raw File objects (otherLocalFiles)
       const { otherLocalFiles, checks, otherAttachments, ...sanitizedValues } = values;
 
-      // 4. Perform non-blocking update
       updateDocumentNonBlocking(auditRef, {
         ...sanitizedValues,
         inverterNumber: finalInverterNumber,
         checks: updatedChecks,
         otherAttachments: updatedOtherAttachments,
         updatedAt: serverTimestamp(),
-        status: 'Pending'
+        updatedBy: user.uid,
+        updatedByName: userProfile.username || user.email,
+        status: 'Pending',
+        editHistory: arrayUnion(historyEntry)
       });
 
       toast({ 
         title: "Revision Saved", 
-        description: "Audit record updated and returned to Pending status for review." 
+        description: "Audit updated and returned to Pending status for re-approval." 
       });
       
-      router.back();
+      setTimeout(() => {
+        router.back();
+      }, 300);
+
     } catch (e: any) {
-      console.error("Inverter Edit Error:", e);
-      toast({ 
-        variant: "destructive", 
-        title: "Update Failed", 
-        description: e.message || "An error occurred during synchronization." 
-      });
+      toast({ variant: "destructive", title: "Update Failed", description: e.message });
       setIsSubmitting(false);
     }
   };
@@ -222,7 +245,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
   return (
     <div className="max-w-4xl mx-auto space-y-8 pb-32 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} disabled={isSubmitting} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
+        <Button variant="ghost" size="sm" onClick={() => router.back()} disabled={isSubmitting} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
           <ArrowLeft className="mr-2 h-4 w-4" /> Cancel & Return
         </Button>
         <div className="flex items-center gap-3">
@@ -252,6 +275,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
                       />
                     </div>
                   </FormControl>
+                  <FormMessage />
                 </FormItem>
               )} />
               <FormField control={form.control} name="inverterSerialNumber" render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Serial #</FormLabel><FormControl><Input {...field} className="h-11 font-mono" /></FormControl></FormItem>)} />
@@ -285,7 +309,7 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
                         {['OK', 'NOT OK', 'Pending'].map(s => (
                           <div key={s} className="flex items-center space-x-1.5">
                             <RadioGroupItem value={s} id={`check-${index}-${s}`} className="sr-only" />
-                            <Label htmlFor={`check-${index}-${s}`} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-sm border-2 cursor-pointer text-[10px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-lg" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
+                            <Label htmlFor={`check-${index}-${s}`} className={cn("flex items-center gap-1 px-3 py-1.5 rounded-sm border-2 cursor-pointer text-[10px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-lg" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
                           </div>
                         ))}
                       </RadioGroup>
@@ -339,8 +363,8 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
           <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-40 md:left-[16rem]">
             <div className="max-w-4xl mx-auto flex items-center justify-end gap-3">
               <Button type="button" variant="ghost" onClick={() => router.back()} disabled={isSubmitting} className="rounded-sm font-bold uppercase text-[10px] tracking-widest h-12 px-8">Discard</Button>
-              <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] tracking-widest h-12 px-12 shadow-xl">
-                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Syncing...</> : <><Save className="mr-2 h-4 w-4" /> Save Revision</>}
+              <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-[10px] tracking-widest h-12 px-12 shadow-xl flex-1 sm:flex-none">
+                {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Synchronizing...</> : <><Save className="mr-2 h-4 w-4" /> Save Revision</>}
               </Button>
             </div>
           </div>
@@ -349,3 +373,4 @@ export default function EditInverterAuditPage({ params }: { params: Promise<{ si
     </div>
   );
 }
+

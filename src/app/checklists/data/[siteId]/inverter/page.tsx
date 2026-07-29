@@ -25,7 +25,8 @@ import {
   LayoutGrid,
   Cpu,
   Pencil,
-  FileDown
+  FileDown,
+  History
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -57,6 +58,9 @@ type InverterChecklist = {
   userId: string;
   status: string;
   createdAt: any;
+  updatedAt?: any;
+  updatedByName?: string;
+  updatedById?: string;
   checks: any[];
   otherRemarks?: string;
 };
@@ -234,7 +238,7 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search Inverter #, Make or Auditor..." className="pl-10 h-10 text-sm rounded-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <Input placeholder="Search Inverter #, Make or Auditor..." className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
         <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
           {filteredRecords.length} Audits Found
@@ -285,6 +289,7 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
                   <TableHead>Make & Rating</TableHead>
                   <TableHead>Auditor</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Last Edited</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -307,6 +312,14 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
                         record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
                       )}>{record.status}</Badge>
                     </TableCell>
+                    <TableCell>
+                      {record.updatedAt ? (
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-bold text-foreground">{record.updatedByName}</span>
+                          <span className="text-[9px] font-mono font-medium text-muted-foreground">{format(record.updatedAt.toDate(), 'dd/MM HH:mm')}</span>
+                        </div>
+                      ) : <span className="text-[10px] text-muted-foreground italic">—</span>}
+                    </TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => handleExportPDF([record])} title="Export PDF"><FileDown className="h-4 w-4" /></Button>
@@ -322,7 +335,7 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
                   </TableRow>
                 ))}
                 {filteredRecords.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No records found.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No records found.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>
@@ -345,3 +358,4 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
     </div>
   );
 }
+
