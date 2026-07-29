@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -22,7 +21,9 @@ import {
   Building2,
   Navigation,
   MessageCircle,
-  TrendingUp
+  TrendingUp,
+  FileDown,
+  History
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,15 @@ type HTConductorChecklist = {
   processedBy?: string;
   processedByName?: string;
   processedAt?: any;
+  editHistory?: {
+    editedBy: string;
+    editedById: string;
+    timestamp: any;
+    previousValues: {
+      poleConfiguration: string;
+      spans: { label: string; distance: number; remarks?: string }[];
+    }
+  }[];
 };
 
 export default function HTConductorAuditViewPage({ params }: { params: Promise<{ siteId: string, checklistId: string }> }) {
@@ -64,6 +74,7 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
 
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [approvingAction, setApprovingAction] = React.useState<'Approved' | 'Rejected' | null>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -74,6 +85,15 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
   const recordTotalLength = React.useMemo(() => {
     if (!audit?.spans) return 0;
     return audit.spans.reduce((sum, span) => sum + (Number(span.distance) || 0), 0);
+  }, [audit]);
+
+  const isPointEdited = React.useCallback((idx: number) => {
+    if (!audit?.editHistory || audit.editHistory.length === 0) return false;
+    const originalSpans = audit.editHistory[0].previousValues.spans;
+    const currentSpan = audit.spans?.[idx];
+    const originalSpan = originalSpans?.[idx];
+    if (!originalSpan || !currentSpan) return false;
+    return originalSpan.distance !== currentSpan.distance || originalSpan.remarks !== currentSpan.remarks;
   }, [audit]);
 
   const handleProcessAudit = async (remarks: string) => {
@@ -96,6 +116,74 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
     }
   };
 
+  const exportToPDF = async () => {
+    if (!audit) return;
+    setIsExporting(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const margin = 15;
+      let currY = 40;
+      const colWidthLabel = 65;
+      const colWidthValue = 115;
+      const rowHeight = 8;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('HT CONDUCTOR SPAN AUDIT', margin, currY - 10);
+      
+      const drawRow = (label: string, value: string) => {
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.rect(margin, currY, colWidthLabel, rowHeight);
+        doc.text(label, margin + 2, currY + 5.5);
+        doc.setFont('helvetica', 'normal');
+        doc.rect(margin + colWidthLabel, currY, colWidthValue, rowHeight);
+        doc.text(String(value || '—'), margin + colWidthLabel + 2, currY + 5.5);
+        currY += rowHeight;
+      };
+
+      drawRow('PROJECT COMPANY', audit.projectCompany || 'Aditya Green Energy');
+      drawRow('PROJECT NAME', audit.siteName);
+      drawRow('PLANT CONFIGURATION', audit.poleConfiguration);
+      drawRow('AUDITOR', audit.userName);
+      drawRow('STATUS', audit.status);
+
+      currY += 5;
+      const colDesc = 110; const colDist = 40;
+      doc.setFont('helvetica', 'bold');
+      doc.rect(margin, currY, colDesc, rowHeight);
+      doc.text('SPAN DESCRIPTION', margin + 2, currY + 5.5);
+      doc.rect(margin + colDesc, currY, colDist, rowHeight);
+      doc.text('DISTANCE (MTRS)', margin + colDesc + 2, currY + 5.5);
+      currY += rowHeight;
+
+      doc.setFont('helvetica', 'normal');
+      audit.spans.forEach(span => {
+        const h = rowHeight;
+        if (currY + h > 270) { doc.addPage(); currY = 30; }
+        doc.rect(margin, currY, colDesc, h);
+        doc.text(span.label.toUpperCase(), margin + 2, currY + 5.5);
+        doc.rect(margin + colDesc, currY, colDist, h);
+        doc.text((Number(span.distance) || 0).toFixed(2), margin + colDesc + colDist - 2, currY + 5.5, { align: 'right' });
+        currY += h;
+      });
+
+      doc.setFont('helvetica', 'bold');
+      doc.rect(margin, currY, colDesc, rowHeight);
+      doc.text('TOTAL SECTION LENGTH', margin + 2, currY + 5.5);
+      doc.rect(margin + colDesc, currY, colDist, rowHeight);
+      doc.text(recordTotalLength.toFixed(2), margin + colDesc + colDist - 2, currY + 5.5, { align: 'right' });
+
+      doc.save(`Conductor_Audit_${audit.id.slice(0, 8)}.pdf`);
+      toast({ title: 'PDF Exported' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Export Failed' });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   if (auditLoading) return <div className="p-8 space-y-4 max-w-4xl mx-auto"><Skeleton className="h-10 w-48" /><Skeleton className="h-64 w-full" /></div>;
   if (!audit) return <div className="p-12 text-center italic">Record not found.</div>;
 
@@ -113,13 +201,18 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
                 <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest truncate">{audit.siteName} • {audit.poleConfiguration} Setup</p>
               </div>
            </div>
-           <Badge variant="outline" className={cn(
-             "rounded-sm text-[10px] font-black uppercase px-3 h-8",
-             audit.status === 'Approved' ? "bg-green-100 text-green-700 border-green-200" :
-             audit.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-200" :
-             audit.status === 'Draft' ? "bg-amber-100 text-amber-700 border-amber-200" :
-             "bg-yellow-50 text-yellow-700 border-yellow-200"
-           )}>{audit.status === 'Draft' ? 'In Progress' : audit.status}</Badge>
+           <div className="flex items-center gap-3">
+             <Badge variant="outline" className={cn(
+               "rounded-sm text-[10px] font-black uppercase px-3 h-8",
+               audit.status === 'Approved' ? "bg-green-100 text-green-700 border-green-200" :
+               audit.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-200" :
+               audit.status === 'Draft' ? "bg-amber-100 text-amber-700 border-amber-200" :
+               "bg-yellow-50 text-yellow-700 border-yellow-200"
+             )}>{audit.status}</Badge>
+             <Button onClick={exportToPDF} disabled={isExporting} variant="outline" size="sm" className="h-8 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary">
+                {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileDown className="h-3.5 w-3.5 mr-1.5" />} Report PDF
+             </Button>
+           </div>
         </div>
       </div>
 
@@ -149,6 +242,9 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
                       <div className="flex items-center gap-3">
                         <div className="h-6 w-6 rounded-sm bg-muted flex items-center justify-center font-mono font-black text-[10px] text-muted-foreground">{idx + 1}</div>
                         <span className="font-bold text-sm text-foreground uppercase tracking-tight">{span.label}</span>
+                        {isPointEdited(idx) && (
+                            <span className="text-[10px] text-blue-600 italic font-medium ml-1">*edited</span>
+                        )}
                       </div>
                       {span.remarks && (
                         <div className="flex items-start gap-2 ml-9">
@@ -179,6 +275,58 @@ export default function HTConductorAuditViewPage({ params }: { params: Promise<{
           )}
         </CardContent>
       </Card>
+
+      {/* Revision History Section */}
+      <div className="space-y-6 pt-10 no-print">
+        <div className="flex items-center gap-3 border-b-2 border-primary/10 pb-3">
+           <History className="h-6 w-6 text-primary" />
+           <h2 className="text-2xl font-black uppercase tracking-tight">Audit Lifecycle & Revisions</h2>
+        </div>
+        
+        {audit.editHistory && audit.editHistory.length > 0 ? (
+          <div className="space-y-8 relative pl-6 ml-4 border-l-2 border-muted-foreground/10 py-4">
+            {[...audit.editHistory].reverse().map((entry, eIdx) => {
+              const safeTime = format(new Date(entry.timestamp), 'dd MMM yyyy, HH:mm');
+              return (
+                <div key={eIdx} className="relative animate-in slide-in-from-left-4 duration-500">
+                  <div className="absolute -left-[33px] top-1.5 h-3.5 w-3.5 rounded-full bg-primary ring-4 ring-background shadow-sm" />
+                  <Card className="rounded-sm border-primary/10 shadow-md bg-muted/5 overflow-hidden">
+                    <CardHeader className="bg-primary/5 py-3 px-6 border-b flex flex-row items-center justify-between space-y-0">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="rounded-sm bg-background font-black text-[9px] uppercase tracking-tighter border-primary/20">Version Snapshot</Badge>
+                        <span className="text-11px font-black text-foreground uppercase tracking-tight">{entry.editedBy}</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{safeTime}</span>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {entry.previousValues?.spans?.map((prevSpan: any, sIdx: number) => (
+                            <div key={sIdx} className="p-3 border rounded-sm bg-background space-y-2 shadow-sm">
+                               <div className="flex justify-between items-center">
+                                  <span className="text-[10px] font-black uppercase truncate pr-4 text-foreground/70">{prevSpan.label}</span>
+                                  <span className="text-xs font-black text-primary">{prevSpan.distance}m</span>
+                               </div>
+                               {prevSpan.remarks && <p className="text-[10px] italic text-muted-foreground leading-snug line-clamp-1">"{prevSpan.remarks}"</p>}
+                            </div>
+                          ))}
+                       </div>
+                       <div className="p-4 bg-muted/30 border rounded-sm space-y-1">
+                          <span className="text-[9px] font-black text-muted-foreground uppercase">Original Config:</span>
+                          <p className="text-xs font-bold text-primary">{entry.previousValues.poleConfiguration}</p>
+                       </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-24 text-center border-2 border-dashed rounded-sm bg-muted/5 flex flex-col items-center justify-center gap-4 opacity-40">
+             <History className="h-12 w-12 text-muted-foreground/20" />
+             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Original Version • No Revisions</p>
+          </div>
+        )}
+      </div>
 
       {canApprove && audit.status === 'Pending' && (
         <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-40 md:left-[16rem] animate-in slide-in-from-bottom-full duration-500 shadow-2xl">
