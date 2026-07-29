@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, doc, limit, where } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,14 +15,12 @@ import {
   ArrowLeft,
   Loader2,
   Trash2,
-  Calendar,
   Zap,
   Pencil,
   FileDown,
   User,
-  LayoutGrid,
-  Clock,
-  Navigation
+  Navigation,
+  LayoutGrid
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -58,6 +56,7 @@ type HTLineChecklist = {
   createdAt: any;
   updatedAt?: any;
   updatedByName?: string;
+  updatedById?: string;
   checks: any[];
 };
 
@@ -104,6 +103,33 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
+      const logoUrl = '/icon.png';
+
+      let logoProps: any = null;
+      try {
+        logoProps = await doc.getImageProperties(logoUrl);
+      } catch (e) {
+        console.warn("Logo load failed", e);
+      }
+
+      const addHeaderLogo = (pdfDoc: any) => {
+        if (!logoProps) return;
+        try {
+          const areaSize = 25;
+          const startX = 210 - areaSize - 15; // Right aligned with margin
+          const startY = 10;
+          const ratio = logoProps.width / logoProps.height;
+          let renderW = areaSize;
+          let renderH = areaSize;
+          if (ratio > 1) renderH = areaSize / ratio;
+          else renderW = areaSize * ratio;
+          const x = startX + (areaSize - renderW) / 2;
+          const y = startY + (areaSize - renderH) / 2;
+          pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
+        } catch (e) {
+          pdfDoc.addImage(logoUrl, 'PNG', 170, 10, 25, 25);
+        }
+      };
       
       for (let index = 0; index < items.length; index++) {
         const record = items[index];
@@ -111,6 +137,8 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
         
         setGenerationProgress(Math.round(((index + 1) / items.length) * 100));
         await new Promise(resolve => setTimeout(resolve, 0));
+
+        addHeaderLogo(doc);
 
         const margin = 15;
         let currY = 40;
@@ -161,7 +189,11 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
           const attachments = check.attachments || [];
           const h = Math.max(rowHeight, remarksLines.length * 4 + 4, attachments.length * 5 + 4);
           
-          if (currY + h > 270) { doc.addPage(); currY = 30; }
+          if (currY + h > 270) { 
+            doc.addPage(); 
+            currY = 30; 
+            addHeaderLogo(doc);
+          }
           
           doc.rect(margin, currY, col1, h);
           doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
