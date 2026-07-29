@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -20,7 +21,8 @@ import {
   Pencil,
   FileDown,
   User,
-  LayoutGrid
+  LayoutGrid,
+  Clock
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -53,6 +55,8 @@ type HTLineChecklist = {
   userId: string;
   status: string;
   createdAt: any;
+  updatedAt?: any;
+  updatedByName?: string;
   checks: any[];
 };
 
@@ -178,7 +182,8 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (!deletingRecord) return;
     deleteDocumentNonBlocking(doc(firestore, 'ht_line_checklists', deletingRecord.id));
     setDeletingRecord(null);
@@ -251,6 +256,7 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
                   <TableHead>Configuration</TableHead>
                   <TableHead>Auditor</TableHead>
                   <TableHead>Status</TableHead>
+                  <TableHead>Last Edited</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -268,9 +274,17 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
                         record.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
                       )}>{record.status}</Badge>
                     </TableCell>
+                    <TableCell>
+                      {record.updatedAt ? (
+                        <div className="flex flex-col gap-0.5">
+                          <span className="text-[10px] font-bold text-foreground">{record.updatedByName}</span>
+                          <span className="text-[9px] font-mono font-medium text-muted-foreground">{format(record.updatedAt.toDate(), 'dd/MM HH:mm')}</span>
+                        </div>
+                      ) : <span className="text-[10px] text-muted-foreground italic">—</span>}
+                    </TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => handleExportPDF([record])} title="Export PDF"><FileDown className="h-4 w-4" /></Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={(e) => { e.stopPropagation(); handleExportPDF([record]); }} title="Export PDF"><FileDown className="h-4 w-4" /></Button>
                         {(isAdmin || record.userId === user?.uid) && (
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild><Link href={`/checklists/data/${siteId}/ht-line/edit/${record.id}`}><Pencil className="h-4 w-4" /></Link></Button>
                         )}
@@ -283,7 +297,7 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
                   </TableRow>
                 ))}
                 {filteredRecords.length === 0 && (
-                  <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic">No HT Line records found.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No HT Line records found.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

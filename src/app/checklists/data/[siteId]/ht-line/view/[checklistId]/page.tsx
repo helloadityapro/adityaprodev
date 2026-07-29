@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -30,7 +31,9 @@ import {
   Film,
   PlayCircle,
   FileImage,
-  Download
+  Download,
+  History,
+  MessageCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -41,8 +44,11 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 type Attachment = { url: string; contentType: string; name: string; };
+
+type CheckPoint = { label: string; remarks: string; status: string; quantity?: number; attachments?: Attachment[] };
 
 type HTLineChecklist = {
   id: string;
@@ -58,9 +64,23 @@ type HTLineChecklist = {
   userId: string;
   status: string;
   createdAt: any;
-  checks: { label: string; remarks: string; status: string; quantity?: number; attachments?: Attachment[] }[];
+  updatedAt?: any;
+  checks: CheckPoint[];
   additionalRemarks?: string;
   generalPhotos?: Attachment[];
+  editHistory?: {
+    editedBy: string;
+    editedById: string;
+    timestamp: any;
+    previousValues: {
+      checks: CheckPoint[];
+      additionalRemarks?: string;
+    }
+  }[];
+  adminRemarks?: string;
+  processedBy?: string;
+  processedByName?: string;
+  processedAt?: any;
 };
 
 export default function HTLineAuditViewPage({ params }: { params: Promise<{ siteId: string, checklistId: string }> }) {
@@ -114,6 +134,22 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
       setIsProcessing(false);
     }
   };
+
+  // Check if a point was edited by comparing with original values (from first edit history entry)
+  const isPointEdited = React.useCallback((label: string) => {
+    if (!audit?.editHistory || audit.editHistory.length === 0) return false;
+    
+    // Original values are in the previousValues of the FIRST history entry
+    const originalChecks = audit.editHistory[0].previousValues.checks;
+    const originalCheck = originalChecks.find(c => c.label === label);
+    const currentCheck = audit.checks.find(c => c.label === label);
+    
+    if (!originalCheck || !currentCheck) return false;
+    
+    return originalCheck.status !== currentCheck.status || 
+           originalCheck.quantity !== currentCheck.quantity || 
+           originalCheck.remarks !== currentCheck.remarks;
+  }, [audit]);
 
   // Viewer Helpers
   const isVideo = (file: Attachment) => {
@@ -194,14 +230,15 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
            <Badge variant="outline" className={cn(
              "rounded-sm text-[10px] font-black uppercase px-3 h-8",
              audit.status === 'Approved' ? "bg-green-100 text-green-700 border-green-200" :
-             audit.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-200" : "bg-yellow-50 text-yellow-700 border-yellow-200"
+             audit.status === 'Rejected' ? "bg-red-100 text-red-700 border-red-200" :
+             "bg-yellow-50 text-yellow-700 border-yellow-200"
            )}>{audit.status}</Badge>
         </div>
       </div>
 
       <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden">
         <CardHeader className="bg-primary/5 border-b p-6 md:p-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Personnel</Label><p className="text-sm font-bold flex items-center gap-2"><User className="h-3.5 w-3.5 text-primary opacity-50" />{audit.userName}</p></div>
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pole Config</Label><p className="text-sm font-bold">{audit.poleType}</p></div>
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pole Size</Label><p className="text-xs font-bold leading-tight">{audit.poleSize}</p></div>
@@ -214,7 +251,12 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
               <div key={idx} className="p-6 md:p-8 space-y-4 hover:bg-primary/[0.01] transition-colors">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="space-y-1">
-                    <span className="text-base font-black uppercase tracking-tight text-foreground block">{check.label}</span>
+                    <div className="flex items-center gap-2">
+                        <span className="text-base font-black uppercase tracking-tight text-foreground block">{check.label}</span>
+                        {isPointEdited(check.label) && (
+                            <Badge variant="outline" className="text-[8px] h-4 font-black uppercase bg-amber-50 text-amber-600 border-amber-200">*edited</Badge>
+                        )}
+                    </div>
                     <div className="flex items-center gap-3">
                       <Badge variant="outline" className={cn(
                         "rounded-sm text-[9px] font-bold uppercase px-2 h-5",
@@ -275,8 +317,82 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
                </div>
              )}
           </div>
+
+          {audit.adminRemarks && (
+            <div className="p-8 bg-muted/5 border-t space-y-3">
+               <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Authority Feedback</Label>
+               <p className="text-sm italic leading-relaxed text-foreground/80 p-4 bg-background border rounded-sm">"{audit.adminRemarks}"</p>
+               <div className="flex justify-end gap-2 text-[8px] font-bold text-muted-foreground/60 uppercase">
+                  <span>Processed by {audit.processedByName}</span>
+                  <span>•</span>
+                  <span>{audit.processedAt ? format(audit.processedAt.toDate(), 'dd/MM/yyyy HH:mm') : ''}</span>
+               </div>
+            </div>
+          )}
         </CardContent>
       </Card>
+
+      {/* Revision History Section */}
+      <div className="space-y-6 pt-10 no-print">
+        <div className="flex items-center gap-3 border-b-2 border-primary/10 pb-3">
+           <History className="h-6 w-6 text-primary" />
+           <h2 className="text-2xl font-black uppercase tracking-tight">Audit Lifecycle & Revisions</h2>
+        </div>
+        
+        {audit.editHistory && audit.editHistory.length > 0 ? (
+          <div className="space-y-8 relative pl-6 ml-4 border-l-2 border-muted-foreground/10 py-4">
+            {[...audit.editHistory].reverse().map((entry, eIdx) => {
+              const getT = (ts: any) => {
+                if (!ts) return 0;
+                if (typeof ts === 'string') return new Date(ts).getTime();
+                if (ts.toDate) return ts.toDate().getTime();
+                if (ts instanceof Date) return ts.getTime();
+                return 0;
+              };
+              const safeTime = format(new Date(getT(entry.timestamp)), 'dd MMM yyyy, HH:mm');
+              
+              return (
+                <div key={eIdx} className="relative animate-in slide-in-from-left-4 duration-500">
+                  <div className="absolute -left-[33px] top-1.5 h-3.5 w-3.5 rounded-full bg-primary ring-4 ring-background shadow-sm" />
+                  <Card className="rounded-sm border-primary/10 shadow-md bg-muted/5 overflow-hidden">
+                    <CardHeader className="bg-primary/5 py-3 px-6 border-b flex flex-row items-center justify-between space-y-0">
+                      <div className="flex items-center gap-2">
+                        <Badge variant="outline" className="rounded-sm bg-background font-black text-[9px] uppercase tracking-tighter border-primary/20">Version Snapshot</Badge>
+                        <span className="text-11px font-black text-foreground uppercase tracking-tight">{entry.editedBy}</span>
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{safeTime}</span>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-8">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {entry.previousValues?.checks?.map((prevCheck: any, cIdx: number) => (
+                            <div key={cIdx} className="p-3 border rounded-sm bg-background space-y-2 shadow-sm">
+                               <div className="flex items-center justify-between">
+                                  <span className="text-[10px] font-black uppercase truncate pr-4 text-foreground/70">{prevCheck.label}</span>
+                                  <Badge variant="outline" className={cn("h-4 text-[8px] font-black uppercase rounded-sm px-1", prevCheck.status === 'Yes' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200")}>{prevCheck.status}</Badge>
+                               </div>
+                               {prevCheck.remarks && <p className="text-[10px] italic text-muted-foreground leading-snug line-clamp-1">"{prevCheck.remarks}"</p>}
+                            </div>
+                          ))}
+                       </div>
+                       {entry.previousValues?.additionalRemarks && (
+                          <div className="p-4 bg-muted/30 border rounded-sm">
+                             <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Previous Observations</Label>
+                             <p className="text-xs italic text-foreground/80 leading-relaxed">"{entry.previousValues.additionalRemarks}"</p>
+                          </div>
+                       )}
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-24 text-center border-2 border-dashed rounded-sm bg-muted/5 flex flex-col items-center justify-center gap-4 opacity-40">
+             <History className="h-12 w-12 text-muted-foreground/20" />
+             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Original Version • No Revisions</p>
+          </div>
+        )}
+      </div>
 
       {canApprove && audit.status === 'Pending' && (
         <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-40 md:left-[16rem] animate-in slide-in-from-bottom-full duration-500 shadow-2xl">
@@ -317,7 +433,7 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
       <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { resetViewer(); setViewFile(null); setViewFiles([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[100]">
           <DialogHeader className="sr-only"><DialogTitle>Audit Media Evidence</DialogTitle></DialogHeader>
-          <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
+          <div className="absolute top-0 left-0 right-0 z-110 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
             <div className="flex items-center gap-3">
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
               <div className="flex flex-col">
@@ -337,10 +453,10 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
 
           {viewFiles.length > 1 && (
             <>
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[110]">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-110">
                 <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[110]">
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-110">
                 <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
               </div>
             </>

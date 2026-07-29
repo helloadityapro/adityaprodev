@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { 
@@ -161,14 +162,8 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
     try {
       // 1. Snapshot current state for history
       const previousValues = {
-        poleNumber: audit.poleNumber,
-        poleType: audit.poleType,
-        poleSize: audit.poleSize,
-        studSize: audit.studSize || "",
-        cutPointType: audit.cutPointType,
         checks: audit.checks || [],
         additionalRemarks: audit.additionalRemarks || "",
-        generalPhotos: audit.generalPhotos || [],
       };
 
       const historyEntry = {
