@@ -70,11 +70,12 @@ const htLineSchema = z.object({
   siteId: z.string().min(1, 'Site selection is mandatory.'),
   siteName: z.string(),
   projectCompany: z.string().optional(),
-  poleType: z.enum(['Two Pole', 'Four Pole']),
-  poleNumber: z.string().min(1, "Required").regex(/^\d{1,2}$/, "Max 2 digits allowed."),
+  poleConfiguration: z.enum(['Single Pole', 'Two Pole']),
+  poleType: z.enum(['Two Pole', 'Four Pole']).optional().or(z.literal("")),
+  poleNumber: z.string().min(1, "Required").regex(/^\d{1,3}$/, "Max 3 digits allowed."),
   poleSize: z.string().min(1, "Please select pole size."),
   studSize: z.string().optional(),
-  cutPointType: z.enum(['Single Cut Point', 'Double Cut Point', 'V-Cross', 'Horizontal Channel (One Side channel)']),
+  cutPointType: z.enum(['Single Cut Point', 'Double Cut Point', 'V-Cross', 'Horizontal Channel (One Side channel)', '-NA-']),
   checks: z.record(pointSchema),
   additionalRemarks: z.string().optional(),
   generalPhotos: z.array(z.any()).default([]),
@@ -133,11 +134,12 @@ export default function HTLineChecklistPage() {
       siteId: "",
       siteName: "",
       projectCompany: "",
-      poleType: "Two Pole",
+      poleConfiguration: "Single Pole",
+      poleType: "",
       poleNumber: "",
       poleSize: "",
       studSize: "",
-      cutPointType: "Single Cut Point",
+      cutPointType: "-NA-",
       checks: defaultChecks,
       additionalRemarks: "",
       generalPhotos: [],
@@ -146,6 +148,13 @@ export default function HTLineChecklistPage() {
   });
 
   const watchChecks = form.watch('checks');
+  const watchPoleNumber = form.watch('poleNumber');
+
+  const isPoleOne = React.useMemo(() => {
+    if (!watchPoleNumber) return false;
+    const num = parseInt(watchPoleNumber);
+    return num === 1;
+  }, [watchPoleNumber]);
 
   const uploadFile = async (file: File, path: string): Promise<any> => {
     let blob: Blob = file;
@@ -208,7 +217,8 @@ export default function HTLineChecklistPage() {
         siteId: values.siteId,
         siteName: values.siteName,
         projectCompany: values.projectCompany || "",
-        poleType: values.poleType,
+        poleConfiguration: values.poleConfiguration,
+        poleType: isPoleOne ? values.poleType : "",
         poleNumber: values.poleNumber,
         poleSize: values.poleSize,
         studSize: values.studSize || "",
@@ -315,27 +325,44 @@ export default function HTLineChecklistPage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 pt-2">
-                <FormField control={form.control} name="poleType" render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Four Pole / Two Pole in Plant? *</FormLabel>
-                    <FormControl>
-                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 sm:gap-6 h-11 items-center">
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pt-two" /><Label htmlFor="pt-two" className="font-bold cursor-pointer text-xs uppercase">Two Pole</Label></div>
-                        <div className="flex items-center space-x-2"><RadioGroupItem value="Four Pole" id="pt-four" /><Label htmlFor="pt-four" className="font-bold cursor-pointer text-xs uppercase">Four Pole</Label></div>
-                      </RadioGroup>
-                    </FormControl>
-                  </FormItem>
-                )} />
-
                 <FormField control={form.control} name="poleNumber" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Number (2 Digits) *</FormLabel>
-                    <FormControl><Input placeholder="01" maxLength={2} {...field} className="h-11 rounded-sm font-mono font-bold" /></FormControl>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Number (3 Digits) *</FormLabel>
+                    <FormControl><Input placeholder="01" maxLength={3} {...field} className="h-11 rounded-sm font-mono font-bold" /></FormControl>
                     <p className="text-[9px] font-bold uppercase text-primary tracking-tighter pt-1.5">Start numbering from Plant side and end at Substation side.</p>
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                <FormField control={form.control} name="poleConfiguration" render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Configuration *</FormLabel>
+                    <FormControl>
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 sm:gap-6 h-11 items-center">
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="Single Pole" id="pc-single" /><Label htmlFor="pt-single" className="font-bold cursor-pointer text-xs uppercase">Single Pole</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pc-two" /><Label htmlFor="pc-two" className="font-bold cursor-pointer text-xs uppercase">Two Pole</Label></div>
+                      </RadioGroup>
+                    </FormControl>
+                  </FormItem>
+                )} />
               </div>
+
+              {isPoleOne && (
+                <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm animate-in fade-in zoom-in-95 duration-300">
+                  <FormField control={form.control} name="poleType" render={({ field }) => (
+                    <FormItem className="space-y-3">
+                      <FormLabel className="text-[10px] font-black uppercase tracking-wider text-primary">Plant Side Configuration (Only for Pole #1) *</FormLabel>
+                      <FormControl>
+                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 sm:gap-6 h-11 items-center">
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pt-two" /><Label htmlFor="pt-two" className="font-bold cursor-pointer text-xs uppercase">Two Pole</Label></div>
+                          <div className="flex items-center space-x-2"><RadioGroupItem value="Four Pole" id="pt-four" /><Label htmlFor="pt-four" className="font-bold cursor-pointer text-xs uppercase">Four Pole</Label></div>
+                        </RadioGroup>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+              )}
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <FormField control={form.control} name="poleSize" render={({ field }) => (
@@ -355,6 +382,7 @@ export default function HTLineChecklistPage() {
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
+                        <SelectItem value="-NA-" className="text-xs uppercase font-medium">-NA-</SelectItem>
                         <SelectItem value="Single Cut Point" className="text-xs uppercase font-medium">Single Cut Point</SelectItem>
                         <SelectItem value="Double Cut Point" className="text-xs uppercase font-medium">Double Cut Point</SelectItem>
                         <SelectItem value="V-Cross" className="text-xs uppercase font-medium">V-Cross</SelectItem>

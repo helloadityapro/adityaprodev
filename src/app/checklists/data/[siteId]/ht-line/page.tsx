@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -22,7 +21,8 @@ import {
   FileDown,
   User,
   LayoutGrid,
-  Clock
+  Clock,
+  Navigation
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -48,7 +48,8 @@ type HTLineChecklist = {
   siteName: string;
   projectCompany?: string;
   poleNumber: string;
-  poleType: string;
+  poleConfiguration?: string;
+  poleType?: string;
   poleSize: string;
   cutPointType: string;
   userName: string;
@@ -81,6 +82,11 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
 
   const htQuery = useMemoFirebase(() => query(collection(firestore, 'ht_line_checklists'), where('siteId', '==', siteId), limit(1000)), [firestore, siteId]);
   const { data: records, isLoading: htLoading } = useCollection<HTLineChecklist>(htQuery);
+
+  const totalPolesLogged = React.useMemo(() => {
+    if (!records) return 0;
+    return records.reduce((acc, r) => acc + (r.poleConfiguration === 'Two Pole' ? 2 : 1), 0);
+  }, [records]);
 
   const filteredRecords = React.useMemo(() => {
     if (!records) return [];
@@ -130,7 +136,8 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
         drawRow('PROJECT COMPANY', record.projectCompany || 'Aditya Green Energy');
         drawRow('PROJECT NAME', record.siteName);
         drawRow('POLE NUMBER', record.poleNumber);
-        drawRow('POLE TYPE', record.poleType);
+        drawRow('POLE CONFIGURATION', record.poleConfiguration || 'Single Pole');
+        if (record.poleType) drawRow('PLANT SIDE CONFIG', record.poleType);
         drawRow('POLE SIZE', record.poleSize);
         drawRow('CUT POINT TYPE', record.cutPointType);
         drawRow('STATUS', record.status);
@@ -240,9 +247,14 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input placeholder="Search Pole # or Auditor..." className="pl-10 h-11 text-sm rounded-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
-        <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
-          {filteredRecords.length} Audits Indexed
-        </Badge>
+        <div className="flex items-center gap-3">
+          <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-8 border-primary/20 text-primary bg-primary/5">
+            <Navigation className="h-3.5 w-3.5 mr-1.5" /> Total Poles: {totalPolesLogged}
+          </Badge>
+          <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
+            {filteredRecords.length} Audits Indexed
+          </Badge>
+        </div>
       </div>
 
       <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
@@ -265,7 +277,12 @@ export default function ProjectHTLineDataPage({ params }: { params: Promise<{ si
                   <TableRow key={record.id} className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={() => router.push(`/checklists/data/${siteId}/ht-line/view/${record.id}`)}>
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{record.createdAt ? format(record.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}</TableCell>
                     <TableCell className="font-black text-sm text-primary">#{record.poleNumber}</TableCell>
-                    <TableCell><span className="text-xs font-bold">{record.poleType}</span></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-xs font-bold">{record.poleConfiguration || 'Single Pole'}</span>
+                        {record.poleType && <span className="text-[8px] font-black uppercase text-muted-foreground opacity-50">Plant: {record.poleType}</span>}
+                      </div>
+                    </TableCell>
                     <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.userName}</div></TableCell>
                     <TableCell>
                       <Badge variant="outline" className={cn(

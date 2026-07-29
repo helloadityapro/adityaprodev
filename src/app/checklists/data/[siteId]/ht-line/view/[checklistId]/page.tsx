@@ -32,7 +32,8 @@ import {
   ImageIcon,
   Film,
   Download,
-  FileImage
+  FileImage,
+  LayoutGrid
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -56,8 +57,8 @@ type HTConductorChecklist = {
   siteName: string;
   projectCompany: string;
   poleConfiguration: string;
+  poleType?: string;
   poleNumber: string;
-  poleType: string;
   poleSize: string;
   studSize?: string;
   cutPointType: string;
@@ -66,7 +67,6 @@ type HTConductorChecklist = {
   status: string;
   createdAt: any;
   updatedAt?: any;
-  spans: { label: string; distance: number; remarks?: string }[];
   checks: CheckPoint[];
   adminRemarks?: string;
   additionalRemarks?: string;
@@ -82,6 +82,7 @@ type HTConductorChecklist = {
       checks: CheckPoint[];
       additionalRemarks?: string;
       poleNumber?: string;
+      poleConfiguration?: string;
       poleType?: string;
       poleSize?: string;
       studSize?: string;
@@ -240,9 +241,10 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
 
       <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden">
         <CardHeader className="bg-primary/5 border-b p-6 md:p-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-6 md:gap-8">
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Personnel</Label><p className="text-sm font-bold flex items-center gap-2"><User className="h-3.5 w-3.5 text-primary opacity-50" />{audit.userName}</p></div>
-            <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pole Config</Label><p className="text-sm font-bold uppercase">{audit.poleType}</p></div>
+            <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pole Config</Label><p className="text-sm font-bold uppercase">{audit.poleConfiguration || 'Single Pole'}</p></div>
+            {audit.poleType && <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-primary tracking-widest">Plant Config</Label><p className="text-sm font-bold uppercase">{audit.poleType}</p></div>}
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Pole Size</Label><p className="text-xs font-bold leading-tight">{audit.poleSize}</p></div>
             <div className="space-y-1"><Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Timestamp</Label><p className="text-xs font-mono font-bold text-muted-foreground">{audit.createdAt ? format(audit.createdAt.toDate(), 'dd MMM yy, HH:mm') : '—'}</p></div>
           </div>
@@ -375,12 +377,12 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
                             </div>
                           ))}
                        </div>
-                       {(entry.previousValues?.additionalRemarks || entry.previousValues?.poleSize) && (
+                       {(entry.previousValues?.additionalRemarks || entry.previousValues?.poleConfiguration) && (
                           <div className="p-4 bg-muted/30 border rounded-sm space-y-2">
-                             {entry.previousValues?.poleSize && (
+                             {entry.previousValues?.poleConfiguration && (
                                <div className="flex justify-between items-center text-[9px] font-bold uppercase border-b border-border/10 pb-2 mb-2">
-                                  <span className="text-muted-foreground">Original Pole Size:</span>
-                                  <span className="text-primary">{entry.previousValues.poleSize}</span>
+                                  <span className="text-muted-foreground">Original Config:</span>
+                                  <span className="text-primary">{entry.previousValues.poleConfiguration}</span>
                                </div>
                              )}
                              {entry.previousValues?.additionalRemarks && (

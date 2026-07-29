@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { 
@@ -66,11 +66,12 @@ const checkItemSchema = z.object({
 });
 
 const editSchema = z.object({
-  poleNumber: z.string().min(1, "Required").regex(/^\d{1,2}$/, "Max 2 digits allowed."),
-  poleType: z.enum(['Two Pole', 'Four Pole']),
+  poleNumber: z.string().min(1, "Required").regex(/^\d{1,3}$/, "Max 3 digits allowed."),
+  poleConfiguration: z.enum(['Single Pole', 'Two Pole']),
+  poleType: z.enum(['Two Pole', 'Four Pole']).optional().or(z.literal("")),
   poleSize: z.string().min(1, "Required"),
   studSize: z.string().optional().or(z.literal("")),
-  cutPointType: z.enum(['Single Cut Point', 'Double Cut Point', 'V-Cross', 'Horizontal Channel (One Side channel)']),
+  cutPointType: z.enum(['Single Cut Point', 'Double Cut Point', 'V-Cross', 'Horizontal Channel (One Side channel)', '-NA-']),
   checks: z.array(checkItemSchema),
   additionalRemarks: z.string().optional().or(z.literal("")),
   generalPhotos: z.array(attachmentSchema).default([]),
@@ -98,10 +99,11 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
     resolver: zodResolver(editSchema),
     defaultValues: {
       poleNumber: "",
-      poleType: "Two Pole",
+      poleConfiguration: "Single Pole",
+      poleType: "",
       poleSize: "",
       studSize: "",
-      cutPointType: "Single Cut Point",
+      cutPointType: "-NA-",
       checks: [],
       additionalRemarks: "",
       generalPhotos: [],
@@ -109,14 +111,22 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
     }
   });
 
+  const watchPoleNumber = form.watch('poleNumber');
+  const isPoleOne = React.useMemo(() => {
+    if (!watchPoleNumber) return false;
+    const num = parseInt(watchPoleNumber);
+    return num === 1;
+  }, [watchPoleNumber]);
+
   React.useEffect(() => {
     if (audit) {
       form.reset({
         poleNumber: audit.poleNumber || "",
-        poleType: audit.poleType || "Two Pole",
+        poleConfiguration: audit.poleConfiguration || "Single Pole",
+        poleType: audit.poleType || "",
         poleSize: audit.poleSize || "",
         studSize: audit.studSize || "",
-        cutPointType: audit.cutPointType || "Single Cut Point",
+        cutPointType: audit.cutPointType || "-NA-",
         checks: (audit.checks || []).map((c: any) => ({
           key: c.key || "",
           label: c.label || "",
@@ -162,6 +172,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
         checks: audit.checks || [],
         additionalRemarks: audit.additionalRemarks || "",
         poleNumber: audit.poleNumber || "",
+        poleConfiguration: audit.poleConfiguration || "Single Pole",
         poleType: audit.poleType || "",
         poleSize: audit.poleSize || "",
         studSize: audit.studSize || "",
@@ -211,7 +222,8 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
 
       updateDocumentNonBlocking(auditRef, {
         poleNumber: values.poleNumber,
-        poleType: values.poleType,
+        poleConfiguration: values.poleConfiguration,
+        poleType: isPoleOne ? values.poleType : "",
         poleSize: values.poleSize,
         studSize: values.studSize || "",
         cutPointType: values.cutPointType,
@@ -276,22 +288,39 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                 <FormField control={form.control} name="poleNumber" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Pole Number</FormLabel>
-                    <FormControl><Input {...field} maxLength={2} className="h-11 rounded-sm font-mono font-bold" /></FormControl>
+                    <FormControl><Input {...field} maxLength={3} className="h-11 rounded-sm font-mono font-bold" /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
-                <FormField control={form.control} name="poleType" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Type</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
-                      <SelectContent>
-                        <SelectItem value="Two Pole">Two Pole</SelectItem>
-                        <SelectItem value="Four Pole">Four Pole</SelectItem>
-                      </SelectContent>
-                    </Select>
+                <FormField control={form.control} name="poleConfiguration" render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Pole Configuration</FormLabel>
+                    <FormControl>
+                      <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 h-11 items-center">
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="Single Pole" id="pt-single" /><Label htmlFor="pt-single" className="text-xs font-bold uppercase">Single Pole</Label></div>
+                        <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pt-two-pole" /><Label htmlFor="pt-two-pole" className="text-xs font-bold uppercase">Two Pole</Label></div>
+                      </RadioGroup>
+                    </FormControl>
                   </FormItem>
                 )} />
+
+                {isPoleOne && (
+                  <div className="md:col-span-2 p-4 bg-primary/5 border border-primary/10 rounded-sm animate-in fade-in duration-300">
+                    <FormField control={form.control} name="poleType" render={({ field }) => (
+                      <FormItem className="space-y-3">
+                        <FormLabel className="text-[10px] font-black uppercase text-primary">Plant Side Configuration (Only for Pole #1)</FormLabel>
+                        <FormControl>
+                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-4 h-11 items-center">
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="Two Pole" id="pt-two" /><Label htmlFor="pt-two" className="text-xs font-bold uppercase">Two Pole</Label></div>
+                            <div className="flex items-center space-x-2"><RadioGroupItem value="Four Pole" id="pt-four" /><Label htmlFor="pt-four" className="text-xs font-bold uppercase">Four Pole</Label></div>
+                          </RadioGroup>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
+                )}
+
                 <FormField control={form.control} name="poleSize" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Size</FormLabel>
@@ -310,6 +339,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger className="h-11 rounded-sm"><SelectValue placeholder="Select type" /></SelectTrigger></FormControl>
                       <SelectContent>
+                        <SelectItem value="-NA-">-NA-</SelectItem>
                         <SelectItem value="Single Cut Point">Single Cut Point</SelectItem>
                         <SelectItem value="Double Cut Point">Double Cut Point</SelectItem>
                         <SelectItem value="V-Cross">V-Cross</SelectItem>
