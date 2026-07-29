@@ -303,7 +303,7 @@ export default function EditHTLineAuditPage({ params }: { params: Promise<{ site
                     )} />
                   </div>
 
-                  {form.watch(`checks.${index}.status`) === 'Yes' && ['studInstalled', 'earthingSet', 'discInsulator', 'pinInsulator'].includes(form.watch(`checks.${index}.key`)) && (
+                  {form.watch(`checks.${index}.status`) === 'Yes' && ['studInstalled', 'earthingSet', 'discInsulator', 'pinInsulator', 'vCross', 'stayInstalled'].includes(form.watch(`checks.${index}.key`)) && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-1">
                       {form.watch(`checks.${index}.key`) === 'studInstalled' && (
                         <FormField control={form.control} name="studSize" render={({ field }) => (

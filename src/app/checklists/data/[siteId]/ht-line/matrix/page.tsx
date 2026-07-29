@@ -61,7 +61,7 @@ const CHECK_KEYS = [
   { key: 'silverPaint', label: 'Silver Paint' },
 ];
 
-const QTY_FIELDS = ['studInstalled', 'discInsulator', 'pinInsulator', 'earthingSet'];
+const QTY_FIELDS = ['studInstalled', 'discInsulator', 'pinInsulator', 'earthingSet', 'vCross', 'stayInstalled'];
 
 type Attachment = { url: string; contentType: string; name: string; };
 
@@ -362,10 +362,10 @@ export default function HTLineMatrixPage({ params }: { params: Promise<{ siteId:
           {viewUrls.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[110]">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevUrl(); }}><ChevronLeft className="h-8 w-8" /></Button>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[110]">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextUrl(); }}><ChevronRight className="h-8 w-8" /></Button>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md hover:bg-white/20" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
               </div>
             </>
           )}

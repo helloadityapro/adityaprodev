@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -373,70 +372,72 @@ export default function HTLineChecklistPage() {
             <CardContent className="p-0 divide-y">
               {CHECK_KEYS.map((item) => (
                 <div key={item.key} className="p-4 sm:p-6 space-y-4 hover:bg-muted/[0.01] transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{item.label}</Label>
-                    <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto no-scrollbar pb-1">
-                      <FormField control={form.control} name={`checks.${item.key}.status` as any} render={({ field }) => (
-                        <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-2 shrink-0">
-                          {['Yes', 'No'].map(s => (
-                            <div key={s} className="flex items-center space-x-1">
-                              <RadioGroupItem value={s} id={`${item.key}-${s}`} className="sr-only" />
-                              <Label htmlFor={`${item.key}-${s}`} className={cn("flex items-center gap-1 px-2.5 py-1.5 rounded-sm border-2 cursor-pointer transition-all text-[9px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-sm" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
-                            </div>
-                          ))}
-                        </RadioGroup>
-                      )} />
-                      <div className="flex gap-1.5 shrink-0">
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisibleRemarks(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visibleRemarks[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
-                          <Plus className="h-3 w-3 mr-1" /> Remark
-                        </Button>
-                        <Button type="button" variant="ghost" size="sm" onClick={() => setVisiblePhotos(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visiblePhotos[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
-                          <Camera className="h-3 w-3 mr-1" /> Photo
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Conditional logic for Stud, Earthing and Insulator Quantity */}
-                  {((['studInstalled', 'earthingSet', 'discInsulator', 'pinInsulator'].includes(item.key)) && watchChecks[item.key]?.status === 'Yes') && (
-                    <div className="p-4 bg-primary/[0.03] border-l-4 border-primary rounded-sm animate-in slide-in-from-left-2 duration-300 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {item.key === 'studInstalled' && (
-                        <FormField control={form.control} name="studSize" render={({ field }) => (
-                          <FormItem><FormLabel className="text-[10px] font-bold uppercase">Stud Size *</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl><SelectTrigger className="h-10 bg-background"><SelectValue placeholder="Choose size" /></SelectTrigger></FormControl>
-                            <SelectContent>{STUD_SIZES.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
-                          </Select></FormItem>
+                  <div className="flex flex-col gap-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <Label className="text-xs sm:text-sm font-black uppercase tracking-tight text-foreground">{item.label}</Label>
+                      <div className="flex items-center gap-2 sm:gap-4 overflow-x-auto no-scrollbar pb-1">
+                        <FormField control={form.control} name={`checks.${item.key}.status` as any} render={({ field }) => (
+                          <RadioGroup onValueChange={field.onChange} value={field.value} className="flex gap-2 shrink-0">
+                            {['Yes', 'No'].map(s => (
+                              <div key={s} className="flex items-center space-x-1">
+                                <RadioGroupItem value={s} id={`${item.key}-${s}`} className="sr-only" />
+                                <Label htmlFor={`${item.key}-${s}`} className={cn("flex items-center gap-1 px-2.5 py-1.5 rounded-sm border-2 cursor-pointer transition-all text-[9px] font-black uppercase", field.value === s ? "bg-primary text-white border-primary shadow-sm" : "bg-background border-transparent text-muted-foreground hover:bg-muted/50")}>{s}</Label>
+                              </div>
+                            ))}
+                          </RadioGroup>
                         )} />
-                      )}
-                      
-                      <FormField control={form.control} name={`checks.${item.key}.quantity` as any} render={({ field }) => (
-                        <FormItem><FormLabel className="text-[10px] font-bold uppercase">Quantity Count *</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-bold font-mono" /></FormControl></FormItem>
-                      )} />
-                    </div>
-                  )}
-
-                  {visibleRemarks[item.key] && (
-                    <FormField control={form.control} name={`checks.${item.key}.remarks` as any} render={({ field }) => (
-                      <FormControl><Textarea placeholder="Describe findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm animate-in fade-in duration-300" /></FormControl>
-                    )} />
-                  )}
-
-                  {visiblePhotos[item.key] && (
-                    <FormField control={form.control} name={`checks.${item.key}.localPhotos` as any} render={({ field: { value, onChange } }) => (
-                      <div className="space-y-3 animate-in fade-in duration-300">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {(value || []).map((file: File, fIdx: number) => (
-                            <Badge key={fIdx} variant="secondary" className="h-8 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20">
-                              <ImageIcon className="h-3 w-3" /><span className="text-[9px] font-black truncate max-w-[80px]">{file.name}</span>
-                              <Button type="button" variant="ghost" size="icon" className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground" onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}><X className="h-3 w-3" /></Button>
-                            </Badge>
-                          ))}
-                          <label className="cursor-pointer h-10 border-2 border-dashed border-primary/20 bg-background flex items-center justify-center px-6 gap-2 rounded-sm hover:bg-primary/5 transition-all text-[10px] font-black uppercase text-primary tracking-widest shadow-sm"><Camera className="h-4 w-4" /> ATTACH PHOTO<input type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => onChange([...(value || []), ...Array.from(e.target.files || [])])} /></label>
+                        <div className="flex gap-1.5 shrink-0">
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setVisibleRemarks(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visibleRemarks[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
+                            <Plus className="h-3 w-3 mr-1" /> Remark
+                          </Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => setVisiblePhotos(p => ({...p, [item.key]: !p[item.key]}))} className={cn("h-8 px-2 text-[9px] font-black uppercase border border-primary/5 bg-background", visiblePhotos[item.key] ? "text-primary border-primary/20" : "text-muted-foreground")}>
+                            <Camera className="h-3 w-3 mr-1" /> Photo
+                          </Button>
                         </div>
                       </div>
-                    )} />
-                  )}
+                    </div>
+
+                    {/* Conditional logic for Stud, V-Cross, Stay, Earthing and Insulator Quantity */}
+                    {((['studInstalled', 'earthingSet', 'discInsulator', 'pinInsulator', 'vCross', 'stayInstalled'].includes(item.key)) && watchChecks[item.key]?.status === 'Yes') && (
+                      <div className="p-4 bg-primary/[0.03] border-l-4 border-primary rounded-sm animate-in slide-in-from-left-2 duration-300 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {item.key === 'studInstalled' && (
+                          <FormField control={form.control} name="studSize" render={({ field }) => (
+                            <FormItem><FormLabel className="text-[10px] font-bold uppercase">Stud Size *</FormLabel>
+                            <Select onValueChange={field.onChange} value={field.value}>
+                              <FormControl><SelectTrigger className="h-10 bg-background"><SelectValue placeholder="Choose size" /></SelectTrigger></FormControl>
+                              <SelectContent>{STUD_SIZES.map(s => <SelectItem key={s} value={s} className="text-xs">{s}</SelectItem>)}</SelectContent>
+                            </Select></FormItem>
+                          )} />
+                        )}
+                        
+                        <FormField control={form.control} name={`checks.${item.key}.quantity` as any} render={({ field }) => (
+                          <FormItem><FormLabel className="text-[10px] font-bold uppercase">Quantity Count *</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 bg-background font-bold font-mono" /></FormControl></FormItem>
+                        )} />
+                      </div>
+                    )}
+
+                    {visibleRemarks[item.key] && (
+                      <FormField control={form.control} name={`checks.${item.key}.remarks` as any} render={({ field }) => (
+                        <FormControl><Textarea placeholder="Describe findings..." {...field} className="rounded-sm bg-muted/5 min-h-[80px] text-sm animate-in fade-in duration-300" /></FormControl>
+                      )} />
+                    )}
+
+                    {visiblePhotos[item.key] && (
+                      <FormField control={form.control} name={`checks.${item.key}.localPhotos` as any} render={({ field: { value, onChange } }) => (
+                        <div className="space-y-3 animate-in fade-in duration-300">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {(value || []).map((file: File, fIdx: number) => (
+                              <Badge key={fIdx} variant="secondary" className="h-8 gap-1.5 pl-2 pr-1 rounded-sm bg-primary/5 text-primary border-primary/20">
+                                <ImageIcon className="h-3 w-3" /><span className="text-[9px] font-black truncate max-w-[80px]">{file.name}</span>
+                                <Button type="button" variant="ghost" size="icon" className="h-5 w-5 rounded-full hover:bg-destructive/10 text-muted-foreground" onClick={() => onChange(value.filter((_: any, i: number) => i !== fIdx))}><X className="h-3 w-3" /></Button>
+                              </Badge>
+                            ))}
+                            <label className="cursor-pointer h-10 border-2 border-dashed border-primary/20 bg-background flex items-center justify-center px-6 gap-2 rounded-sm hover:bg-primary/5 transition-all text-[10px] font-black uppercase text-primary tracking-widest shadow-sm"><Camera className="h-4 w-4" /> ATTACH PHOTO<input type="file" multiple accept="image/*,video/*" className="hidden" onChange={e => onChange([...(value || []), ...Array.from(e.target.files || [])])} /></label>
+                          </div>
+                        </div>
+                      )} />
+                    )}
+                  </div>
                 </div>
               ))}
             </CardContent>
