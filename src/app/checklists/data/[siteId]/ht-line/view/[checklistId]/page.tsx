@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -254,7 +253,7 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
                     <div className="flex items-center gap-2">
                         <span className="text-base font-black uppercase tracking-tight text-foreground block">{check.label}</span>
                         {isPointEdited(check.label) && (
-                            <Badge variant="outline" className="text-[8px] h-4 font-black uppercase bg-amber-50 text-amber-600 border-amber-200">*edited</Badge>
+                            <span className="text-[10px] text-blue-600 italic font-medium ml-1">*edited</span>
                         )}
                     </div>
                     <div className="flex items-center gap-3">
@@ -474,8 +473,8 @@ export default function HTLineAuditViewPage({ params }: { params: Promise<{ site
           >
             <div 
               ref={mediaRef} 
-              className={cn("transition-transform duration-200 ease-out flex items-center justify-center pointer-events-none w-fit h-fit", isDragging && "transition-none")} 
-              style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)` }}
+              className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} 
+              style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}
             >
               {viewFile && (
                 isVideo(viewFile) ? (
