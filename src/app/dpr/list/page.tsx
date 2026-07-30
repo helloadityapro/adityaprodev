@@ -36,7 +36,8 @@ import {
   Tags,
   ChevronDown,
   Check,
-  ArrowRight
+  ArrowRight,
+  FileDown
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Input } from '@/components/ui/input';
@@ -73,6 +74,7 @@ import { useRouter } from 'next/navigation';
 import { slugifyRole } from '@/lib/access-control';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from "@/components/ui/progress";
 
 type Attachment = {
   url: string;
@@ -117,6 +119,8 @@ export default function DPRListPage() {
   const [editingDpr, setEditingDpr] = React.useState<DPR | null>(null);
   const [deletingDpr, setDeletingDpr] = React.useState<DPR | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [generationProgress, setGenerationProgress] = React.useState(0);
 
   // Viewer State
   const [viewUrl, setViewUrl] = React.useState<string | null>(null);
@@ -304,9 +308,157 @@ export default function DPRListPage() {
     setSelectedGroupIds([]);
   };
 
+  const handleExportPDF = async () => {
+    if (sortedAndFilteredDprs.length === 0) return;
+    setIsExporting(true);
+    setGenerationProgress(0);
+
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const logoUrl = '/assets/icon.png';
+      const margin = 15;
+      const pageWidth = 210;
+      const contentWidth = pageWidth - (margin * 2);
+      
+      let logoProps: any = null;
+      try {
+        logoProps = await doc.getImageProperties(logoUrl);
+      } catch (e) {
+        console.warn("Logo load failed", e);
+      }
+
+      const addHeaderLogo = (pdfDoc: any) => {
+        if (!logoProps) return;
+        try {
+          const areaSize = 25;
+          const startX = 210 - areaSize - margin;
+          const startY = 10;
+          const ratio = logoProps.width / logoProps.height;
+          let renderW = areaSize;
+          let renderH = areaSize;
+          if (ratio > 1) renderH = areaSize / ratio;
+          else renderW = areaSize * ratio;
+          const x = startX + (areaSize - renderW) / 2;
+          const y = startY + (areaSize - renderH) / 2;
+          pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
+        } catch (e) {
+          pdfDoc.addImage(logoUrl, 'PNG', 170, 10, 25, 25);
+        }
+      };
+
+      for (let i = 0; i < sortedAndFilteredDprs.length; i++) {
+        const dpr = sortedAndFilteredDprs[i];
+        if (i > 0) doc.addPage();
+        
+        setGenerationProgress(Math.round(((i + 1) / sortedAndFilteredDprs.length) * 100));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        addHeaderLogo(doc);
+
+        let currY = 40;
+        const rowHeight = 8;
+        const colWidthLabel = 65;
+        const colWidthValue = contentWidth - colWidthLabel;
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(14);
+        doc.text('DAILY PROGRESS REPORT', margin, currY - 10);
+
+        const drawRow = (label: string, value: string) => {
+          doc.setFont('helvetica', 'bold');
+          doc.setFontSize(9);
+          doc.rect(margin, currY, colWidthLabel, rowHeight);
+          doc.text(label.toUpperCase(), margin + 2, currY + 5.5);
+          
+          doc.setFont('helvetica', 'normal');
+          doc.rect(margin + colWidthLabel, currY, colWidthValue, rowHeight);
+          doc.text(String(value || '—'), margin + colWidthLabel + 2, currY + 5.5);
+          currY += rowHeight;
+        };
+
+        drawRow('PROJECT / LOCATION', dpr.siteName);
+        drawRow('REPORT DATE', format(new Date(dpr.reportDate), 'dd MMMM yyyy'));
+        drawRow('SUBMITTED BY', dpr.userName);
+        drawRow('CATEGORY', dpr.dprType || 'Site');
+
+        currY += 10;
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10);
+        doc.text('ACTIVITY SUMMARY:', margin, currY);
+        currY += 6;
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(9);
+        const splitDescription = doc.splitTextToSize(dpr.description, contentWidth);
+        
+        for (const line of splitDescription) {
+          if (currY > 280) {
+            doc.addPage();
+            currY = 30;
+            addHeaderLogo(doc);
+          }
+          doc.text(line, margin, currY);
+          currY += 5;
+        }
+
+        if (dpr.attachments && dpr.attachments.length > 0) {
+          currY += 10;
+          if (currY > 250) { doc.addPage(); currY = 30; addHeaderLogo(doc); }
+          doc.setFont('helvetica', 'bold');
+          doc.text('ATTACHMENTS & EVIDENCE:', margin, currY);
+          currY += 8;
+
+          const imgSize = 55;
+          const gap = 5;
+          let x = margin;
+
+          for (const att of dpr.attachments) {
+            if (!isImage(att)) continue;
+            
+            if (x + imgSize > pageWidth - margin) {
+              x = margin;
+              currY += imgSize + gap;
+            }
+
+            if (currY + imgSize > 280) {
+              doc.addPage();
+              currY = 30;
+              addHeaderLogo(doc);
+              x = margin;
+            }
+
+            try {
+              // Note: Using images in PDF with URLs requires them to be CORS-friendly
+              // For a prototype, we attempt to add, but handle failures gracefully
+              doc.addImage(att.url, 'JPEG', x, currY, imgSize, imgSize);
+            } catch (e) {
+              doc.rect(x, currY, imgSize, imgSize);
+              doc.setFontSize(7);
+              doc.text('IMAGE PREVIEW\n(Open link in app)', x + 2, currY + 10);
+            }
+            x += imgSize + gap;
+          }
+        }
+      }
+
+      doc.save(`DPR_Report_Batch_${format(new Date(), 'yyyyMMdd')}.pdf`);
+      toast({ title: 'Export Complete', description: 'Progress reports saved as PDF.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
+    } finally {
+      setIsExporting(false);
+      setGenerationProgress(0);
+    }
+  };
+
   const isVideoUrl = (url: string) => {
     const lowUrl = url.toLowerCase();
     return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
+  };
+
+  const isImage = (att: Attachment) => {
+    return att.contentType?.startsWith('image/') || /\.(jpg|jpeg|png|webp|heic)$/i.test(att.name);
   };
 
   const resetViewer = () => { 
@@ -546,13 +698,36 @@ export default function DPRListPage() {
   return (
     <div className="space-y-8">
       <div className="flex flex-col gap-1 no-print">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2">
-            <FileText className="h-8 w-8 text-primary" /> DPR Data Registry
-          </h1>
-          <p className="text-muted-foreground text-sm font-medium">Historical log of all progress updates across authorized locations.</p>
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="flex items-center gap-2">
+              <FileText className="h-8 w-8 text-primary" /> DPR Data Registry
+            </h1>
+            <p className="text-muted-foreground text-sm font-medium">Historical log of all progress updates across authorized locations.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={handleExportPDF} 
+              disabled={isExporting || sortedAndFilteredDprs.length === 0} 
+              variant="outline" 
+              className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary hover:bg-primary/5"
+            >
+              {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="h-4 w-4 mr-2" />}
+              PDF Export
+            </Button>
+          </div>
         </div>
       </div>
+
+      {isExporting && (
+        <div className="space-y-1.5 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
+            <span>Rendering PDF Batch</span>
+            <span>{generationProgress}%</span>
+          </div>
+          <Progress value={generationProgress} className="h-1 rounded-none" />
+        </div>
+      )}
 
       <div className="bg-card p-3 border rounded-sm shadow-sm no-print">
         <div className="flex flex-wrap items-end gap-2 md:gap-3">
@@ -742,7 +917,7 @@ export default function DPRListPage() {
             <AlertDialogHeader>
                 <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                 <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete the progress report for <strong>{deletingDpr?.siteName}</strong> on {deletingDpr?.reportDate} and reverse any reward points earned.
+                    This action cannot be undone. This will permanently delete the progress report for <strong>{deletingDpr?.siteName}</strong> and reverse any reward points earned.
                 </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
