@@ -12,6 +12,7 @@ import {
   useCollection
 } from '@/firebase';
 import { doc, serverTimestamp, arrayUnion, collection, query, where, getDocs } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -124,6 +125,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
   const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = React.useState(0);
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mediaRef = React.useRef<HTMLDivElement>(null);
 
@@ -180,7 +182,35 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
-      const logoUrl = '/icon.png';
+      const logoUrl = '/assets/icon.png';
+
+      let logoProps: any = null;
+      try {
+        logoProps = await doc.getImageProperties(logoUrl);
+      } catch (e) {
+        console.warn("Logo load failed", e);
+      }
+
+      const addHeaderLogo = (pdfDoc: any) => {
+        if (!logoProps) return;
+        try {
+          const areaSize = 25;
+          const startX = 210 - areaSize - 15; // Align with table margin
+          const startY = 10;
+          const ratio = logoProps.width / logoProps.height;
+          let renderW = areaSize;
+          let renderH = areaSize;
+          if (ratio > 1) renderH = areaSize / ratio;
+          else renderW = areaSize * ratio;
+          const x = startX + (areaSize - renderW) / 2;
+          const y = startY + (areaSize - renderH) / 2;
+          pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
+        } catch (e) {
+          pdfDoc.addImage(logoUrl, 'PNG', 170, 10, 25, 25);
+        }
+      };
+
+      addHeaderLogo(doc);
       
       const margin = 15;
       let currY = 40;
@@ -230,7 +260,11 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
         const attachments = check.attachments || [];
         const iHeight = attachments.length > 0 ? (attachments.length * 5) + 4 : rowHeight;
         const h = Math.max(rowHeight, combinedLines.length * 4 + 4, iHeight);
-        if (currY + h > 270) { doc.addPage(); currY = 20; }
+        if (currY + h > 270) { 
+          doc.addPage(); 
+          currY = 30; 
+          addHeaderLogo(doc);
+        }
         doc.rect(margin, currY, col1, h);
         doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
         doc.rect(margin + col1, currY, colStatusRemarks, h);
@@ -271,7 +305,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
     const name = (file.name || "").toLowerCase();
     return name.endsWith('.heic') || name.endsWith('.heif');
   };
-  const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
+  const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); setRotation(0); };
   const openViewer = (file: Attachment, gallery: Attachment[]) => {
     const mediaFiles = gallery.filter(a => isImage(a) || isVideo(a));
     const index = mediaFiles.findIndex(a => a.url === file.url);
@@ -460,68 +494,6 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
         </CardContent>
       </Card>
 
-      {/* Revision History Section */}
-      <div className="space-y-6 pt-10 no-print">
-        <div className="flex items-center gap-3 border-b-2 border-primary/10 pb-3">
-           <History className="h-6 w-6 text-primary" />
-           <h2 className="text-2xl font-black uppercase tracking-tight">Audit Lifecycle & Revisions</h2>
-        </div>
-        
-        {audit.editHistory && audit.editHistory.length > 0 ? (
-          <div className="space-y-8 relative pl-6 ml-4 border-l-2 border-muted-foreground/10 py-4">
-            {[...audit.editHistory].reverse().map((entry, eIdx) => {
-              const getT = (ts: any) => {
-                if (!ts) return 0;
-                if (typeof ts === 'string') return new Date(ts).getTime();
-                if (ts.toDate) return ts.toDate().getTime();
-                if (ts instanceof Date) return ts.getTime();
-                return 0;
-              };
-              const safeTime = format(new Date(getT(entry.timestamp)), 'dd MMM yyyy, HH:mm');
-              
-              return (
-                <div key={eIdx} className="relative animate-in slide-in-from-left-4 duration-500">
-                  <div className="absolute -left-[33px] top-1.5 h-3.5 w-3.5 rounded-full bg-primary ring-4 ring-background shadow-sm" />
-                  <Card className="rounded-sm border-primary/10 shadow-md bg-muted/5 overflow-hidden">
-                    <CardHeader className="bg-primary/5 py-3 px-6 border-b flex flex-row items-center justify-between space-y-0">
-                      <div className="flex items-center gap-2">
-                        <Badge variant="outline" className="rounded-sm bg-background font-black text-[9px] uppercase tracking-tighter border-primary/20">Version Snapshot</Badge>
-                        <span className="text-11px font-black text-foreground uppercase tracking-tight">{entry.editedBy}</span>
-                      </div>
-                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{safeTime}</span>
-                    </CardHeader>
-                    <CardContent className="p-6 space-y-8">
-                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                          {entry.previousValues?.checks?.map((prevCheck: any, cIdx: number) => (
-                            <div key={cIdx} className="p-3 border rounded-sm bg-background space-y-2 shadow-sm">
-                               <div className="flex items-center justify-between">
-                                  <span className="text-[10px] font-black uppercase truncate pr-4 text-foreground/70">{prevCheck.label}</span>
-                                  <Badge variant="outline" className={cn("h-4 text-[8px] font-black uppercase rounded-sm px-1", prevCheck.status === 'OK' ? "bg-green-50 text-green-700 border-green-200" : "bg-red-50 text-red-700 border-red-200")}>{prevCheck.status}</Badge>
-                               </div>
-                               {prevCheck.remarks && <p className="text-[10px] italic text-muted-foreground leading-snug line-clamp-1">"{prevCheck.remarks}"</p>}
-                            </div>
-                          ))}
-                       </div>
-                       {entry.previousValues?.otherRemarks && (
-                          <div className="p-4 bg-muted/30 border rounded-sm">
-                             <Label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground mb-1 block">Previous Observations</Label>
-                             <p className="text-xs italic text-foreground/80 leading-relaxed">"{entry.previousValues.otherRemarks}"</p>
-                          </div>
-                       )}
-                    </CardContent>
-                  </Card>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="py-24 text-center border-2 border-dashed rounded-sm bg-muted/5 flex flex-col items-center justify-center gap-4 opacity-40">
-             <History className="h-12 w-12 text-muted-foreground/20" />
-             <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Original Version • No Revisions</p>
-          </div>
-        )}
-      </div>
-
       {/* Discussion Section */}
       <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden no-print">
         <CardHeader className="bg-primary/5 border-b p-6 flex flex-row items-center justify-between">
@@ -611,27 +583,61 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
       <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { resetViewer(); setViewFile(null); setViewFiles([]); } }}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[100]">
           <DialogHeader className="sr-only"><DialogTitle>Audit Media Detail</DialogTitle></DialogHeader>
-          <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-3 md:p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
-            <div className="flex items-center gap-2"><div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-3.5 w-3.5 text-white" /></div><span className="text-[8px] md:text-[10px] font-black text-white uppercase truncate max-w-[120px]">{viewFile?.name}</span></div>
-            <div className="flex items-center gap-1.5"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => setRotation(prev => (prev + 90) % 360)}><RotateCw className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button><Separator orientation="vertical" className="h-6 bg-white/20 mx-1 md:mx-2" /><DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-red-500"><X className="h-5 w-5" /></Button></DialogClose></div>
+          <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
+            <div className="flex items-center gap-3">
+              <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">{viewFile?.name}</span>
+                <span className="text-[8px] font-bold text-white/50 uppercase">{currentFileIndex + 1} of {viewFiles.length} Evidence Artifacts</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setRotation(prev => (prev + 90) % 360)}><RotateCw className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
+              <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
+              <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-red-500"><X className="h-6 w-6" /></Button></DialogClose>
+            </div>
           </div>
-          {viewFiles.length > 1 && (<><div className="absolute left-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white shadow-2xl" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-6 w-6" /></Button></div><div className="absolute right-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white shadow-2xl" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-6 w-6" /></Button></div></>)}
-          <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>
-            <div ref={mediaRef} className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale})` }}>
+
+          {viewFiles.length > 1 && (
+            <>
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-[110]">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
+              </div>
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-[110]">
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
+              </div>
+            </>
+          )}
+
+          <div 
+            ref={containerRef} 
+            className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none z-[105]", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} 
+            onWheel={handleWheel} 
+            onMouseDown={handleMouseDown} 
+            onMouseMove={handleMouseMove} 
+            onMouseUp={handleMouseUp} 
+            onMouseLeave={handleMouseUp}
+            onDoubleClick={handleDoubleClick}
+          >
+            <div 
+              ref={mediaRef} 
+              className={cn("transition-transform duration-200 ease-out will-change-transform flex items-center justify-center select-none pointer-events-none w-fit h-fit", isDragging && "transition-none")} 
+              style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)` }}
+            >
               {viewFile && (
                 isVideo(viewFile) ? (
-                  <div className="pointer-events-auto"><video src={viewFile.url} controls autoPlay className="max-w-[90vw] max-h-[80vh] shadow-2xl rounded-sm" /></div>
+                  <div className="pointer-events-auto"><video src={viewFile.url} controls autoPlay className="max-w-[90vw] max-h-[75vh] shadow-2xl rounded-sm" /></div>
                 ) : isHeic(viewFile) ? (
                   <div className="bg-white/5 p-12 rounded-sm flex flex-col items-center gap-6 text-center pointer-events-auto">
                     <FileImage className="h-16 w-16 text-primary opacity-20" />
-                    <div className="space-y-2">
-                      <p className="text-white font-black text-sm uppercase tracking-widest" style={{ letterSpacing: "0.4em" }}>HEIC Media Unsupported</p>
-                      <p className="text-white/40 text-xs max-w-[200px]">Format restricted. Download for local viewing.</p>
-                    </div>
-                    <Button asChild className="rounded-sm font-bold uppercase text-[10px] tracking-widest"><a href={viewFile.url} download={viewFile.name}><Download className="h-3.5 w-3.5 mr-2" /> Save Artifact</a></Button>
+                    <p className="text-white font-black text-sm uppercase tracking-widest">HEIC Media Unsupported</p>
+                    <Button asChild className="rounded-sm font-bold uppercase text-[10px] tracking-widest"><a href={viewFile.url} download={viewFile.name}><Download className="h-3.5 w-3.5 mr-2" /> Download File</a></Button>
                   </div>
                 ) : (
-                  <img src={viewFile.url} className="max-w-[90vw] max-h-[80vh] object-contain shadow-2xl rounded-sm pointer-events-none" alt="Evidence View" draggable={false} />
+                  <img src={viewFile.url} className="max-w-[90vw] max-h-[75vh] object-contain shadow-2xl rounded-sm" alt="Evidence" />
                 )
               )}
             </div>

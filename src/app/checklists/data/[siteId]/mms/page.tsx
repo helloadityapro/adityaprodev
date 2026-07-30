@@ -285,7 +285,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         uploadTask.on('state_changed', null, reject, resolve);
       });
       
-      const url = await getDownloadURL(uploadTask.snapshot.ref);
+      const url = await getDownloadURL(storageRef);
       
       await updateDocumentNonBlocking(doc(firestore, 'sites', siteId), {
         drawingUrl: url,
@@ -361,7 +361,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
-      const logoUrl = '/icon.png';
+      const logoUrl = '/assets/icon.png';
 
       let logoProps: any = null;
       try {
@@ -370,11 +370,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         console.warn("Logo load failed", e);
       }
 
-      const addCenteredLogo = (pdfDoc: any) => {
+      const addHeaderLogo = (pdfDoc: any) => {
         if (!logoProps) return;
         try {
           const areaSize = 25;
-          const startX = 210 - areaSize - 10;
+          const startX = 210 - areaSize - 15; // Align with table margin
           const startY = 10;
           const ratio = logoProps.width / logoProps.height;
           let renderW = areaSize;
@@ -385,7 +385,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           const y = startY + (areaSize - renderH) / 2;
           pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
         } catch (e) {
-          pdfDoc.addImage(logoUrl, 'PNG', 175, 10, 25, 25);
+          pdfDoc.addImage(logoUrl, 'PNG', 170, 10, 25, 25);
         }
       };
       
@@ -402,7 +402,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         const colWidthLabel = 65;
         const colWidthValue = 115;
         const rowHeight = 8;
-        addCenteredLogo(doc);
+        addHeaderLogo(doc);
         doc.setFont('helvetica', 'bold');
         doc.setFontSize(14);
         doc.text('TABLE LEVEL MMS CHECKLIST', margin, currY - 10);
@@ -447,7 +447,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           const iHeight = attachments.length > 0 ? (attachments.length * 5) + 4 : rowHeight;
           const h = Math.max(rowHeight, combinedLines.length * 4 + 4, iHeight);
           
-          if (currY + h > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+          if (currY + h > 270) { 
+            doc.addPage(); 
+            currY = 40; 
+            addHeaderLogo(doc); 
+          }
           
           doc.rect(margin, currY, col1, h);
           doc.text(check.label.toUpperCase(), margin + 2, currY + 5.5);
@@ -475,7 +479,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         const otherAttH = otherAttachments.length > 0 ? (otherAttachments.length * 5) + 4 : rowHeight;
         const otherH = Math.max(rowHeight, otherRemLines.length * 4 + 4, otherAttH);
         
-        if (currY + otherH > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+        if (currY + otherH > 270) { 
+          doc.addPage(); 
+          currY = 40; 
+          addHeaderLogo(doc); 
+        }
         
         doc.rect(margin, currY, col1, otherH);
         doc.text('OTHER REMARK (IF ANY)', margin + 2, currY + 5.5);
@@ -493,13 +501,17 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
             doc.line(margin + col1 + colStatusRemarks + 2, linkY + 0.5, margin + col1 + colStatusRemarks + 2 + textWidth, linkY + 0.5);
             doc.link(margin + col1 + colStatusRemarks + 2, linkY - 4, textWidth, 6, { url: att.url });
           });
-          doc.setTextColor(0, 0, 0);
+          doc.setTextColor(0, 0, 255);
         } else { doc.text('NO', margin + col1 + colStatusRemarks + 2, currY + 5.5); }
         currY += otherH;
 
         currY += 5;
         const drawFooterRow = (label: string, value: string) => {
-          if (currY + rowHeight > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+          if (currY + rowHeight > 270) { 
+            doc.addPage(); 
+            currY = 40; 
+            addHeaderLogo(doc); 
+          }
           doc.setFont('helvetica', 'bold');
           doc.rect(margin, currY, colWidthLabel, rowHeight);
           doc.text(label, margin + 2, currY + 5.5);
@@ -516,7 +528,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         const clientContent = record.customerRepPresent ? `Rep: ${record.customerRepName || 'N/A'}\nRemarks: ${clientRemarks}` : "Not Present";
         const clientLines = doc.splitTextToSize(clientContent, colWidthValue - 4);
         const clientH = Math.max(rowHeight * 2, clientLines.length * 4 + 6);
-        if (currY + clientH > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+        if (currY + clientH > 270) { 
+          doc.addPage(); 
+          currY = 40; 
+          addHeaderLogo(doc); 
+        }
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, colWidthLabel, clientH);
         doc.text('REPRESENTATIVE OF PROJECT\nCLIENT & THEIR COMMENTS', margin + 2, currY + 5.5);
@@ -531,7 +547,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
           const reviewContent = `Status: ${record.status}\nReviewer: ${record.processedByName || 'Admin'}\nDate: ${record.processedAt ? format(record.processedAt.toDate(), 'dd/MM/yyyy HH:mm') : '—'}\nRemarks: ${reviewRemarks}`;
           const reviewLines = doc.splitTextToSize(reviewContent, colWidthValue - 4);
           const reviewH = Math.max(rowHeight * 2, reviewLines.length * 4 + 6);
-          if (currY + reviewH > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+          if (currY + reviewH > 270) { 
+            doc.addPage(); 
+            currY = 40; 
+            addHeaderLogo(doc); 
+          }
           doc.setFont('helvetica', 'bold');
           doc.rect(margin, currY, colWidthLabel, reviewH);
           doc.text('AUTHORITY REVIEW COMMENTS', margin + 2, currY + 5.5);
@@ -544,7 +564,11 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         const extCommentsRaw = record.comments?.map(c => `[${format(new Date(c.createdAt), 'dd/MM HH:mm')}] ${c.userName}: ${c.text}`).join('\n') || '—';
         const extLines = doc.splitTextToSize(extCommentsRaw, colWidthValue - 4);
         const extH = Math.max(rowHeight * 2, extLines.length * 4 + 6);
-        if (currY + extH > 270) { doc.addPage(); currY = 40; addCenteredLogo(doc); }
+        if (currY + extH > 270) { 
+          doc.addPage(); 
+          currY = 40; 
+          addHeaderLogo(doc); 
+        }
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, colWidthLabel, extH);
         doc.text('EXTERNAL COMMENTS', margin + 2, currY + 5.5);
@@ -663,9 +687,9 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
   return (
     <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.push(`/checklists/data`)} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors">
+        <button onClick={() => router.push(`/checklists/data`)} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors flex items-center text-sm font-medium">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Registry
-        </Button>
+        </button>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1 min-w-0">
             <h2 className="text-lg md:text-2xl font-black text-foreground uppercase tracking-tight flex items-center gap-2 md:gap-3 leading-none">
@@ -738,7 +762,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         )}
       </div>
 
-      <div className="flex flex-col gap-3 bg-card p-3 border border-primary/10 rounded-sm shadow-sm">
+      <div className="flex flex-col gap-3 bg-card p-3 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="flex flex-row items-end gap-2">
           <div className="flex-1 space-y-1">
             <Label className="text-[9px] font-black uppercase text-muted-foreground px-1 hidden xs:block">Search Registry</Label>
