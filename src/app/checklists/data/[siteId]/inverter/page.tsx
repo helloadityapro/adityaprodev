@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, doc, limit, where } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -141,7 +141,7 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
         drawRow('STATUS', record.status);
 
         currY += 5;
-        const col1 = 50; const colStatusRemarks = 95; const col3 = 35;
+        const col1 = 65; const colStatusRemarks = 80; const col3 = 35;
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, col1, rowHeight);
         doc.text('VERIFICATION POINT', margin + 2, currY + 5.5);
@@ -358,4 +358,3 @@ export default function ProjectInverterDataPage({ params }: { params: Promise<{ 
     </div>
   );
 }
-

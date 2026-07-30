@@ -44,7 +44,9 @@ import {
   FileImage,
   Download,
   ThumbsUp,
-  ThumbsDown
+  ThumbsDown,
+  RotateCw,
+  ShieldAlert
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -209,7 +211,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
       drawRow('NUMBER OF MODULES', String(audit.moduleCount || '—'));
 
       currY += 5;
-      const col1 = 50; const colStatusRemarks = 95; const col3 = 35;
+      const col1 = 65; const colStatusRemarks = 80; const col3 = 35;
       doc.setFont('helvetica', 'bold');
       doc.rect(margin, currY, col1, rowHeight);
       doc.text('CHECKS/ AUTHORITIES', margin + 2, currY + 5.5);
@@ -260,14 +262,21 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
     const name = file.name?.toLowerCase() || '';
     return type.startsWith('video/') || name.endsWith('.mp4') || name.endsWith('.mov') || name.endsWith('.webm');
   };
+  const isImage = (file: Attachment) => {
+    const type = file.contentType?.toLowerCase() || '';
+    const name = file.name?.toLowerCase() || '';
+    return type.startsWith('image/') || name.endsWith('.jpg') || name.endsWith('.jpeg') || name.endsWith('.png') || name.endsWith('.webp') || name.endsWith('.heic') || name.endsWith('.heif');
+  };
   const isHeic = (file: Attachment) => {
     const name = (file.name || "").toLowerCase();
     return name.endsWith('.heic') || name.endsWith('.heif');
   };
   const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); };
   const openViewer = (file: Attachment, gallery: Attachment[]) => {
-    setViewFiles(gallery);
-    setCurrentFileIndex(gallery.findIndex(a => a.url === file.url) || 0);
+    const mediaFiles = gallery.filter(a => isImage(a) || isVideo(a));
+    const index = mediaFiles.findIndex(a => a.url === file.url);
+    setViewFiles(mediaFiles);
+    setCurrentFileIndex(index >= 0 ? index : 0);
     setViewFile(file);
     resetViewer();
   };
@@ -349,7 +358,6 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
         </div>
       </div>
 
-      {/* Current Audit Details */}
       <Card className="rounded-sm shadow-xl border-primary/10 overflow-hidden">
         <CardHeader className="bg-primary/5 border-b p-6 md:p-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
@@ -453,7 +461,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
       </Card>
 
       {/* Revision History Section */}
-      <div className="space-y-6 pt-10">
+      <div className="space-y-6 pt-10 no-print">
         <div className="flex items-center gap-3 border-b-2 border-primary/10 pb-3">
            <History className="h-6 w-6 text-primary" />
            <h2 className="text-2xl font-black uppercase tracking-tight">Audit Lifecycle & Revisions</h2>
@@ -562,7 +570,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
 
       {/* Admin Action Overlay */}
       {canApprove && (!audit.status || audit.status === 'Pending') && (
-        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-40 md:left-[16rem] no-print animate-in slide-in-from-bottom-full duration-500">
+        <div className="fixed bottom-[calc(4rem+env(safe-area-inset-bottom))] md:bottom-0 left-0 right-0 bg-background/90 backdrop-blur border-t p-4 z-40 md:left-[16rem] no-print animate-in slide-in-from-bottom-full duration-500 shadow-2xl">
           <div className="max-w-4xl mx-auto flex items-center justify-between gap-4">
              <div className="hidden sm:block">
                 <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Audit Resolution Center</p>
@@ -589,8 +597,7 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
           </div>
           <DialogFooter className="flex flex-col sm:flex-row gap-3">
             <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-12 font-bold rounded-sm text-[10px] uppercase">Cancel</Button></DialogClose>
-            <Button 
-              className={cn("w-full sm:flex-1 h-12 rounded-sm font-black uppercase text-[10px] shadow-lg", approvingAction === 'Approved' ? 'bg-green-600' : 'bg-red-600')} 
+            <Button className={cn("w-full sm:flex-1 h-12 rounded-sm font-black uppercase text-[10px]", approvingAction === 'Approved' ? 'bg-green-600' : 'bg-red-600')} 
               onClick={() => handleProcessAudit((document.getElementById('final-action-remarks') as HTMLTextAreaElement)?.value || "")}
               disabled={isProcessing}
             >
@@ -600,13 +607,13 @@ export default function MmsAuditViewPage({ params }: { params: Promise<{ siteId:
         </DialogContent>
       </Dialog>
 
-      {/* Media Viewer Dialog */}
+      {/* Advanced Media Viewer Dialog */}
       <Dialog open={!!viewFile} onOpenChange={(o) => { if(!o) { resetViewer(); setViewFile(null); setViewFiles([]); } }}>
-        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl">
+        <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[100]">
           <DialogHeader className="sr-only"><DialogTitle>Audit Media Detail</DialogTitle></DialogHeader>
           <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-3 md:p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
             <div className="flex items-center gap-2"><div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-3.5 w-3.5 text-white" /></div><span className="text-[8px] md:text-[10px] font-black text-white uppercase truncate max-w-[120px]">{viewFile?.name}</span></div>
-            <div className="flex items-center gap-1.5"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button><Separator orientation="vertical" className="h-6 bg-white/20 mx-1 md:mx-2" /><DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-red-500"><X className="h-5 w-5" /></Button></DialogClose></div>
+            <div className="flex items-center gap-1.5"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={() => setRotation(prev => (prev + 90) % 360)}><RotateCw className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button><Separator orientation="vertical" className="h-6 bg-white/20 mx-1 md:mx-2" /><DialogClose asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full text-white hover:bg-red-500"><X className="h-5 w-5" /></Button></DialogClose></div>
           </div>
           {viewFiles.length > 1 && (<><div className="absolute left-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white shadow-2xl" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-6 w-6" /></Button></div><div className="absolute right-2 top-1/2 -translate-y-1/2 z-50"><Button variant="secondary" size="icon" className="h-10 w-10 rounded-full bg-white/10 text-white shadow-2xl" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-6 w-6" /></Button></div></>)}
           <div ref={containerRef} className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none", scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp} onDoubleClick={handleDoubleClick}>

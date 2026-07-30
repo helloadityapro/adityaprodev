@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, useFirebaseApp } from '@/firebase';
-import { collection, query, doc, limit, arrayUnion, serverTimestamp, getDocs, where } from 'firebase/firestore';
+import { collection, doc, query, where, limit, arrayUnion, serverTimestamp, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -426,7 +426,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
         drawRow('NUMBER OF MODULES', String(record.moduleCount || '—'));
 
         currY += 5;
-        const col1 = 50; const colStatusRemarks = 95; const col3 = 35;
+        const col1 = 65; const colStatusRemarks = 80; const col3 = 35;
         doc.setFont('helvetica', 'bold');
         doc.rect(margin, currY, col1, rowHeight);
         doc.text('CHECKS/ AUTHORITIES', margin + 2, currY + 5.5);
@@ -780,7 +780,7 @@ export default function ProjectMmsDataPage({ params }: { params: Promise<{ siteI
                 <Label className="text-[8px] font-black uppercase text-primary tracking-widest px-1">Start Date</Label>
                 <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-8 text-[10px] rounded-none border-primary/20" />
              </div>
-             <ArrowRight className="h-3 w-3 text-primary/40 mt-4 shrink-0" />
+             <ArrowRight className="h-3.5 w-3.5 text-primary/40 mt-4 shrink-0" />
              <div className="flex-1 space-y-1">
                 <Label className="text-[8px] font-black uppercase text-primary tracking-widest px-1">End Date</Label>
                 <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-8 text-[10px] rounded-none border-primary/20" />
