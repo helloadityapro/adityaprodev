@@ -337,7 +337,7 @@ export default function TaskListPage() {
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex flex-col gap-1 min-w-0">
                     <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-tight">Due {format(new Date(task.dueDate), 'dd MMM yy')}</span>
-                    <h3 className="font-bold text-sm leading-tight text-foreground truncate">{task.title}</h3>
+                    <h3 className="font-bold text-sm leading-tight text-foreground">{task.title}</h3>
                   </div>
                   <div className="flex flex-col items-end gap-1.5 shrink-0">
                     <StatusBadge status={task.status} />
@@ -671,7 +671,7 @@ export default function TaskListPage() {
                     Permanently delete <strong>{deletingTask?.title}</strong>? This removes all assignee history and progress logs.
                 </AlertDialogDescription>
             </AlertDialogHeader>
-            <AlertDialogFooter className="gap-2">
+            <AlertDialogFooter>
                 <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11">Cancel</AlertDialogCancel>
                 <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px] h-11 shadow-lg">
                     Confirm Removal
