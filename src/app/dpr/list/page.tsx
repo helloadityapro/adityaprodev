@@ -5,7 +5,6 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDo
 import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, and, limit, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from 'date-fns';
 import { format, subDays, subMonths, subYears } from 'date-fns';
 import { 
   FileText, 
@@ -76,6 +75,7 @@ import { slugifyRole } from '@/lib/access-control';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Progress } from "@/components/ui/progress";
+import { Skeleton } from '@/components/ui/skeleton';
 
 type Attachment = {
   url: string;
@@ -866,7 +866,7 @@ export default function DPRListPage() {
           <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
             <div className="flex items-center gap-3">
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
-              <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px]">Attachments</span>
+              <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px] sm:max-w-xs">Attachments</span>
             </div>
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
