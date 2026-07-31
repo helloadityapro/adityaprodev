@@ -347,6 +347,27 @@ export default function DPRListPage() {
         }
       };
 
+      const loadImg = (url: string): Promise<{data: string, width: number, height: number}> => {
+        return new Promise((resolve) => {
+          const img = new Image();
+          img.crossOrigin = 'anonymous';
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            ctx?.drawImage(img, 0, 0);
+            resolve({ 
+              data: canvas.toDataURL('image/jpeg', 0.6), 
+              width: img.width,
+              height: img.height
+            });
+          };
+          img.onerror = () => resolve({ data: '', width: 0, height: 0 });
+          img.src = url;
+        });
+      };
+
       for (let i = 0; i < sortedAndFilteredDprs.length; i++) {
         const dpr = sortedAndFilteredDprs[i];
         if (i > 0) doc.addPage();
@@ -403,41 +424,54 @@ export default function DPRListPage() {
         }
 
         if (dpr.attachments && dpr.attachments.length > 0) {
-          currY += 10;
-          if (currY > 250) { doc.addPage(); currY = 30; addHeaderLogo(doc); }
-          doc.setFont('helvetica', 'bold');
-          doc.text('ATTACHMENTS & EVIDENCE:', margin, currY);
-          currY += 8;
+          const validImages = dpr.attachments.filter(isImage);
+          if (validImages.length > 0) {
+            currY += 10;
+            if (currY > 260) { doc.addPage(); currY = 30; addHeaderLogo(doc); }
+            doc.setFont('helvetica', 'bold');
+            doc.text('ATTACHMENTS & EVIDENCE:', margin, currY);
+            currY += 8;
 
-          const imgSize = 55;
-          const gap = 5;
-          let x = margin;
-
-          for (const att of dpr.attachments) {
-            if (!isImage(att)) continue;
+            const gap = 10;
+            const imgWidth = (contentWidth - gap) / 2;
+            const maxH = 65; 
             
-            if (x + imgSize > pageWidth - margin) {
-              x = margin;
-              currY += imgSize + gap;
-            }
+            let rowMaxH = 0;
 
-            if (currY + imgSize > 280) {
-              doc.addPage();
-              currY = 30;
-              addHeaderLogo(doc);
-              x = margin;
-            }
+            for (let j = 0; j < validImages.length; j++) {
+              const img = validImages[j];
+              const { data: base64, width, height } = await loadImg(img.url);
+              
+              if (!base64) continue;
 
-            try {
-              // Note: Using images in PDF with URLs requires them to be CORS-friendly
-              // For a prototype, we attempt to add, but handle failures gracefully
-              doc.addImage(att.url, 'JPEG', x, currY, imgSize, imgSize);
-            } catch (e) {
-              doc.rect(x, currY, imgSize, imgSize);
-              doc.setFontSize(7);
-              doc.text('IMAGE PREVIEW\n(Open link in app)', x + 2, currY + 10);
+              const col = j % 2;
+              const x = margin + (col * (imgWidth + gap));
+              
+              const ratio = width / height;
+              let finalW = imgWidth;
+              let finalH = imgWidth / ratio;
+              
+              if (finalH > maxH) {
+                finalH = maxH;
+                finalW = maxH * ratio;
+              }
+
+              if (currY + finalH > 280) {
+                doc.addPage();
+                currY = 30;
+                addHeaderLogo(doc);
+                rowMaxH = 0;
+              }
+
+              doc.addImage(base64, 'JPEG', x + (imgWidth - finalW) / 2, currY, finalW, finalH, undefined, 'FAST');
+              
+              rowMaxH = Math.max(rowMaxH, finalH);
+
+              if (col === 1 || j === validImages.length - 1) {
+                currY += rowMaxH + gap;
+                rowMaxH = 0;
+              }
             }
-            x += imgSize + gap;
           }
         }
       }
