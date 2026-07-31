@@ -11,8 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Select, 
-  SelectContent, 
-  SelectItem, 
+  SelectContent, SelectItem, 
   SelectTrigger, 
   SelectValue 
 } from "@/components/ui/select";
@@ -201,6 +200,7 @@ export default function SiteVisitsSummaryPage() {
     const totalVisits = filteredVisits.length;
     let totalMinutes = 0;
     const uniqueDays = new Set<string>();
+    const uniqueSites = new Set<string>();
 
     filteredVisits.forEach(v => {
       totalMinutes += calculateDurationMins(v.startTime, v.endTime);
@@ -208,13 +208,17 @@ export default function SiteVisitsSummaryPage() {
         const date = v.startTime.toDate ? v.startTime.toDate() : new Date(v.startTime);
         uniqueDays.add(format(date, 'yyyy-MM-dd'));
       }
+      if (v.locationType === 'site' || !v.locationType) {
+        uniqueSites.add(v.siteName);
+      }
     });
 
     return {
       totalVisits,
       totalTime: calculateDurationStr(totalMinutes),
       avgTime: totalVisits > 0 ? calculateDurationStr(Math.round(totalMinutes / totalVisits)) : '0h 0m',
-      uniqueDays: uniqueDays.size
+      uniqueDays: uniqueDays.size,
+      uniqueSitesCount: uniqueSites.size
     };
   }, [filteredVisits]);
 
@@ -395,9 +399,10 @@ export default function SiteVisitsSummaryPage() {
         </div>
       ) : (
         <div className="space-y-10">
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6 animate-in slide-in-from-bottom-4 duration-500">
             <SummaryCard title="Aggregate Visits" value={globalSummary.totalVisits} icon={Navigation} color="blue" description="Total in range" />
             <SummaryCard title="Workdays Active" value={globalSummary.uniqueDays} icon={Calendar} color="amber" description="Distinct days visited" />
+            <SummaryCard title="Unique Sites Visited" value={globalSummary.uniqueSitesCount} icon={Building2} color="primary" description="Projects covered" />
             <SummaryCard title="Total Field Time" value={globalSummary.totalTime} icon={Clock} color="primary" description="Team aggregate" />
             <SummaryCard title="Avg. Visit Cycle" value={globalSummary.avgTime} icon={Timer} color="emerald" description="Efficiency metric" />
           </div>
