@@ -5,7 +5,7 @@ import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDo
 import { collection, doc, query, where, or, serverTimestamp, increment, getDoc, and, limit, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Skeleton } from 'date-fns';
 import { format, subDays, subMonths, subYears } from 'date-fns';
 import { 
   FileText, 
@@ -152,7 +152,7 @@ export default function DPRListPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const roleConfigsQuery = useMemoFirebase(() => user ? collection(firestore, 'system_settings', 'access', 'roles') : null, [firestore, user]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const siteGroupsQuery = useMemoFirebase(() => collection(firestore, 'site_groups'), [firestore]);
@@ -276,11 +276,11 @@ export default function DPRListPage() {
   const totalExpectedImages = React.useMemo(() => {
     if (!printData) return 0;
     const attachmentImages = printData.reduce((acc, dpr) => acc + (dpr.attachments?.filter(isImage).length || 0), 0);
-    return attachmentImages + printData.length; // +1 logo per report page
+    return attachmentImages;
   }, [printData]);
 
   React.useEffect(() => {
-    if (printData && isPreparingPrint && imagesLoadedCount >= totalExpectedImages && totalExpectedImages > 0) {
+    if (printData && isPreparingPrint && imagesLoadedCount >= totalExpectedImages) {
       const timer = setTimeout(() => {
         window.print();
         setPrintData(null);
@@ -595,7 +595,7 @@ export default function DPRListPage() {
               onClick={handlePrintTrigger} 
               disabled={isPreparingPrint || sortedAndFilteredDprs.length === 0} 
               variant="outline" 
-              className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary hover:bg-primary/5"
+              className="h-10 rounded-sm font-bold uppercase text-[10px] tracking-widest border-primary/20 text-primary hover:bg-primary/5"
             >
               {isPreparingPrint ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
               Print Reports
@@ -726,7 +726,7 @@ export default function DPRListPage() {
               <div className="space-y-1">
                 <CardTitle className="text-sm font-bold uppercase tracking-widest">{activeTab === 'site' ? 'Project Site Reports' : 'Other Work Reports'}</CardTitle>
                 <CardDescription className="text-[10px] font-medium uppercase opacity-60">
-                  {queryDateRange.start} to {queryDateRange.end}
+                  {format(queryDateRange.start, 'dd/MM/yyyy')} to {format(queryDateRange.end, 'dd/MM/yyyy')}
                 </CardDescription>
               </div>
               <Badge variant="secondary" className="h-6 px-3 rounded-full font-black text-[10px] bg-primary/5 text-primary border-primary/10">
@@ -759,71 +759,51 @@ export default function DPRListPage() {
       {printData && (
         <div id="printable-dpr-area" className="hidden print:block font-sans text-black">
           {printData.map((dpr, idx) => (
-            <div key={dpr.id} className={cn("p-10 min-h-screen relative bg-white", idx > 0 && "page-break-before-always")}>
-              {/* Logo at top right */}
-              <div className="absolute top-8 right-8">
-                <img 
-                  src="/assets/icon.png" 
-                  alt="Aditya Pro" 
-                  className="h-20 w-auto object-contain" 
-                  onLoad={handleImageLoad}
-                  onError={handleImageLoad}
-                />
-              </div>
-
-              <div className="space-y-8 pt-10">
-                <h1 className="text-3xl font-black border-b-4 border-black pb-2 uppercase tracking-tighter">DAILY PROGRESS REPORT</h1>
+            <div key={dpr.id} className={cn("p-10 min-h-screen bg-white page-break-before-always")}>
+              <div className="space-y-8 pt-4">
+                <h1 className="text-2xl font-bold border-b-2 border-black pb-2 uppercase text-center">DAILY PROGRESS REPORT</h1>
                 
-                <div className="border-2 border-black overflow-hidden rounded-sm">
+                <div className="border border-black overflow-hidden rounded-sm">
                   <div className="grid grid-cols-2 border-b border-black">
-                    <div className="p-3 border-r border-black font-black bg-slate-100 uppercase text-[10px] tracking-widest flex items-center">Project / Location</div>
-                    <div className="p-3 text-sm font-bold uppercase">{dpr.siteName}</div>
+                    <div className="p-3 border-r border-black font-bold bg-slate-50 uppercase text-[10px] flex items-center">Project / Location</div>
+                    <div className="p-3 text-sm font-semibold uppercase">{dpr.siteName}</div>
                   </div>
                   <div className="grid grid-cols-2 border-b border-black">
-                    <div className="p-3 border-r border-black font-black bg-slate-100 uppercase text-[10px] tracking-widest flex items-center">Report Date</div>
-                    <div className="p-3 text-sm font-mono font-bold">{format(new Date(dpr.reportDate), 'dd MMMM yyyy')}</div>
-                  </div>
-                  <div className="grid grid-cols-2 border-b border-black">
-                    <div className="p-3 border-r border-black font-black bg-slate-100 uppercase text-[10px] tracking-widest flex items-center">Submitted By</div>
-                    <div className="p-3 text-sm font-bold">{dpr.userName}</div>
+                    <div className="p-3 border-r border-black font-bold bg-slate-50 uppercase text-[10px] flex items-center">Report Date</div>
+                    <div className="p-3 text-sm font-mono font-semibold">{format(new Date(dpr.reportDate), 'dd MMMM yyyy')}</div>
                   </div>
                   <div className="grid grid-cols-2">
-                    <div className="p-3 border-r border-black font-black bg-slate-100 uppercase text-[10px] tracking-widest flex items-center">Category</div>
-                    <div className="p-3 text-sm font-black uppercase tracking-widest text-primary">{dpr.dprType || 'Site'}</div>
+                    <div className="p-3 border-r border-black font-bold bg-slate-50 uppercase text-[10px] flex items-center">Submitted By</div>
+                    <div className="p-3 text-sm font-semibold">{dpr.userName}</div>
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <h2 className="text-lg font-black uppercase tracking-[0.2em] border-b-2 border-black/10 pb-1">Activity Summary</h2>
+                <div className="space-y-3">
+                  <h2 className="text-base font-bold uppercase border-b border-black/10 pb-1">Activity Summary</h2>
                   <div className="text-sm leading-relaxed whitespace-pre-wrap font-medium text-slate-800 bg-slate-50/50 p-6 border rounded-sm italic">
                     "{dpr.description}"
                   </div>
                 </div>
 
                 {dpr.attachments && dpr.attachments.filter(isImage).length > 0 && (
-                  <div className="space-y-6 pt-4">
-                    <h2 className="text-lg font-black uppercase tracking-[0.2em] border-b-2 border-black/10 pb-1">Attachments & Evidence</h2>
-                    <div className="grid grid-cols-2 gap-8">
+                  <div className="space-y-4 pt-4">
+                    <h2 className="text-base font-bold uppercase border-b border-black/10 pb-1">Attachments & Evidence</h2>
+                    <div className="grid grid-cols-2 gap-6">
                       {dpr.attachments.filter(isImage).map((att, attIdx) => (
-                        <div key={attIdx} className="break-inside-avoid border-2 border-slate-100 p-2 bg-white shadow-sm flex flex-col gap-2">
+                        <div key={attIdx} className="break-inside-avoid border border-slate-200 p-2 bg-white shadow-sm flex flex-col gap-2">
                           <img 
                             src={att.url} 
                             alt={att.name} 
-                            className="w-full h-auto object-contain border border-slate-50" 
+                            className="w-full h-auto object-contain" 
                             onLoad={handleImageLoad}
                             onError={handleImageLoad}
                           />
-                          <p className="text-[8px] font-black text-center uppercase tracking-widest text-slate-400 truncate px-2">{att.name}</p>
+                          <p className="text-[8px] font-bold text-center uppercase text-slate-400 truncate px-2">{att.name}</p>
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-              </div>
-              
-              <div className="absolute bottom-8 left-10 right-10 flex justify-between text-[8px] font-black uppercase tracking-[0.3em] text-slate-400 border-t-2 border-slate-100 pt-4">
-                <span>Aditya Green Energy Private Limited</span>
-                <span className="font-mono">Printed on {format(new Date(), 'dd/MM/yyyy HH:mm')}</span>
               </div>
             </div>
           ))}
