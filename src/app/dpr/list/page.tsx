@@ -37,7 +37,8 @@ import {
   ChevronDown,
   Check,
   ArrowRight,
-  FileDown
+  FileDown,
+  Printer
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Input } from '@/components/ui/input';
@@ -119,8 +120,9 @@ export default function DPRListPage() {
   const [editingDpr, setEditingDpr] = React.useState<DPR | null>(null);
   const [deletingDpr, setDeletingDpr] = React.useState<DPR | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
-  const [isExporting, setIsExporting] = React.useState(false);
-  const [generationProgress, setGenerationProgress] = React.useState(0);
+  const [isPreparingPrint, setIsPreparingPrint] = React.useState(false);
+  const [printData, setPrintData] = React.useState<DPR[] | null>(null);
+  const [imagesLoadedCount, setImagesLoadedCount] = React.useState(0);
 
   // Viewer State
   const [viewUrl, setViewUrl] = React.useState<string | null>(null);
@@ -133,7 +135,6 @@ export default function DPRListPage() {
   
   const containerRef = React.useRef<HTMLDivElement>(null);
   const mediaRef = React.useRef<HTMLDivElement>(null);
-  const viewerRef = React.useRef<HTMLDivElement>(null);
 
   // Persistence logic for active tab
   React.useEffect(() => {
@@ -252,6 +253,43 @@ export default function DPRListPage() {
     });
   }, [dprs, searchTerm, queryDateRange, userProfile, roleConfigs, isSuper, activeTab, userRoleStr, selectedGroupIds, siteGroups]);
 
+  const isVideoUrl = (url: string) => {
+    const lowUrl = url.toLowerCase();
+    return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
+  };
+
+  const isImage = (att: Attachment) => {
+    return att.contentType?.startsWith('image/') || /\.(jpg|jpeg|png|webp|heic)$/i.test(att.name);
+  };
+
+  const handleImageLoad = () => {
+    setImagesLoadedCount(prev => prev + 1);
+  };
+
+  const handlePrintTrigger = () => {
+    if (sortedAndFilteredDprs.length === 0) return;
+    setIsPreparingPrint(true);
+    setImagesLoadedCount(0);
+    setPrintData(sortedAndFilteredDprs);
+  };
+
+  const totalExpectedImages = React.useMemo(() => {
+    if (!printData) return 0;
+    const attachmentImages = printData.reduce((acc, dpr) => acc + (dpr.attachments?.filter(isImage).length || 0), 0);
+    return attachmentImages + printData.length; // +1 logo per report page
+  }, [printData]);
+
+  React.useEffect(() => {
+    if (printData && isPreparingPrint && imagesLoadedCount >= totalExpectedImages && totalExpectedImages > 0) {
+      const timer = setTimeout(() => {
+        window.print();
+        setPrintData(null);
+        setIsPreparingPrint(false);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [imagesLoadedCount, totalExpectedImages, printData, isPreparingPrint]);
+
   const handleDelete = async () => {
     if (!deletingDpr || !firestore) return;
 
@@ -306,193 +344,6 @@ export default function DPRListPage() {
     setSearchTerm("");
     setDateFilter("7days");
     setSelectedGroupIds([]);
-  };
-
-  const handleExportPDF = async () => {
-    if (sortedAndFilteredDprs.length === 0) return;
-    setIsExporting(true);
-    setGenerationProgress(0);
-
-    try {
-      const { default: jsPDF } = await import('jspdf');
-      const doc = new jsPDF('p', 'mm', 'a4');
-      const logoUrl = '/assets/icon.png';
-      const margin = 15;
-      const pageWidth = 210;
-      const contentWidth = pageWidth - (margin * 2);
-      
-      let logoProps: any = null;
-      try {
-        logoProps = await doc.getImageProperties(logoUrl);
-      } catch (e) {
-        console.warn("Logo load failed", e);
-      }
-
-      const addHeaderLogo = (pdfDoc: any) => {
-        if (!logoProps) return;
-        try {
-          const areaSize = 25;
-          const startX = 210 - areaSize - margin;
-          const startY = 10;
-          const ratio = logoProps.width / logoProps.height;
-          let renderW = areaSize;
-          let renderH = areaSize;
-          if (ratio > 1) renderH = areaSize / ratio;
-          else renderW = areaSize * ratio;
-          const x = startX + (areaSize - renderW) / 2;
-          const y = startY + (areaSize - renderH) / 2;
-          pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
-        } catch (e) {
-          pdfDoc.addImage(logoUrl, 'PNG', 170, 10, 25, 25);
-        }
-      };
-
-      const loadImg = (url: string): Promise<{data: string, width: number, height: number}> => {
-        return new Promise((resolve) => {
-          const img = new Image();
-          img.crossOrigin = 'anonymous';
-          img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            ctx?.drawImage(img, 0, 0);
-            resolve({ 
-              data: canvas.toDataURL('image/jpeg', 0.6), 
-              width: img.width,
-              height: img.height
-            });
-          };
-          img.onerror = () => resolve({ data: '', width: 0, height: 0 });
-          img.src = url;
-        });
-      };
-
-      for (let i = 0; i < sortedAndFilteredDprs.length; i++) {
-        const dpr = sortedAndFilteredDprs[i];
-        if (i > 0) doc.addPage();
-        
-        setGenerationProgress(Math.round(((i + 1) / sortedAndFilteredDprs.length) * 100));
-        await new Promise(resolve => setTimeout(resolve, 0));
-
-        addHeaderLogo(doc);
-
-        let currY = 40;
-        const rowHeight = 8;
-        const colWidthLabel = 65;
-        const colWidthValue = contentWidth - colWidthLabel;
-
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(14);
-        doc.text('DAILY PROGRESS REPORT', margin, currY - 10);
-
-        const drawRow = (label: string, value: string) => {
-          doc.setFont('helvetica', 'bold');
-          doc.setFontSize(9);
-          doc.rect(margin, currY, colWidthLabel, rowHeight);
-          doc.text(label.toUpperCase(), margin + 2, currY + 5.5);
-          
-          doc.setFont('helvetica', 'normal');
-          doc.rect(margin + colWidthLabel, currY, colWidthValue, rowHeight);
-          doc.text(String(value || '—'), margin + colWidthLabel + 2, currY + 5.5);
-          currY += rowHeight;
-        };
-
-        drawRow('PROJECT / LOCATION', dpr.siteName);
-        drawRow('REPORT DATE', format(new Date(dpr.reportDate), 'dd MMMM yyyy'));
-        drawRow('SUBMITTED BY', dpr.userName);
-        drawRow('CATEGORY', dpr.dprType || 'Site');
-
-        currY += 10;
-        doc.setFont('helvetica', 'bold');
-        doc.setFontSize(10);
-        doc.text('ACTIVITY SUMMARY:', margin, currY);
-        currY += 6;
-
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        const splitDescription = doc.splitTextToSize(dpr.description, contentWidth);
-        
-        for (const line of splitDescription) {
-          if (currY > 280) {
-            doc.addPage();
-            currY = 30;
-            addHeaderLogo(doc);
-          }
-          doc.text(line, margin, currY);
-          currY += 5;
-        }
-
-        if (dpr.attachments && dpr.attachments.length > 0) {
-          const validImages = dpr.attachments.filter(isImage);
-          if (validImages.length > 0) {
-            currY += 10;
-            if (currY > 260) { doc.addPage(); currY = 30; addHeaderLogo(doc); }
-            doc.setFont('helvetica', 'bold');
-            doc.text('ATTACHMENTS & EVIDENCE:', margin, currY);
-            currY += 8;
-
-            const gap = 10;
-            const imgWidth = (contentWidth - gap) / 2;
-            const maxH = 65; 
-            
-            let rowMaxH = 0;
-
-            for (let j = 0; j < validImages.length; j++) {
-              const img = validImages[j];
-              const { data: base64, width, height } = await loadImg(img.url);
-              
-              if (!base64) continue;
-
-              const col = j % 2;
-              const x = margin + (col * (imgWidth + gap));
-              
-              const ratio = width / height;
-              let finalW = imgWidth;
-              let finalH = imgWidth / ratio;
-              
-              if (finalH > maxH) {
-                finalH = maxH;
-                finalW = maxH * ratio;
-              }
-
-              if (currY + finalH > 280) {
-                doc.addPage();
-                currY = 30;
-                addHeaderLogo(doc);
-                rowMaxH = 0;
-              }
-
-              doc.addImage(base64, 'JPEG', x + (imgWidth - finalW) / 2, currY, finalW, finalH, undefined, 'FAST');
-              
-              rowMaxH = Math.max(rowMaxH, finalH);
-
-              if (col === 1 || j === validImages.length - 1) {
-                currY += rowMaxH + gap;
-                rowMaxH = 0;
-              }
-            }
-          }
-        }
-      }
-
-      doc.save(`DPR_Report_Batch_${format(new Date(), 'yyyyMMdd')}.pdf`);
-      toast({ title: 'Export Complete', description: 'Progress reports saved as PDF.' });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
-    } finally {
-      setIsExporting(false);
-      setGenerationProgress(0);
-    }
-  };
-
-  const isVideoUrl = (url: string) => {
-    const lowUrl = url.toLowerCase();
-    return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
-  };
-
-  const isImage = (att: Attachment) => {
-    return att.contentType?.startsWith('image/') || /\.(jpg|jpeg|png|webp|heic)$/i.test(att.name);
   };
 
   const resetViewer = () => { 
@@ -741,27 +592,17 @@ export default function DPRListPage() {
           </div>
           <div className="flex items-center gap-2">
             <Button 
-              onClick={handleExportPDF} 
-              disabled={isExporting || sortedAndFilteredDprs.length === 0} 
+              onClick={handlePrintTrigger} 
+              disabled={isPreparingPrint || sortedAndFilteredDprs.length === 0} 
               variant="outline" 
               className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary hover:bg-primary/5"
             >
-              {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="h-4 w-4 mr-2" />}
-              PDF Export
+              {isPreparingPrint ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Printer className="h-4 w-4 mr-2" />}
+              Print Reports
             </Button>
           </div>
         </div>
       </div>
-
-      {isExporting && (
-        <div className="space-y-1.5 animate-in fade-in duration-300">
-          <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
-            <span>Rendering PDF Batch</span>
-            <span>{generationProgress}%</span>
-          </div>
-          <Progress value={generationProgress} className="h-1 rounded-none" />
-        </div>
-      )}
 
       <div className="bg-card p-3 border rounded-sm shadow-sm no-print">
         <div className="flex flex-wrap items-end gap-2 md:gap-3">
@@ -869,7 +710,7 @@ export default function DPRListPage() {
         )}
       </div>
 
-      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full no-print">
         <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-11 mb-6">
           <TabsTrigger value="site" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
             <Building2 className="h-3.5 w-3.5 mr-2" /> Projects
@@ -913,6 +754,81 @@ export default function DPRListPage() {
           </CardContent>
         </Card>
       </Tabs>
+
+      {/* Printable Area */}
+      {printData && (
+        <div id="printable-dpr-area" className="hidden print:block font-sans text-black">
+          {printData.map((dpr, idx) => (
+            <div key={dpr.id} className={cn("p-10 min-h-screen relative bg-white", idx > 0 && "page-break-before-always")}>
+              {/* Logo at top right */}
+              <div className="absolute top-8 right-8">
+                <img 
+                  src="/assets/icon.png" 
+                  alt="Aditya Pro" 
+                  className="h-20 w-auto object-contain" 
+                  onLoad={handleImageLoad}
+                  onError={handleImageLoad}
+                />
+              </div>
+
+              <div className="space-y-8 pt-10">
+                <h1 className="text-3xl font-black border-b-4 border-black pb-2 uppercase tracking-tighter">DAILY PROGRESS REPORT</h1>
+                
+                <div className="border-2 border-black overflow-hidden rounded-sm">
+                  <div className="grid grid-cols-2 border-b border-black">
+                    <div className="p-3 border-r border-black font-black bg-slate-100 uppercase text-[10px] tracking-widest flex items-center">Project / Location</div>
+                    <div className="p-3 text-sm font-bold uppercase">{dpr.siteName}</div>
+                  </div>
+                  <div className="grid grid-cols-2 border-b border-black">
+                    <div className="p-3 border-r border-black font-black bg-slate-100 uppercase text-[10px] tracking-widest flex items-center">Report Date</div>
+                    <div className="p-3 text-sm font-mono font-bold">{format(new Date(dpr.reportDate), 'dd MMMM yyyy')}</div>
+                  </div>
+                  <div className="grid grid-cols-2 border-b border-black">
+                    <div className="p-3 border-r border-black font-black bg-slate-100 uppercase text-[10px] tracking-widest flex items-center">Submitted By</div>
+                    <div className="p-3 text-sm font-bold">{dpr.userName}</div>
+                  </div>
+                  <div className="grid grid-cols-2">
+                    <div className="p-3 border-r border-black font-black bg-slate-100 uppercase text-[10px] tracking-widest flex items-center">Category</div>
+                    <div className="p-3 text-sm font-black uppercase tracking-widest text-primary">{dpr.dprType || 'Site'}</div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h2 className="text-lg font-black uppercase tracking-[0.2em] border-b-2 border-black/10 pb-1">Activity Summary</h2>
+                  <div className="text-sm leading-relaxed whitespace-pre-wrap font-medium text-slate-800 bg-slate-50/50 p-6 border rounded-sm italic">
+                    "{dpr.description}"
+                  </div>
+                </div>
+
+                {dpr.attachments && dpr.attachments.filter(isImage).length > 0 && (
+                  <div className="space-y-6 pt-4">
+                    <h2 className="text-lg font-black uppercase tracking-[0.2em] border-b-2 border-black/10 pb-1">Attachments & Evidence</h2>
+                    <div className="grid grid-cols-2 gap-8">
+                      {dpr.attachments.filter(isImage).map((att, attIdx) => (
+                        <div key={attIdx} className="break-inside-avoid border-2 border-slate-100 p-2 bg-white shadow-sm flex flex-col gap-2">
+                          <img 
+                            src={att.url} 
+                            alt={att.name} 
+                            className="w-full h-auto object-contain border border-slate-50" 
+                            onLoad={handleImageLoad}
+                            onError={handleImageLoad}
+                          />
+                          <p className="text-[8px] font-black text-center uppercase tracking-widest text-slate-400 truncate px-2">{att.name}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+              
+              <div className="absolute bottom-8 left-10 right-10 flex justify-between text-[8px] font-black uppercase tracking-[0.3em] text-slate-400 border-t-2 border-slate-100 pt-4">
+                <span>Aditya Green Energy Private Limited</span>
+                <span className="font-mono">Printed on {format(new Date(), 'dd/MM/yyyy HH:mm')}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Edit Dialog */}
       <Dialog open={!!editingDpr} onOpenChange={(o) => !o && setEditingDpr(null)}>
@@ -982,13 +898,13 @@ export default function DPRListPage() {
           </div>
           {viewUrls.length > 1 && (
             <>
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
                 <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); prevUrl(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50">
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
                 <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white" onClick={(e) => { e.stopPropagation(); nextUrl(); }}><ChevronRight className="h-8 w-8" /></Button>
               </div>
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50">
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
                 <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
                   {currentUrlIndex + 1} / {viewUrls.length}
                 </Badge>

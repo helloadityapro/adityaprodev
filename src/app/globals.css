@@ -133,10 +133,11 @@
     visibility: hidden;
   }
   #printable-permit-area, #printable-permit-area *, 
-  #printable-report-area, #printable-report-area * {
+  #printable-report-area, #printable-report-area *,
+  #printable-dpr-area, #printable-dpr-area * {
     visibility: visible;
   }
-  #printable-permit-area, #printable-report-area {
+  #printable-permit-area, #printable-report-area, #printable-dpr-area {
     position: absolute !important;
     left: 0 !important;
     top: 0 !important;
