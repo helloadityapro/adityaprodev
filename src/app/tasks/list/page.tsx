@@ -32,7 +32,9 @@ import {
   ArrowDown,
   UserCheck,
   MessageCircle,
-  Share2
+  Share2,
+  Activity,
+  XCircle
 } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
@@ -161,7 +163,9 @@ export default function TaskListPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [activeTab, setActiveTab] = React.useState("all");
-  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [dateFilter, setDateFilter] = React.useState<string>("allTime");
+  const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   
   const [actionTask, setActionTask] = React.useState<Task | null>(null);
   const [selectedUpdateUserId, setSelectedUpdateUserId] = React.useState<string>("");
@@ -179,7 +183,7 @@ export default function TaskListPage() {
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
-  const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? userProfile.role.toLowerCase().replace(/\s+/g, '-') : 'site-engineer');
+  const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
   const tasksQuery = useMemoFirebase(() => {
     if (!user || !userProfile) return null;
@@ -207,36 +211,38 @@ export default function TaskListPage() {
       case 'yesterday': return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
       case '7days': return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
       case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
-      default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime': return { start: '1970-01-01', end: '2099-12-31' };
+      case 'custom': return { start: customStart, end: customEnd };
+      default: return { start: '1970-01-01', end: '2099-12-31' };
     }
-  }, [dateFilter]);
+  }, [dateFilter, customStart, customEnd]);
 
   const filteredTasks = React.useMemo(() => {
     if (!tasks || !userProfile) return [];
     
     const { start, end } = queryDateRange;
-    let list = tasks;
-
-    if (!isAdmin) {
-      list = list.filter(task => 
-        (task.assigneeIds || []).includes(user?.uid || "") || task.assignedById === user?.uid
-      );
-    }
-
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
       : roleConfigs?.find(c => c.id === userRoleStr)?.ownDataOnly ?? false;
 
+    let result = tasks;
+
+    if (!isAdmin) {
+      result = result.filter(task => 
+        (task.assigneeIds || []).includes(user?.uid || "") || task.assignedById === user?.uid
+      );
+    }
+
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      list = list.filter(task => {
+      result = result.filter(task => {
         if ((task.assigneeIds || []).includes(user?.uid || "") || task.assignedById === user?.uid) return true;
         if (!task.siteId) return true;
         return assignedIds.has(task.siteId);
       });
     }
 
-    list = list.filter(task => {
+    return result.filter(task => {
       const tDate = task.createdAt?.toDate?.() || new Date(task.createdAt);
       const tDateStr = format(tDate, 'yyyy-MM-dd');
 
@@ -253,14 +259,21 @@ export default function TaskListPage() {
       const matchesDate = tDateStr >= start && tDateStr <= end;
 
       return matchesSearch && matchesDate && matchesStatus && matchesTab;
-    });
-
-    return list.sort((a, b) => {
+    }).sort((a, b) => {
         const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
         const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
         return dateB - dateA;
     });
   }, [tasks, searchTerm, statusFilter, activeTab, user, userProfile, roleConfigs, isSuper, isAdmin, queryDateRange, userRoleStr]);
+
+  const stats = React.useMemo(() => {
+    const total = filteredTasks.length;
+    const todo = filteredTasks.filter(t => t.status === 'To-do').length;
+    const inProgress = filteredTasks.filter(t => t.status === 'In Progress').length;
+    const completed = filteredTasks.filter(t => t.status === 'Completed').length;
+    const cancelled = filteredTasks.filter(t => t.status === 'Cancelled').length;
+    return { total, todo, inProgress, completed, cancelled };
+  }, [filteredTasks]);
 
   const handleUpdateStatus = async (remarks: string) => {
     if (!actionTask || !pendingStatus) return;
@@ -537,38 +550,61 @@ export default function TaskListPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
             <ListTodo className="h-8 w-8 text-primary" /> Task Board
           </h1>
           <p className="text-muted-foreground text-sm font-medium">Monitor and update site activity assignments.</p>
         </div>
-        <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold shadow-md">
+        <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold shadow-md h-11 px-8">
           Assign New Task
         </Button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 animate-in slide-in-from-top-2 duration-300">
+        <SummaryCard title="Total Tasks" value={stats.total} icon={ListTodo} color="primary" description="Work Items Logged" />
+        <SummaryCard title="To-do" value={stats.todo} icon={Clock} color="amber" description="Awaiting Action" />
+        <SummaryCard title="In-progress" value={stats.inProgress} icon={Activity} color="blue" description="Currently Active" />
+        <SummaryCard title="Completed" value={stats.completed} icon={CheckCircle2} color="emerald" description="Work Finalized" />
+        <SummaryCard title="Cancelled" value={stats.cancelled} icon={XCircle} color="red" description="Requests Revoked" />
       </div>
 
       <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-            <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50 h-9 p-1">
-              <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">All Tasks</TabsTrigger>
-              <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">My Tasks</TabsTrigger>
-              <TabsTrigger value="assigned-by-me" className="rounded-sm text-[10px] font-bold uppercase tracking-tight">Assigned By Me</TabsTrigger>
+            <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50 h-10 p-1">
+              <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">All Tasks</TabsTrigger>
+              <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">My Tasks</TabsTrigger>
+              <TabsTrigger value="assigned-by-me" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">Assigned By Me</TabsTrigger>
             </TabsList>
           </Tabs>
 
           <div className="flex items-center gap-2">
             <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Search title or personnel..." 
-                className="pl-9 h-9 rounded-sm border-primary/20 text-xs"
+                className="pl-9 h-10 rounded-sm border-primary/20 text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+            </div>
+            <div className="w-[140px]">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="h-10 rounded-sm border-primary/20 text-[10px] font-bold uppercase">
+                   <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                   <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Time</SelectItem>
+                  <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+                  <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
+                  <SelectItem value="7days" className="text-[10px] font-bold uppercase">7 Days</SelectItem>
+                  <SelectItem value="lastMonth" className="text-[10px] font-bold uppercase">Month</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         </div>
@@ -680,5 +716,28 @@ export default function TaskListPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color, description }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' | 'red', description: string }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+    red: "bg-red-500/5 border-red-500/10 text-red-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-1 p-3 sm:p-4">
+        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3.5 sm:h-4 sm:w-4" />
+      </CardHeader>
+      <CardContent className="p-3 sm:p-4 pt-0">
+        <div className="text-xl sm:text-2xl font-black">{value}</div>
+        <p className="text-[8px] sm:text-[9px] text-muted-foreground mt-0.5 font-bold uppercase tracking-tighter opacity-60">{description}</p>
+      </CardContent>
+    </Card>
   );
 }
