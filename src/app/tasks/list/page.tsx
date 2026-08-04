@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
@@ -18,7 +18,6 @@ import {
   FilterX, 
   CheckCircle2, 
   MapPin, 
-  Users, 
   ChevronDown, 
   ChevronUp, 
   ShieldCheck, 
@@ -26,13 +25,7 @@ import {
   User,
   CircleCheck,
   CircleX,
-  Eye,
-  ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  UserCheck,
   MessageCircle,
-  Share2,
   Activity,
   XCircle
 } from "lucide-react";
@@ -64,7 +57,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 import { Textarea } from "@/components/ui/textarea";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
@@ -107,8 +100,6 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
-const STATUS_OPTIONS = ["To-do", "In Progress", "Completed", "Cancelled"] as const;
-
 function PriorityBadge({ priority }: { priority: string }) {
   const config = {
     High: "bg-red-100 text-red-800 border-red-200",
@@ -146,7 +137,6 @@ const getSummarizedAssignees = (task: Task) => {
   if (task.assignedRoles && task.assignedRoles.length > 0) {
     return `All ${task.assignedRoles.join(", ")}s`;
   }
-  
   const states = Object.values(task.assigneeStates || {});
   if (states.length === 0) return "Unassigned";
   if (states.length === 1) return states[0].userName;
@@ -251,7 +241,6 @@ export default function TaskListPage() {
         (task.assigneeIds || []).some(id => task.assigneeStates?.[id]?.userName.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-      
       const matchesTab = activeTab === 'all' || 
         (activeTab === 'my-tasks' && (task.assigneeIds || []).includes(user?.uid || "")) ||
         (activeTab === 'assigned-by-me' && task.assignedById === user?.uid);
@@ -336,12 +325,87 @@ export default function TaskListPage() {
     window.open(url, '_blank');
   };
 
-  function renderTable() {
-    return (
-      <>
-        {/* Mobile Card Layout */}
-        <div className="md:hidden divide-y">
-          {filteredTasks.length > 0 ? filteredTasks.map((task) => {
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setDateFilter("7days");
+  };
+
+  if (isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
+
+  return (
+    <div className="space-y-8 pb-20">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <ListTodo className="h-8 w-8 text-primary" /> Task Board
+          </h1>
+          <p className="text-muted-foreground text-sm font-medium">Monitor and update site activity assignments.</p>
+        </div>
+        <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold shadow-md h-11 px-8">
+          Assign New Task
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4 animate-in slide-in-from-top-2 duration-300">
+        <SummaryCard title="Total Tasks" value={stats.total} icon={ListTodo} color="primary" description="Work Items Logged" isLoading={isLoading} />
+        <SummaryCard title="To-do" value={stats.todo} icon={Clock} color="amber" description="Awaiting Action" isLoading={isLoading} />
+        <SummaryCard title="In-progress" value={stats.inProgress} icon={Activity} color="blue" description="Currently Active" isLoading={isLoading} />
+        <SummaryCard title="Completed" value={stats.completed} icon={CheckCircle2} color="emerald" description="Work Finalized" isLoading={isLoading} />
+        <SummaryCard title="Cancelled" value={stats.cancelled} icon={XCircle} color="red" description="Requests Revoked" isLoading={isLoading} />
+      </div>
+
+      <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
+            <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50 h-10 p-1">
+              <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">All Tasks</TabsTrigger>
+              <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">My Tasks</TabsTrigger>
+              <TabsTrigger value="assigned-by-me" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">Assigned By Me</TabsTrigger>
+            </TabsList>
+          </Tabs>
+
+          <div className="flex items-center gap-2">
+            <div className="relative flex-1 md:w-64">
+              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Input 
+                placeholder="Search title or personnel..." 
+                className="pl-9 h-10 rounded-sm border-primary/20 text-sm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
+            <div className="w-[140px]">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="h-10 rounded-sm border-primary/20 text-[10px] font-bold uppercase">
+                   <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                   <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Time</SelectItem>
+                  <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+                  <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
+                  <SelectItem value="7days" className="text-[10px] font-bold uppercase">7 Days</SelectItem>
+                  <SelectItem value="lastMonth" className="text-[10px] font-bold uppercase">Month</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground">
+                <FilterX className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <div className="space-y-4">
+        {/* Mobile View */}
+        <div className="md:hidden divide-y border rounded-sm overflow-hidden">
+          {isLoading ? (
+            <div className="p-20 text-center flex flex-col items-center gap-4">
+              <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+              <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Loading Task Board...</p>
+            </div>
+          ) : filteredTasks.length > 0 ? filteredTasks.map((task) => {
             const assignees = Object.values(task.assigneeStates || {});
             const completedCount = assignees.filter(s => s.status === 'Completed').length;
             
@@ -394,224 +458,166 @@ export default function TaskListPage() {
                   </div>
                   <div className="flex gap-1" onClick={e => e.stopPropagation()}>
                     <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(task)}><MessageCircle className="h-4 w-4" /></Button>
-                    {((task.assigneeIds || []).includes(user?.uid || "") || isAdmin || task.assignedById === user?.uid) && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => { 
-                        setActionTask(task); 
-                        const targetId = (task.assigneeIds || []).includes(user?.uid || "") ? user?.uid : (task.assigneeIds[0] || "");
-                        setSelectedUpdateUserId(targetId || "");
-                        setPendingStatus(task.assigneeStates?.[targetId || ""]?.status || "To-do");
-                      }}><Pencil className="h-4 w-4" /></Button>
-                    )}
-                    {isAdmin && (
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}><Trash2 className="h-4 w-4" /></Button>
-                    )}
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => { 
+                      setActionTask(task); 
+                      const targetId = (task.assigneeIds || []).includes(user?.uid || "") ? user?.uid : (task.assigneeIds[0] || "");
+                      setSelectedUpdateUserId(targetId || "");
+                      setPendingStatus(task.assigneeStates?.[targetId || ""]?.status || "To-do");
+                    }}><Pencil className="h-4 w-4" /></Button>
                   </div>
                 </div>
               </div>
             );
           }) : (
-            <div className="p-12 text-center text-muted-foreground italic text-sm">No tasks found.</div>
+            <div className="p-12 text-center text-muted-foreground italic text-sm">No tasks discovered matching your selection.</div>
           )}
         </div>
 
-        {/* Desktop Table View */}
+        {/* Desktop View */}
         <div className="hidden md:block">
-          <Table>
-            <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
-              <TableRow>
-                <TableHead className="w-12"></TableHead>
-                <TableHead className="w-32">Due Date</TableHead>
-                <TableHead>Description</TableHead>
-                <TableHead>Priority</TableHead>
-                <TableHead>Assignees</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Assigned By</TableHead>
-                <TableHead className="text-right px-6">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTasks.length > 0 ? filteredTasks.map((task) => {
-                const assignees = Object.values(task.assigneeStates || {});
-                const completedCount = assignees.filter(s => s.status === 'Completed').length;
-                
-                return (
-                  <React.Fragment key={task.id}>
-                    <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => toggleExpand(task.id)}>
-                      <TableCell className="pl-4">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm">
-                          {expandedTaskIds.has(task.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </TableCell>
-                      <TableCell>
-                        <span className="font-mono text-xs font-bold text-primary">{format(new Date(task.dueDate), 'dd MMM yy')}</span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-0.5">
-                          <span className="font-bold text-sm text-foreground">{task.title}</span>
-                          <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
-                            <MapPin className="h-3 w-3 text-primary/40" /> {task.siteName}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell><PriorityBadge priority={task.priority} /></TableCell>
-                      <TableCell>
-                        <span className="text-xs font-bold text-foreground">
-                          {getSummarizedAssignees(task)}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex flex-col gap-1">
-                          <StatusBadge status={task.status} />
-                          <Badge variant="secondary" className="w-fit text-[8px] h-4 px-1 rounded-sm bg-primary/5 text-primary/60 border-none font-black uppercase">
-                            {completedCount}/{assignees.length} Finished
-                          </Badge>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <UserCheck className="h-3.5 w-3.5 text-primary opacity-60" />
-                          <span className="text-[10px] font-black uppercase text-muted-foreground">{task.assignedByName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleWhatsAppShare(task)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
-                          {((task.assigneeIds || []).includes(user?.uid || "") || isAdmin || task.assignedById === user?.uid) && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm" 
-                              onClick={() => { 
-                                setActionTask(task); 
-                                const targetId = (task.assigneeIds || []).includes(user?.uid || "") ? user?.uid : (task.assigneeIds[0] || "");
-                                setSelectedUpdateUserId(targetId || "");
-                                setPendingStatus(task.assigneeStates?.[targetId || ""]?.status || "To-do");
-                              }}
-                              title="Record Progress"
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                          )}
-                          {isAdmin && (
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          )}
+          <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
+                  <TableRow>
+                    <TableHead className="w-12"></TableHead>
+                    <TableHead className="w-32">Due Date</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead>Priority</TableHead>
+                    <TableHead>Assignees</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Assigned By</TableHead>
+                    <TableHead className="text-right px-6">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {isLoading ? (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-64 text-center">
+                        <div className="flex flex-col items-center justify-center gap-4">
+                          <Loader2 className="h-10 w-10 animate-spin text-primary opacity-20" />
+                          <p className="text-[11px] font-black uppercase text-muted-foreground tracking-[0.3em]">Synchronizing Board</p>
                         </div>
                       </TableCell>
                     </TableRow>
-                    {expandedTaskIds.has(task.id) && (
-                      <TableRow className="bg-primary/[0.01]">
-                        <TableCell colSpan={8} className="p-0 border-b">
-                          <div className="p-6 px-20 space-y-6 animate-in slide-in-from-top-1 duration-200 text-left">
-                            <div className="flex items-center gap-2 border-b pb-2">
-                              <ShieldCheck className="h-4 w-4 text-primary" />
-                              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Task Allotment Breakdown</h4>
+                  ) : filteredTasks.length > 0 ? filteredTasks.map((task) => {
+                    const assignees = Object.values(task.assigneeStates || {});
+                    const completedCount = assignees.filter(s => s.status === 'Completed').length;
+                    
+                    return (
+                      <React.Fragment key={task.id}>
+                        <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => toggleExpand(task.id)}>
+                          <TableCell className="pl-4">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm">
+                              {expandedTaskIds.has(task.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-mono text-xs font-bold text-primary">{format(new Date(task.dueDate), 'dd MMM yy')}</span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-0.5">
+                              <span className="font-bold text-sm text-foreground">{task.title}</span>
+                              <div className="flex items-center gap-1 text-[10px] text-muted-foreground uppercase font-bold tracking-tight">
+                                <MapPin className="h-3 w-3 text-primary/40" /> {task.siteName}
+                              </div>
                             </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                              {Object.values(task.assigneeStates || {}).map((s) => (
-                                <Card key={s.userId} className="rounded-sm shadow-sm border-primary/5">
-                                  <CardHeader className="p-3 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
-                                    <div className="flex items-center gap-2">
-                                      <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-black text-[10px] text-primary">{s.userName.charAt(0).toUpperCase()}</div>
-                                      <span className="font-bold text-xs">{s.userName}</span>
-                                    </div>
-                                    <StatusBadge status={s.status} className="h-4 px-1 text-[8px]" />
-                                  </CardHeader>
-                                  <CardContent className="p-3 space-y-3">
-                                    <div className="flex flex-col gap-1">
-                                      <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Personnel Status</span>
-                                      <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">
-                                        "{s.remarks || 'Awaiting update...'}"
-                                      </p>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              ))}
+                          </TableCell>
+                          <TableCell><PriorityBadge priority={task.priority} /></TableCell>
+                          <TableCell>
+                            <span className="text-xs font-bold text-foreground">
+                              {getSummarizedAssignees(task)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <StatusBadge status={task.status} />
+                              <Badge variant="secondary" className="w-fit text-[8px] h-4 px-1 rounded-sm bg-primary/5 text-primary/60 border-none font-black uppercase">
+                                {completedCount}/{assignees.length} Finished
+                              </Badge>
                             </div>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </React.Fragment>
-                );
-              }) : (
-                <TableRow>
-                  <TableCell colSpan={8} className="h-40 text-center italic text-muted-foreground uppercase font-black text-[11px] opacity-20 tracking-[0.2em]">
-                    No tasks recorded for this selection
-                  </TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-1.5">
+                              <User className="h-3.5 w-3.5 text-primary opacity-60" />
+                              <span className="text-[10px] font-black uppercase text-muted-foreground">{task.assignedByName}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end items-center gap-1" onClick={e => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleWhatsAppShare(task)} title="Share on WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-8 w-8 text-primary hover:bg-primary/10 rounded-sm" 
+                                onClick={() => { 
+                                  setActionTask(task); 
+                                  const targetId = (task.assigneeIds || []).includes(user?.uid || "") ? user?.uid : (task.assigneeIds[0] || "");
+                                  setSelectedUpdateUserId(targetId || "");
+                                  setPendingStatus(task.assigneeStates?.[targetId || ""]?.status || "To-do");
+                                }}
+                                title="Update Status"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              {isAdmin && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingTask(task)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                        {expandedTaskIds.has(task.id) && (
+                          <TableRow className="bg-primary/[0.01]">
+                            <TableCell colSpan={8} className="p-0 border-b">
+                              <div className="p-6 px-20 space-y-6 animate-in slide-in-from-top-1 duration-200 text-left">
+                                <div className="flex items-center gap-2 border-b pb-2">
+                                  <ShieldCheck className="h-4 w-4 text-primary" />
+                                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Task Allotment Breakdown</h4>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                  {Object.values(task.assigneeStates || {}).map((s) => (
+                                    <Card key={s.userId} className="rounded-sm shadow-sm border-primary/5">
+                                      <CardHeader className="p-3 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
+                                        <div className="flex items-center gap-2">
+                                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-black text-[10px] text-primary">{s.userName.charAt(0).toUpperCase()}</div>
+                                          <span className="font-bold text-xs">{s.userName}</span>
+                                        </div>
+                                        <StatusBadge status={s.status} className="h-4 px-1 text-[8px]" />
+                                      </CardHeader>
+                                      <CardContent className="p-3 space-y-3">
+                                        <div className="flex flex-col gap-1">
+                                          <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Personnel Status</span>
+                                          <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">
+                                            "{s.remarks || 'Awaiting update...'}"
+                                          </p>
+                                        </div>
+                                      </CardContent>
+                                    </Card>
+                                  ))}
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  }) : (
+                    <TableRow>
+                      <TableCell colSpan={8} className="h-40 text-center italic text-muted-foreground uppercase font-black text-[11px] opacity-20 tracking-[0.2em]">
+                        No tasks recorded for this selection
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
         </div>
-      </>
-    );
-  }
-
-  return (
-    <div className="space-y-8 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-bold flex items-center gap-2">
-            <ListTodo className="h-8 w-8 text-primary" /> Task Board
-          </h1>
-          <p className="text-muted-foreground text-sm font-medium">Monitor and update site activity assignments.</p>
-        </div>
-        <Button onClick={() => router.push('/tasks/create')} className="rounded-sm font-bold shadow-md h-11 px-8">
-          Assign New Task
-        </Button>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4 animate-in slide-in-from-top-2 duration-300">
-        <SummaryCard title="Total Tasks" value={stats.total} icon={ListTodo} color="primary" description="Work Items Logged" />
-        <SummaryCard title="To-do" value={stats.todo} icon={Clock} color="amber" description="Awaiting Action" />
-        <SummaryCard title="In-progress" value={stats.inProgress} icon={Activity} color="blue" description="Currently Active" />
-        <SummaryCard title="Completed" value={stats.completed} icon={CheckCircle2} color="emerald" description="Work Finalized" />
-        <SummaryCard title="Cancelled" value={stats.cancelled} icon={XCircle} color="red" description="Requests Revoked" />
-      </div>
-
-      <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full md:w-auto">
-            <TabsList className="grid w-full grid-cols-3 md:w-[400px] rounded-sm bg-muted/50 h-10 p-1">
-              <TabsTrigger value="all" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">All Tasks</TabsTrigger>
-              <TabsTrigger value="my-tasks" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">My Tasks</TabsTrigger>
-              <TabsTrigger value="assigned-by-me" className="rounded-sm text-[10px] font-bold uppercase tracking-tight h-8">Assigned By Me</TabsTrigger>
-            </TabsList>
-          </Tabs>
-
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1 md:w-64">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input 
-                placeholder="Search title or personnel..." 
-                className="pl-9 h-10 rounded-sm border-primary/20 text-sm"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            <div className="w-[140px]">
-              <Select value={dateFilter} onValueChange={setDateFilter}>
-                <SelectTrigger className="h-10 rounded-sm border-primary/20 text-[10px] font-bold uppercase">
-                   <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
-                   <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Time</SelectItem>
-                  <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
-                  <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
-                  <SelectItem value="7days" className="text-[10px] font-bold uppercase">7 Days</SelectItem>
-                  <SelectItem value="lastMonth" className="text-[10px] font-bold uppercase">Month</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {renderTable()}
-
+      {/* Action Dialog */}
       <Dialog open={!!actionTask} onOpenChange={() => { setActionTask(null); setPendingStatus(""); setSelectedUpdateUserId(""); }}>
         <DialogContent className="rounded-sm max-w-lg">
           <DialogHeader className="p-0 border-b pb-4">
@@ -697,6 +703,7 @@ export default function TaskListPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingTask} onOpenChange={(o) => !o && setDeletingTask(null)}>
         <AlertDialogContent className="rounded-sm max-md w-[95vw]">
             <AlertDialogHeader>
@@ -719,7 +726,7 @@ export default function TaskListPage() {
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, color, description }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' | 'red', description: string }) {
+function SummaryCard({ title, value, icon: Icon, color, description, isLoading }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' | 'red', description: string, isLoading: boolean }) {
   const colors = {
     primary: "bg-primary/5 border-primary/10 text-primary",
     emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
@@ -735,7 +742,7 @@ function SummaryCard({ title, value, icon: Icon, color, description }: { title: 
         <Icon className="h-3.5 sm:h-4 sm:w-4" />
       </CardHeader>
       <CardContent className="p-3 sm:p-4 pt-0">
-        <div className="text-xl sm:text-2xl font-black">{value}</div>
+        {isLoading ? <Skeleton className="h-8 w-12 bg-muted" /> : <div className="text-xl sm:text-2xl font-black">{value}</div>}
         <p className="text-[8px] sm:text-[9px] text-muted-foreground mt-0.5 font-bold uppercase tracking-tighter opacity-60">{description}</p>
       </CardContent>
     </Card>
