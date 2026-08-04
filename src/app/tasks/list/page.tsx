@@ -63,6 +63,8 @@ import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
 
+const STATUS_OPTIONS = ["To-do", "In Progress", "Completed", "Cancelled"] as const;
+
 type AssigneeState = {
   userId: string;
   userName: string;
