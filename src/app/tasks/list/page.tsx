@@ -27,7 +27,8 @@ import {
   CircleX,
   MessageCircle,
   Activity,
-  XCircle
+  XCircle,
+  FileText
 } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { Input } from "@/components/ui/input";
@@ -243,6 +244,7 @@ export default function TaskListPage() {
         (task.assigneeIds || []).some(id => task.assigneeStates?.[id]?.userName.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
+      
       const matchesTab = activeTab === 'all' || 
         (activeTab === 'my-tasks' && (task.assigneeIds || []).includes(user?.uid || "")) ||
         (activeTab === 'assigned-by-me' && task.assignedById === user?.uid);
@@ -441,6 +443,11 @@ export default function TaskListPage() {
 
                 {expandedTaskIds.has(task.id) && (
                    <div className="pt-4 border-t space-y-4 animate-in slide-in-from-top-1">
+                      {/* Mobile Description Section */}
+                      <div className="p-3 bg-primary/5 border rounded-sm space-y-1">
+                         <span className="text-[8px] font-black uppercase text-primary tracking-widest">Original Instructions</span>
+                         <p className="text-[11px] italic text-muted-foreground leading-snug whitespace-pre-wrap">"{task.description}"</p>
+                      </div>
                       {Object.values(task.assigneeStates || {}).map(s => (
                         <div key={s.userId} className="p-3 bg-muted/20 border rounded-sm space-y-2">
                            <div className="flex justify-between items-center">
@@ -508,7 +515,7 @@ export default function TaskListPage() {
                     
                     return (
                       <React.Fragment key={task.id}>
-                        <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => toggleExpand(task.id)}>
+                        <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer group" onClick={() => toggleExpand(task.id)}>
                           <TableCell className="pl-4">
                             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm">
                               {expandedTaskIds.has(task.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
@@ -573,31 +580,47 @@ export default function TaskListPage() {
                         {expandedTaskIds.has(task.id) && (
                           <TableRow className="bg-primary/[0.01]">
                             <TableCell colSpan={8} className="p-0 border-b">
-                              <div className="p-6 px-20 space-y-6 animate-in slide-in-from-top-1 duration-200 text-left">
-                                <div className="flex items-center gap-2 border-b pb-2">
-                                  <ShieldCheck className="h-4 w-4 text-primary" />
-                                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Task Allotment Breakdown</h4>
+                              <div className="p-6 px-20 space-y-8 animate-in slide-in-from-top-1 duration-200 text-left">
+                                
+                                {/* Desktop Description Section */}
+                                <div className="space-y-3">
+                                  <div className="flex items-center gap-2 border-b pb-2">
+                                    <FileText className="h-4 w-4 text-primary" />
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Original Task Instructions</h4>
+                                  </div>
+                                  <div className="p-5 bg-background border border-primary/5 rounded-sm shadow-inner">
+                                    <p className="text-sm font-medium text-foreground/80 leading-relaxed italic whitespace-pre-wrap">
+                                      "{task.description || 'No detailed instructions provided.'}"
+                                    </p>
+                                  </div>
                                 </div>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                  {Object.values(task.assigneeStates || {}).map((s) => (
-                                    <Card key={s.userId} className="rounded-sm shadow-sm border-primary/5">
-                                      <CardHeader className="p-3 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
-                                        <div className="flex items-center gap-2">
-                                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-black text-[10px] text-primary">{s.userName.charAt(0).toUpperCase()}</div>
-                                          <span className="font-bold text-xs">{s.userName}</span>
-                                        </div>
-                                        <StatusBadge status={s.status} className="h-4 px-1 text-[8px]" />
-                                      </CardHeader>
-                                      <CardContent className="p-3 space-y-3">
-                                        <div className="flex flex-col gap-1">
-                                          <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Personnel Status</span>
-                                          <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">
-                                            "{s.remarks || 'Awaiting update...'}"
-                                          </p>
-                                        </div>
-                                      </CardContent>
-                                    </Card>
-                                  ))}
+
+                                <div className="space-y-4">
+                                  <div className="flex items-center gap-2 border-b pb-2">
+                                    <ShieldCheck className="h-4 w-4 text-primary" />
+                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Task Allotment Breakdown</h4>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    {Object.values(task.assigneeStates || {}).map((s) => (
+                                      <Card key={s.userId} className="rounded-sm shadow-sm border-primary/5">
+                                        <CardHeader className="p-3 bg-muted/10 border-b flex flex-row items-center justify-between space-y-0">
+                                          <div className="flex items-center gap-2">
+                                            <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center font-black text-[10px] text-primary">{s.userName.charAt(0).toUpperCase()}</div>
+                                            <span className="font-bold text-xs">{s.userName}</span>
+                                          </div>
+                                          <StatusBadge status={s.status} className="h-4 px-1 text-[8px]" />
+                                        </CardHeader>
+                                        <CardContent className="p-3 space-y-3">
+                                          <div className="flex flex-col gap-1">
+                                            <span className="text-[8px] font-black uppercase text-muted-foreground tracking-tighter">Personnel Status</span>
+                                            <p className="text-[11px] font-medium leading-relaxed italic text-foreground/80">
+                                              "{s.remarks || 'Awaiting update...'}"
+                                            </p>
+                                          </div>
+                                        </CardContent>
+                                      </Card>
+                                    ))}
+                                  </div>
                                 </div>
                               </div>
                             </TableCell>

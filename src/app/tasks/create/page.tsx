@@ -374,7 +374,7 @@ export default function CreateTaskPage() {
                               <span className="truncate">{site.name}</span>
                             </Button>
                           )) : (
-                            <div className="p-4 text-center text-sm text-muted-foreground italic">No authorized sites found.</div>
+                            <div className="p-4 text-center text-sm text-muted-foreground">No authorized sites found.</div>
                           )}
                         </ScrollArea>
                       </PopoverContent>
@@ -438,7 +438,9 @@ export default function CreateTaskPage() {
                                 }}
                               >
                                 <Checkbox checked={watchedRoles.includes(role.name)} className="rounded-full" />
-                                <span className={cn("text-xs font-bold uppercase transition-colors", watchedRoles.includes(role.name) ? "text-primary" : "text-foreground")}>{role.name}</span>
+                                <span className={cn("text-xs font-bold uppercase transition-colors", watchedRoles.includes(role.name) ? "text-primary" : "text-foreground")}>
+                                  All {role.name}s
+                                </span>
                               </div>
                             ))}
                           </div>
@@ -481,7 +483,7 @@ export default function CreateTaskPage() {
                 <div className="flex flex-wrap gap-2 pt-1">
                   {watchedRoles.map(role => (
                     <Badge key={role} variant="secondary" className="bg-primary/10 text-primary border-primary/20 h-6 pl-2 pr-1 gap-1 uppercase text-[9px] font-black">
-                      Role: {role}
+                      All {role}s
                       <Button variant="ghost" size="icon" className="h-4 w-4 p-0 hover:bg-transparent" onClick={() => form.setValue('assignedRoles', watchedRoles.filter(r => r !== role))}><X className="h-2.5 w-2.5" /></Button>
                     </Badge>
                   ))}
@@ -557,4 +559,3 @@ export default function CreateTaskPage() {
     </div>
   );
 }
-
