@@ -172,6 +172,10 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
     if (!userProfile) return false;
 
+    // Bypass for Purchase & Supply Chain department for inventory operations
+    const isPurchaseDept = userProfile.department === 'Purchase & Supply Chain' || userProfile.department === 'Procurement and Supply-chain';
+    if (isPurchaseDept && (key === 'inventory' || key === 'purchase-orders')) return true;
+
     // Use specific keys if defined in profile, otherwise role defaults
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
@@ -206,13 +210,17 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     const pageKey = getPageKeyByPath(pathname);
     if (!pageKey) return true; // Default allowed if not mapped to a specific system key
 
+    // Essential screens that bypass restriction logic
+    if (pageKey === 'rewards' || pageKey === 'reports') return true;
+
+    // Department bypass for Purchase & Supply Chain
+    const isPurchaseDept = userProfile.department === 'Purchase & Supply Chain' || userProfile.department === 'Procurement and Supply-chain';
+    if (isPurchaseDept && (pageKey === 'inventory' || pageKey === 'purchase-orders')) return true;
+
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
       : new Set(roleConfigs?.find(c => c.id === userRoleStr)?.allowedPageKeys || []);
 
-    // Essential screens that bypass restriction logic
-    if (pageKey === 'rewards' || pageKey === 'reports') return true;
-    
     if (allowedKeys.size === 0) return false; 
     
     return allowedKeys.has(pageKey);

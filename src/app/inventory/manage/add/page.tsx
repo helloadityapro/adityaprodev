@@ -78,6 +78,8 @@ export default function AddMasterItemPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isPurchaseDept = userProfile?.department === 'Purchase & Supply Chain' || userProfile?.department === 'Procurement and Supply-chain';
+  const canManage = isAdmin || isPurchaseDept;
 
   const categoriesQuery = useMemoFirebase(() => 
     collection(firestore, 'inventory_categories'), 
@@ -124,7 +126,7 @@ export default function AddMasterItemPage() {
   }, [watchName, existingItems]);
 
   const onSubmit = async (values: z.infer<typeof itemSchema>) => {
-    if (!isAdmin) return;
+    if (!canManage) return;
     
     // Duplicate check: Verify if Name AND Make match an existing item
     const isDuplicate = existingItems?.some(item => 
@@ -156,7 +158,7 @@ export default function AddMasterItemPage() {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
 
-  if (!isAdmin) return null;
+  if (!canManage) return null;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20 max-w-3xl mx-auto">

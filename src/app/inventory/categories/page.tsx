@@ -1,9 +1,11 @@
+
 'use client';
 
 import * as React from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
+import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -52,6 +54,8 @@ export default function ManageCategoriesPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isPurchaseDept = userProfile?.department === 'Purchase & Supply Chain' || userProfile?.department === 'Procurement and Supply-chain';
+  const canManage = isAdmin || isPurchaseDept;
 
   const categoriesQuery = useMemoFirebase(() => 
     query(collection(firestore, 'inventory_categories'), orderBy('name', 'asc')), 
@@ -65,7 +69,7 @@ export default function ManageCategoriesPage() {
   });
 
   const onSubmit = async (values: z.infer<typeof categorySchema>) => {
-    if (!isAdmin) return;
+    if (!canManage) return;
     setIsSubmitting(true);
     try {
       await addDocumentNonBlocking(collection(firestore, 'inventory_categories'), {
@@ -82,7 +86,7 @@ export default function ManageCategoriesPage() {
   };
 
   const handleDelete = (id: string) => {
-    if (!isAdmin) return;
+    if (!canManage) return;
     deleteDocumentNonBlocking(doc(firestore, 'inventory_categories', id));
     toast({ title: 'Category Removed' });
   };
@@ -96,12 +100,12 @@ export default function ManageCategoriesPage() {
     );
   }
 
-  if (!isAdmin) {
+  if (!canManage) {
     return (
       <div className="p-12 text-center flex flex-col items-center gap-4">
         <AlertCircle className="h-12 w-12 text-destructive opacity-50" />
         <h2 className="text-xl font-bold">Unauthorized Access</h2>
-        <p className="text-muted-foreground">Only administrators can manage inventory categories.</p>
+        <p className="text-muted-foreground">Only authorized personnel can manage inventory categories.</p>
         <Button variant="outline" asChild><Link href="/inventory">Back to Inventory</Link></Button>
       </div>
     );
@@ -111,7 +115,7 @@ export default function ManageCategoriesPage() {
     <div className="space-y-8 animate-in fade-in duration-500 max-w-4xl mx-auto">
       <div className="flex flex-col gap-1">
         <Button variant="ghost" size="sm" asChild className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary">
-          <Link href="/inventory"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Inventory</Link>
+          <Link href="/inventory/manage"><ArrowLeft className="mr-2 h-4 w-4" /> Back to Inventory</Link>
         </Button>
         <h1 className="flex items-center gap-2">
           <Tag className="h-8 w-8 text-primary" /> Product Categories

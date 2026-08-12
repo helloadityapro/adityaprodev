@@ -93,6 +93,8 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
     }
   };
 
+  const isPurchaseDept = userDepartment === 'Purchase & Supply Chain' || userDepartment === 'Procurement and Supply-chain';
+
   return (
     <div className="flex flex-col gap-4 py-2 flex-1">
       {/* Main Section */}
@@ -250,7 +252,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                    {canShow('admin-settings') && (
+                    {(canShow('admin-settings') || isPurchaseDept) && (
                       <>
                         <SidebarMenuSubItem>
                           <SidebarMenuSubButton asChild isActive={pathname === '/inventory/manage'} onClick={handleMobileClose}>
@@ -775,13 +777,12 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                  )}
-                </SidebarMenuSub>
-              </CollapsibleContent>
-            </SidebarMenuItem>
-          </Collapsible>
-        </SidebarMenu>
-      </SidebarGroup>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          </SidebarMenu>
+        </SidebarGroup>
 
       {/* Checklists Section - Globally Accessible */}
       <SidebarGroup>
@@ -806,39 +807,39 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/inverter'} onClick={handleMobileClose}>
-                      <Link href="/checklists/inverter">
-                        <Cpu className="h-4 w-4" />
-                        <span>Inverter Checklist</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-line'} onClick={handleMobileClose}>
-                      <Link href="/checklists/ht-line">
-                        <Zap className="h-4 w-4" />
-                        <span>HT Line Checklist</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-conductor'} onClick={handleMobileClose}>
-                      <Link href="/checklists/ht-conductor">
-                        <Zap className="h-4 w-4" />
-                        <span>HT Conductor Checklist</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
-                  <SidebarMenuSubItem>
-                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
-                      <Link href="/checklists/data">
-                        <Database className="h-4 w-4" />
-                        <span>Checklists Data</span>
-                      </Link>
-                    </SidebarMenuSubButton>
-                  </SidebarMenuSubItem>
                 </SidebarMenuSub>
+                <SidebarMenuSubItem>
+                  <SidebarMenuSubButton asChild isActive={pathname === '/checklists/inverter'} onClick={handleMobileClose}>
+                    <Link href="/checklists/inverter">
+                      <Cpu className="h-4 w-4" />
+                      <span>Inverter Checklist</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+                <SidebarMenuSubItem>
+                  <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-line'} onClick={handleMobileClose}>
+                    <Link href="/checklists/ht-line">
+                      <Zap className="h-4 w-4" />
+                      <span>HT Line Checklist</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+                <SidebarMenuSubItem>
+                  <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-conductor'} onClick={handleMobileClose}>
+                    <Link href="/checklists/ht-conductor">
+                      <Zap className="h-4 w-4" />
+                      <span>HT Conductor Checklist</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
+                <SidebarMenuSubItem>
+                  <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
+                    <Link href="/checklists/data">
+                      <Database className="h-4 w-4" />
+                      <span>Checklists Data</span>
+                    </Link>
+                  </SidebarMenuSubButton>
+                </SidebarMenuSubItem>
               </CollapsibleContent>
             </SidebarMenuItem>
           </Collapsible>

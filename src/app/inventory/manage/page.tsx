@@ -113,6 +113,8 @@ export default function ManageMasterInventoryPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isPurchaseDept = userProfile?.department === 'Purchase & Supply Chain' || userProfile?.department === 'Procurement and Supply-chain';
+  const canManage = isAdmin || isPurchaseDept;
 
   const itemsQuery = useMemoFirebase(() => collection(firestore, 'master_inventory'), [firestore]);
   const { data: items, isLoading: isItemsLoading } = useCollection<MasterItem>(itemsQuery);
@@ -288,7 +290,7 @@ export default function ManageMasterInventoryPage() {
   }, [items, searchTerm, categoryFilter, sortConfig]);
 
   const handleSyncMakes = async () => {
-    if (!items || !makesList) return;
+    if (!canManage || !items || !makesList) return;
     setIsReconciling(true);
     try {
         const batch = writeBatch(firestore);
@@ -334,6 +336,8 @@ export default function ManageMasterInventoryPage() {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
   }
 
+  if (!canManage) return null;
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -343,19 +347,17 @@ export default function ManageMasterInventoryPage() {
           </h1>
           <p className="text-muted-foreground text-sm font-medium">Define global materials, components, and set-breakdowns for organizational use.</p>
         </div>
-        {isAdmin && (
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={handleSyncMakes} disabled={isReconciling} className="h-11 rounded-sm font-bold border-primary/20 text-primary">
-                {isReconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                Reconcile Item Makes
-            </Button>
-            <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
-                <Link href="/inventory/manage/add">
-                <Plus className="mr-2 h-4 w-4" /> Add New Item
-                </Link>
-            </Button>
-          </div>
-        )}
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={handleSyncMakes} disabled={isReconciling} className="h-11 rounded-sm font-bold border-primary/20 text-primary">
+              {isReconciling ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+              Reconcile Item Makes
+          </Button>
+          <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
+              <Link href="/inventory/manage/add">
+              <Plus className="mr-2 h-4 w-4" /> Add New Item
+              </Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
@@ -448,7 +450,7 @@ export default function ManageMasterInventoryPage() {
                       </TableCell>
                       <TableCell className="text-right px-6">
                         <div className="flex justify-end items-center gap-1">
-                          {isAdmin && (
+                          {canManage && (
                             <>
                               <Button 
                                 variant="ghost" 
