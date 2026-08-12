@@ -777,12 +777,13 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
-                  </SidebarMenuSub>
-                </CollapsibleContent>
-              </SidebarMenuItem>
-            </Collapsible>
-          </SidebarMenu>
-        </SidebarGroup>
+                  )}
+                </SidebarMenuSub>
+              </CollapsibleContent>
+            </SidebarMenuItem>
+          </Collapsible>
+        </SidebarMenu>
+      </SidebarGroup>
 
       {/* Checklists Section - Globally Accessible */}
       <SidebarGroup>
@@ -807,39 +808,39 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/inverter'} onClick={handleMobileClose}>
+                      <Link href="/checklists/inverter">
+                        <Cpu className="h-4 w-4" />
+                        <span>Inverter Checklist</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-line'} onClick={handleMobileClose}>
+                      <Link href="/checklists/ht-line">
+                        <Zap className="h-4 w-4" />
+                        <span>HT Line Checklist</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-conductor'} onClick={handleMobileClose}>
+                      <Link href="/checklists/ht-conductor">
+                        <Zap className="h-4 w-4" />
+                        <span>HT Conductor Checklist</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
+                      <Link href="/checklists/data">
+                        <Database className="h-4 w-4" />
+                        <span>Checklists Data</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
                 </SidebarMenuSub>
-                <SidebarMenuSubItem>
-                  <SidebarMenuSubButton asChild isActive={pathname === '/checklists/inverter'} onClick={handleMobileClose}>
-                    <Link href="/checklists/inverter">
-                      <Cpu className="h-4 w-4" />
-                      <span>Inverter Checklist</span>
-                    </Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
-                <SidebarMenuSubItem>
-                  <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-line'} onClick={handleMobileClose}>
-                    <Link href="/checklists/ht-line">
-                      <Zap className="h-4 w-4" />
-                      <span>HT Line Checklist</span>
-                    </Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
-                <SidebarMenuSubItem>
-                  <SidebarMenuSubButton asChild isActive={pathname === '/checklists/ht-conductor'} onClick={handleMobileClose}>
-                    <Link href="/checklists/ht-conductor">
-                      <Zap className="h-4 w-4" />
-                      <span>HT Conductor Checklist</span>
-                    </Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
-                <SidebarMenuSubItem>
-                  <SidebarMenuSubButton asChild isActive={pathname === '/checklists/data'} onClick={handleMobileClose}>
-                    <Link href="/checklists/data">
-                      <Database className="h-4 w-4" />
-                      <span>Checklists Data</span>
-                    </Link>
-                  </SidebarMenuSubButton>
-                </SidebarMenuSubItem>
               </CollapsibleContent>
             </SidebarMenuItem>
           </Collapsible>

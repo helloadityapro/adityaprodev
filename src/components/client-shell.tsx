@@ -165,7 +165,6 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === "Admin";
-  const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
   const canShow = React.useCallback((key: PageKey): boolean => {
@@ -275,6 +274,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   const ptwQueryForBadge = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'permits_to_work');
+    const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
     
     if (userRole === 'Admin') {
       return query(colRef, where('status', '==', 'ManagerApproved'), limit(100));
@@ -290,7 +290,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     }
     
     return null;
-  }, [firestore, userRole, user, isProfileLoading]);
+  }, [firestore, user, isProfileLoading, isAdmin, userProfile?.role]);
   
   const { data: permitsForBadge } = useCollection(ptwQueryForBadge);
 
@@ -423,7 +423,12 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
           </div>
         </SidebarHeader>
         <SidebarContent>
-          <MainNav userRole={userRole} userDepartment={userProfile?.department || ""} pendingPtwCount={pendingPtwCount} canShow={canShow} />
+          <MainNav 
+            userRole={isAdmin ? "Admin" : userProfile?.role || "Site Engineer"} 
+            userDepartment={userProfile?.department || ""} 
+            pendingPtwCount={pendingPtwCount} 
+            canShow={canShow} 
+          />
         </SidebarContent>
       </Sidebar>
       <SidebarInset className="flex flex-col h-full overflow-hidden relative">
