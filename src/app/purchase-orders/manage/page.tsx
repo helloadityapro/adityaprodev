@@ -142,6 +142,11 @@ function getDisplayItems(items: POItem[]) {
   });
 }
 
+function SortIcon({ column, config }: { column: POSortKey, config: { key: POSortKey; direction: 'asc' | 'desc' } }) {
+  if (config.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+}
+
 export default function GlobalManagePOsPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -265,11 +270,6 @@ export default function GlobalManagePOsPage() {
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
-  };
-
-  const SortIcon = ({ column }: { column: POSortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   const toggleRow = (id: string) => {
@@ -588,34 +588,45 @@ export default function GlobalManagePOsPage() {
       {/* Desktop Table View */}
       <div className="hidden md:block">
         <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+          <CardHeader className="bg-muted/5 border-b py-4 flex flex-row items-center justify-between">
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <CardTitle className="text-sm font-bold uppercase tracking-widest">Purchase Order Registry</CardTitle>
+                <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] bg-primary/5 text-primary border-primary/10 h-6">
+                  {filteredPOs.length} Records
+                </Badge>
+              </div>
+              <CardDescription className="text-[10px] font-bold text-muted-foreground uppercase">Records Management</CardDescription>
+            </div>
+          </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader className="bg-muted/30">
                   <TableRow>
                     <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('poNumber')}>
-                      <div className="flex items-center">PO Number <SortIcon column="poNumber" /></div>
+                      <div className="flex items-center">PO Number <SortIcon column="poNumber" config={sortConfig} /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
-                      <div className="flex items-center">Project Site <SortIcon column="site" /></div>
+                      <div className="flex items-center">Project Site <SortIcon column="site" config={sortConfig} /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('supplier')}>
-                      <div className="flex items-center">Supplier <SortIcon column="supplier" /></div>
+                      <div className="flex items-center">Supplier <SortIcon column="supplier" config={sortConfig} /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('createdBy')}>
-                      <div className="flex items-center">Created by <SortIcon column="createdBy" /></div>
+                      <div className="flex items-center">Created by <SortIcon column="createdBy" config={sortConfig} /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('createdAt')}>
-                      <div className="flex items-center">Created Date <SortIcon column="createdAt" /></div>
+                      <div className="flex items-center">Created Date <SortIcon column="createdAt" config={sortConfig} /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
-                      <div className="flex items-center">Order Date <SortIcon column="date" /></div>
+                      <div className="flex items-center">Order Date <SortIcon column="date" config={sortConfig} /></div>
                     </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('status')}>
-                      <div className="flex items-center">Status <SortIcon column="status" /></div>
+                      <div className="flex items-center">Status <SortIcon column="status" config={sortConfig} /></div>
                     </TableHead>
                     <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('total')}>
-                      <div className="flex items-center justify-end">Total Amount <SortIcon column="total" /></div>
+                      <div className="flex items-center justify-end">Total Amount <SortIcon column="total" config={sortConfig} /></div>
                     </TableHead>
                     <TableHead className="text-right px-6">Actions</TableHead>
                   </TableRow>
