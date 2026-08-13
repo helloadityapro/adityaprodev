@@ -37,7 +37,7 @@ import {
   Clock,
   MessageCircle
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, subDays, subMonths, subYears } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -107,12 +107,18 @@ type AccessConfig = {
   ownDataOnly?: boolean;
 };
 
-type POSortKey = 'poNumber' | 'site' | 'supplier' | 'status' | 'date' | 'total' | 'createdBy';
+type POSortKey = 'poNumber' | 'site' | 'supplier' | 'status' | 'date' | 'total' | 'createdBy' | 'createdAt';
 
 const formatTimestamp = (ts: any) => {
   if (!ts) return '—';
   const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
   return format(date, 'dd/MM/yyyy HH:mm');
+};
+
+const formatDateOnly = (ts: any) => {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd MMM yy');
 };
 
 /**
@@ -146,6 +152,7 @@ export default function GlobalManagePOsPage() {
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [dateFilter, setDateFilter] = React.useState("allTime");
   const [sortConfig, setSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set());
   const [poToDelete, setPoToDelete] = React.useState<PurchaseOrder | null>(null);
@@ -163,7 +170,7 @@ export default function GlobalManagePOsPage() {
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
-  const isProcurement = userProfile?.department === 'Purchase & Supply Chain';
+  const isProcurement = userProfile?.department === 'Purchase & Supply Chain' || userProfile?.department === 'Procurement and Supply-chain';
 
   const canApprove = isAdmin || isProcurement;
 
@@ -185,17 +192,20 @@ export default function GlobalManagePOsPage() {
     }
   }, [searchParams, allPOs]);
 
-  const handleSort = (key: POSortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
-
-  const SortIcon = ({ column }: { column: POSortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
-  };
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today': return { start: todayStr, end: todayStr };
+      case 'yesterday': return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
+      case '7days': return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear': return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime': return { start: '1970-01-01', end: '2099-12-31' };
+      default: return { start: '1970-01-01', end: '2099-12-31' };
+    }
+  }, [dateFilter]);
 
   const filteredPOs = React.useMemo(() => {
     if (!allPOs || !userProfile) return [];
@@ -204,6 +214,7 @@ export default function GlobalManagePOsPage() {
       ? userProfile.ownDataOnly 
       : roleConfigs?.find(c => c.id === slugifyRole(userProfile.role || ""))?.ownDataOnly ?? false;
 
+    const { start, end } = queryDateRange;
     let result = allPOs;
 
     if (isOwnDataOnly && !isSuper) {
@@ -212,6 +223,9 @@ export default function GlobalManagePOsPage() {
     }
 
     result = result.filter(po => {
+      const rDate = po.createdAt?.toDate?.() || new Date(po.createdAt);
+      const rDateStr = format(rDate, 'yyyy-MM-dd');
+      
       const matchesSearch = 
         po.poNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         po.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -219,8 +233,9 @@ export default function GlobalManagePOsPage() {
         (po.createdByName || '').toLowerCase().includes(searchTerm.toLowerCase());
       
       const matchesStatus = statusFilter === 'all' || po.status === statusFilter;
+      const matchesDate = rDateStr >= start && rDateStr <= end;
       
-      return matchesSearch && matchesStatus;
+      return matchesSearch && matchesStatus && matchesDate;
     });
 
     result.sort((a, b) => {
@@ -235,6 +250,7 @@ export default function GlobalManagePOsPage() {
       else if (key === 'date') { valA = new Date(a.orderDate).getTime(); valB = new Date(b.orderDate).getTime(); }
       else if (key === 'total') { valA = a.totalAmount || 0; valB = b.totalAmount || 0; }
       else if (key === 'createdBy') { valA = (a.createdByName || "").toLowerCase(); valB = (b.createdByName || "").toLowerCase(); }
+      else if (key === 'createdAt') { valA = a.createdAt?.toDate?.()?.getTime() || 0; valB = b.createdAt?.toDate?.()?.getTime() || 0; }
 
       if (valA < valB) return direction === 'asc' ? -1 : 1;
       if (valA > valB) return direction === 'asc' ? 1 : -1;
@@ -242,7 +258,7 @@ export default function GlobalManagePOsPage() {
     });
 
     return result;
-  }, [allPOs, searchTerm, statusFilter, sortConfig, userProfile, roleConfigs, isSuper]);
+  }, [allPOs, searchTerm, statusFilter, dateFilter, queryDateRange, sortConfig, userProfile, roleConfigs, isSuper]);
 
   const toggleRow = (id: string) => {
     const newSet = new Set(expandedRows);
@@ -395,7 +411,8 @@ export default function GlobalManagePOsPage() {
       'Site': po.siteName,
       'Supplier': po.supplierName,
       'Created by': po.createdByName || '—',
-      'Date': po.orderDate,
+      'Created Date': po.createdAt ? format(po.createdAt.toDate(), 'dd-MM-yyyy HH:mm') : '—',
+      'Order Date': po.orderDate,
       'Status': po.status,
       'Amount (INR)': po.totalAmount
     }));
@@ -418,27 +435,35 @@ export default function GlobalManagePOsPage() {
     router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
+    setDateFilter("allTime");
+  };
+
   if (isProfileLoading || isPOsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-64 w-full" /></div>;
   }
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <ShoppingBag className="h-6 w-6 text-primary" />
-            <h1>Manage Purchase Orders</h1>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="h-6 w-6 text-primary" />
+              <h1>Manage Purchase Orders</h1>
+            </div>
+            <p className="text-muted-foreground text-sm font-medium">Organizational overview of all procurement activities and authorizations.</p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Organizational overview of all procurement activities and authorizations.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={handleExportCSV} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
-            <FileDown className="h-4 w-4 mr-2" /> Export Excel
-          </Button>
-          <Button onClick={() => router.push('/purchase-orders/create')} className="h-10 rounded-sm font-bold shadow-md px-6">
-            <Plus className="h-4 w-4 mr-2" /> New Purchase Order
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleExportCSV} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+              <FileDown className="h-4 w-4 mr-2" /> Export Excel
+            </Button>
+            <Button onClick={() => router.push('/purchase-orders/create')} className="h-10 rounded-sm font-bold shadow-md px-6">
+              <Plus className="h-4 w-4 mr-2" /> New Purchase Order
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -452,20 +477,36 @@ export default function GlobalManagePOsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-[160px]">
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 bg-background">
+                <Calendar className="h-3.5 w-3.5 mr-2 opacity-50" />
+                <SelectValue placeholder="Time Filter" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
+                <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+                <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
             <SelectTrigger className="w-[160px] h-10 text-xs font-bold uppercase tracking-tight rounded-sm border-primary/20 bg-background">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all" className="text-xs font-bold uppercase">All Records</SelectItem>
+              <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
               <SelectItem value="Pending" className="text-xs font-bold uppercase text-amber-600">Pending</SelectItem>
               <SelectItem value="Accepted" className="text-xs font-bold uppercase text-green-600">Accepted</SelectItem>
               <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-600">Rejected</SelectItem>
               <SelectItem value="Cancelled" className="text-xs font-bold uppercase">Cancelled</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }} className="h-10 w-10 text-muted-foreground rounded-sm">
+          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm">
             <FilterX className="h-4 w-4" />
           </Button>
         </div>
@@ -508,6 +549,10 @@ export default function GlobalManagePOsPage() {
                   <User className="h-3.5 w-3.5" />
                   {po.createdByName || '—'}
                 </div>
+                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase">
+                  <Clock className="h-3 w-3" />
+                  Created: {formatDateOnly(po.createdAt)}
+                </div>
               </div>
 
               <div className="flex items-center justify-between pt-2 border-t border-primary/5">
@@ -548,6 +593,9 @@ export default function GlobalManagePOsPage() {
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('createdBy')}>
                       <div className="flex items-center">Created by <SortIcon column="createdBy" /></div>
                     </TableHead>
+                    <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('createdAt')}>
+                      <div className="flex items-center">Created Date <SortIcon column="createdAt" /></div>
+                    </TableHead>
                     <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                       <div className="flex items-center">Order Date <SortIcon column="date" /></div>
                     </TableHead>
@@ -579,6 +627,9 @@ export default function GlobalManagePOsPage() {
                             <User className="h-3.5 w-3.5 text-primary opacity-40" />
                             {po.createdByName || '—'}
                           </div>
+                        </TableCell>
+                        <TableCell className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                          {formatDateOnly(po.createdAt)}
                         </TableCell>
                         <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                         <TableCell>
@@ -635,7 +686,7 @@ export default function GlobalManagePOsPage() {
                       </TableRow>
                       {expandedRows.has(po.id) && po.items && (
                         <TableRow className="bg-muted/20">
-                          <TableCell colSpan={8} className="p-0 border-b">
+                          <TableCell colSpan={9} className="p-0 border-b">
                             <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
                               <div className="flex items-center gap-2 mb-2">
                                 <Layers className="h-3.5 w-3.5 text-primary" />
@@ -667,7 +718,7 @@ export default function GlobalManagePOsPage() {
                       )}
                     </React.Fragment>
                   )) : (
-                    <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic">No purchase orders discovered in registry.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={9} className="h-48 text-center text-muted-foreground italic">No purchase orders discovered in registry.</TableCell></TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -722,11 +773,17 @@ export default function GlobalManagePOsPage() {
                       </div>
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Created by</Label>
-                      <p className="text-sm font-bold flex items-center gap-2">
-                        <User className="h-4 w-4 text-primary opacity-40" />
-                        {viewingPO.createdByName || '—'}
-                      </p>
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">System Record</Label>
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-2 text-sm font-bold">
+                          <User className="h-4 w-4 text-primary opacity-40" />
+                          {viewingPO.createdByName || '—'}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                           <Clock className="h-3.5 w-3.5" />
+                           Created: {formatTimestamp(viewingPO.createdAt)}
+                        </div>
+                      </div>
                     </div>
                   </div>
                   
