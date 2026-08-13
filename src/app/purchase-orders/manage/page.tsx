@@ -260,6 +260,18 @@ export default function GlobalManagePOsPage() {
     return result;
   }, [allPOs, searchTerm, statusFilter, dateFilter, queryDateRange, sortConfig, userProfile, roleConfigs, isSuper]);
 
+  const handleSort = (key: POSortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: POSortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  };
+
   const toggleRow = (id: string) => {
     const newSet = new Set(expandedRows);
     if (newSet.has(id)) newSet.delete(id);
@@ -936,7 +948,7 @@ export default function GlobalManagePOsPage() {
                 handleProcessPO(remarks);
               }}
             >
-              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${poActionState?.type}`}
+              {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : `Confirm ${poActionState?.type}`}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -958,7 +970,7 @@ export default function GlobalManagePOsPage() {
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+function SummaryCard({ title, value, icon: Icon, color, description, isLoading }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber', description: string, isLoading?: boolean }) {
   const colors = {
     primary: "bg-primary/5 border-primary/10 text-primary",
     emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
@@ -973,7 +985,8 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
         <Icon className="h-3.5 sm:h-4 sm:w-4" />
       </CardHeader>
       <CardContent className="p-3 sm:p-4 pt-0">
-        <div className="text-xl sm:text-2xl font-black">{value}</div>
+        {isLoading ? <Skeleton className="h-8 w-12 bg-muted" /> : <div className="text-xl sm:text-2xl font-black">{value}</div>}
+        <p className="text-[8px] sm:text-[9px] text-muted-foreground mt-0.5 font-bold uppercase tracking-tighter opacity-60">{description}</p>
       </CardContent>
     </Card>
   );
