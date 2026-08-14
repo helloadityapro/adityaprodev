@@ -6,7 +6,7 @@ import { collection, query, orderBy, doc, limit, where } from "firebase/firestor
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format } from "date-fns";
+import { format, subDays, subMonths, subYears } from "date-fns";
 import { 
   Table as TableIcon, 
   Search, 
@@ -94,27 +94,6 @@ type Movement = {
   createdAt: any;
 };
 
-type UserProfile = {
-  id: string;
-  username: string;
-  role: string;
-  siteManagerId?: string;
-  assignedProjectIds?: string[];
-  ownDataOnly?: boolean;
-};
-
-type AccessConfig = {
-  id: string;
-  ownDataOnly?: boolean;
-};
-
-type MappingOverride = {
-  id: string;
-  engineerId: string;
-  siteId: string;
-  managerId: string;
-};
-
 type SortKey = 'date' | 'site' | 'item' | 'quantity' | 'personnel' | 'flow' | 'createdAt';
 
 export default function MovementDataPage() {
@@ -124,6 +103,7 @@ export default function MovementDataPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteFilter, setSiteFilter] = React.useState("all");
+  const [dateFilter, setDateFilter] = React.useState("allTime");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ 
     key: 'createdAt', 
     direction: 'desc' 
@@ -137,13 +117,13 @@ export default function MovementDataPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
-  const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
+  const { data: roleConfigs } = useCollection<any>(roleConfigsQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<{ name: string, id: string }>(sitesQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+  const { data: allOverrides } = useCollection<any>(overridesQuery);
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
@@ -168,10 +148,10 @@ export default function MovementDataPage() {
 
     const siteIds = new Set<string>();
     if (isManager) {
-      allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
+      allOverrides?.filter((o: any) => o.managerId === userProfile.id).forEach((o: any) => siteIds.add(o.siteId));
       teamMembers?.forEach(member => {
-        (member.assignedProjectIds || []).forEach(sid => {
-          const hasOtherOverride = allOverrides?.some(o => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
+        (member.assignedProjectIds || []).forEach((sid: string) => {
+          const hasOtherOverride = allOverrides?.some((o: any) => o.engineerId === member.id && o.siteId === sid && o.managerId !== userProfile.id);
           if (!hasOtherOverride) siteIds.add(sid);
         });
       });
@@ -189,25 +169,50 @@ export default function MovementDataPage() {
   );
   const { data: movements, isLoading } = useCollection<Movement>(dataQuery);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today':
+        return { start: todayStr, end: todayStr };
+      case 'yesterday':
+        const yesterday = format(subDays(today, 1), 'yyyy-MM-dd');
+        return { start: yesterday, end: yesterday };
+      case '7days':
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth':
+        return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear':
+        return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime':
+        return { start: '1970-01-01', end: '2099-12-31' };
+      default:
+        return { start: '1970-01-01', end: '2099-12-31' };
+    }
+  }, [dateFilter]);
+
   const filteredData = React.useMemo(() => {
     if (!movements || !userProfile) return [];
     
+    const { start, end } = queryDateRange;
     let result = movements;
 
     if (!isAdmin) {
       result = result.filter(m => accessibleSiteIds.has(m.siteId) || m.userId === user?.uid);
     }
 
-    result = result.filter(m => 
-      m.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      m.sourceOrDestination.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
-    if (siteFilter !== 'all') {
-      result = result.filter(m => m.siteName === siteFilter);
-    }
+    result = result.filter(m => {
+      const matchesSearch = m.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        m.sourceOrDestination.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      const dateMatch = m.movementDate >= start && m.movementDate <= end;
+      const matchesSite = siteFilter === 'all' || m.siteName === siteFilter;
+      
+      return matchesSearch && dateMatch && matchesSite;
+    });
 
     result.sort((a, b) => {
       const { key, direction } = sortConfig;
@@ -225,7 +230,7 @@ export default function MovementDataPage() {
     });
 
     return result;
-  }, [movements, searchTerm, siteFilter, sortConfig, isAdmin, accessibleSiteIds, user]);
+  }, [movements, searchTerm, siteFilter, queryDateRange, sortConfig, isAdmin, accessibleSiteIds, user, userProfile]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -242,6 +247,7 @@ export default function MovementDataPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setSiteFilter("all");
+    setDateFilter("allTime");
   };
 
   const handleDeleteMovement = async () => {
@@ -300,7 +306,23 @@ export default function MovementDataPage() {
           <Input placeholder="Search..." className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="w-[140px]">
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-[10px] uppercase">
+                <Calendar className="h-3.5 w-3.5 mr-1.5 opacity-50" />
+                <SelectValue placeholder="Range" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="allTime" className="text-[10px] font-bold uppercase">All Time</SelectItem>
+                <SelectItem value="today" className="text-[10px] font-bold uppercase">Today</SelectItem>
+                <SelectItem value="yesterday" className="text-[10px] font-bold uppercase">Yesterday</SelectItem>
+                <SelectItem value="7days" className="text-[10px] font-bold uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-[10px] font-bold uppercase">Last Month</SelectItem>
+                <SelectItem value="lastYear" className="text-[10px] font-bold uppercase">Last Year</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <Select value={siteFilter} onValueChange={setSiteFilter}>
             <SelectTrigger className="w-[180px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background">
               <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
@@ -327,7 +349,7 @@ export default function MovementDataPage() {
               <TableHeader className="bg-muted/30">
                 <TableRow>
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('createdAt')}>
-                    <div className="flex items-center">Submission Timestamp <SortIcon column="createdAt" /></div>
+                    <div className="flex items-center">Log Timestamp <SortIcon column="createdAt" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Movement Date <SortIcon column="date" /></div>
@@ -361,7 +383,12 @@ export default function MovementDataPage() {
                     </TableCell>
                     <TableCell className="font-bold text-sm text-foreground"><div className="flex items-center gap-2"><MapPin className="h-3 w-3 text-primary" />{m.siteName}</div></TableCell>
                     <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-2 h-5", m.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>{m.movementType}</Badge></TableCell>
-                    <TableCell><div className="flex flex-col"><span className="font-bold text-sm truncate max-w-[200px]" title={m.itemName}>{m.itemName}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">{m.sourceOrDestination}</span></div></TableCell>
+                    <TableCell>
+                      <div className="flex flex-col max-w-[250px]">
+                        <span className="font-bold text-sm text-foreground leading-tight break-words" title={m.itemName}>{m.itemName}</span>
+                        <span className="text-[9px] font-bold text-muted-foreground uppercase mt-1">{m.sourceOrDestination}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="text-center font-black text-primary font-mono text-sm">{m.quantity} {m.unit}</TableCell>
                     <TableCell className="text-right px-6 whitespace-nowrap">
                       <div className="flex justify-end items-center gap-1">
@@ -467,7 +494,7 @@ export default function MovementDataPage() {
                     </Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {viewingMovement.attachments.map((att, idx) => (
-                        <div key={idx} className="flex items-center justify-between p-3 border rounded-sm bg-background group hover:border-primary/30 transition-all">
+                        <div className="flex items-center justify-between p-3 border rounded-sm bg-background group hover:border-primary/30 transition-all">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="p-2 bg-muted rounded-sm"><FileText className="h-4 w-4 text-primary" /></div>
                             <span className="text-[10px] font-bold truncate max-w-[120px]" title={att.name}>{att.name}</span>
