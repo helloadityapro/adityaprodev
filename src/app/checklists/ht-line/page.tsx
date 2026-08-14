@@ -49,6 +49,7 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import imageCompression from 'browser-image-compression';
 import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
 
 const POLE_SIZES = [
   "RSJ 152 X 152, 13 Mtr Long Pole",
@@ -508,7 +509,7 @@ export default function HTLineChecklistPage() {
           <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden">
             <CardContent className="p-6 sm:p-8 space-y-8">
               <FormField control={form.control} name="undertaking" render={({ field }) => (
-                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-5 rounded-sm bg-primary/5 border border-primary/20">
+                <FormItem className="flex flex-row items-start space-x-3 space-y-0 p-4 sm:p-6 rounded-sm bg-primary/5 border border-primary/20">
                   <FormControl><Checkbox checked={field.value} onCheckedChange={field.onChange} className="mt-1" /></FormControl>
                   <div className="space-y-1">
                     <FormLabel className="text-xs sm:text-sm text-foreground leading-relaxed cursor-pointer font-bold">
@@ -521,7 +522,7 @@ export default function HTLineChecklistPage() {
             </CardContent>
           </Card>
           
-          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4 sm:pt-8">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 pt-8">
             <Button type="button" variant="outline" onClick={() => router.back()} className="rounded-sm font-bold h-12 sm:w-32 order-2 sm:order-1">Cancel</Button>
             <Button type="submit" disabled={isSubmitting} className="rounded-sm font-black uppercase text-xs tracking-widest h-12 px-10 shadow-xl shadow-primary/20 flex-1 sm:flex-none order-1 sm:order-2">
               {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Publishing...</> : <><Save className="mr-2 h-4 w-4" /> SUBMIT AUDIT</>}
