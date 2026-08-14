@@ -76,6 +76,8 @@ const formatCapacity = (val: any) => {
   return isNaN(num) ? "0.000" : num.toFixed(3);
 };
 
+const STATE_STORAGE_KEY = 'adityapro_projects_list_v1';
+
 export default function ProjectsListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -116,17 +118,72 @@ export default function ProjectsListPage() {
 
   const starredIds = React.useMemo(() => new Set(userProfile?.starredProjectIds || []), [userProfile]);
 
-  // Persist active tab
+  // STATE PRESERVATION LOGIC
   React.useEffect(() => {
-    const saved = localStorage.getItem('projectListActiveTab');
-    if (saved && (saved === 'groundmount' || saved === 'rooftop')) {
-      setActiveTab(saved);
+    if (typeof window === 'undefined') return;
+
+    // Check if this is a manual page refresh/reload
+    const navEntries = window.performance.getEntriesByType('navigation');
+    const isReload = navEntries.length > 0 && (navEntries[0] as any).type === 'reload';
+    
+    if (isReload) {
+      // Clear state on refresh
+      sessionStorage.removeItem(STATE_STORAGE_KEY);
+      return;
+    }
+
+    // Attempt to restore state from session storage
+    const saved = sessionStorage.getItem(STATE_STORAGE_KEY);
+    if (saved) {
+      try {
+        const state = JSON.parse(saved);
+        if (state.activeTab) setActiveTab(state.activeTab);
+        if (state.searchTerm) setSearchTerm(state.searchTerm);
+        if (state.showStarredOnly !== undefined) setShowStarredOnly(state.showStarredOnly);
+        if (state.selectedGroupIds) setSelectedGroupIds(state.selectedGroupIds);
+        
+        // Restore scroll position after a slight delay to allow content to render
+        if (state.scrollPosition) {
+          setTimeout(() => {
+            window.scrollTo({ top: state.scrollPosition, behavior: 'instant' });
+          }, 150);
+        }
+      } catch (e) {
+        console.error("State restoration error:", e);
+      }
     }
   }, []);
 
+  // Sync current state to session storage
+  React.useEffect(() => {
+    const saveState = () => {
+      const state = {
+        activeTab,
+        searchTerm,
+        showStarredOnly,
+        selectedGroupIds,
+        scrollPosition: window.scrollY
+      };
+      sessionStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
+    };
+
+    saveState();
+
+    const handleScroll = () => {
+      // Direct update to prevent heavy re-renders while scrolling
+      try {
+        const current = JSON.parse(sessionStorage.getItem(STATE_STORAGE_KEY) || '{}');
+        current.scrollPosition = window.scrollY;
+        sessionStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(current));
+      } catch (e) {}
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [activeTab, searchTerm, showStarredOnly, selectedGroupIds]);
+
   const handleTabChange = (val: string) => {
     setActiveTab(val);
-    localStorage.setItem('projectListActiveTab', val);
   };
 
   const toggleStar = (e: React.MouseEvent, siteId: string) => {
@@ -176,7 +233,6 @@ export default function ProjectsListPage() {
 
   const filteredSites = React.useMemo(() => {
     let result = accessibleSites.filter(s => {
-      // Move all existing projects under groundmount if projectType is missing
       const type = s.projectType || 'groundmount';
       return type === activeTab;
     });
