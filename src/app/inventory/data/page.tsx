@@ -29,7 +29,8 @@ import {
   Building2,
   Truck,
   ShieldCheck,
-  History
+  History,
+  Loader2
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -123,7 +124,7 @@ export default function MovementDataPage() {
   const { data: allSites } = useCollection<{ name: string, id: string }>(sitesQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<any>(overridesQuery);
+  const { data: allOverrides, isLoading: overridesLoading } = useCollection<any>(overridesQuery);
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
@@ -494,7 +495,7 @@ export default function MovementDataPage() {
                     </Label>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       {viewingMovement.attachments.map((att, idx) => (
-                        <div className="flex items-center justify-between p-3 border rounded-sm bg-background group hover:border-primary/30 transition-all">
+                        <div key={idx} className="flex items-center justify-between p-3 border rounded-sm bg-background group hover:border-primary/30 transition-all">
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="p-2 bg-muted rounded-sm"><FileText className="h-4 w-4 text-primary" /></div>
                             <span className="text-[10px] font-bold truncate max-w-[120px]" title={att.name}>{att.name}</span>
