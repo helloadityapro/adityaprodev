@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -176,8 +177,6 @@ export default function GlobalManagePOsPage() {
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
   const isProcurement = userProfile?.department === 'Purchase & Supply Chain' || userProfile?.department === 'Procurement and Supply-chain';
-
-  const canApprove = isAdmin || isProcurement;
 
   const posQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
@@ -526,61 +525,70 @@ export default function GlobalManagePOsPage() {
 
       {/* Mobile-Responsive Card List */}
       <div className="md:hidden space-y-4">
-        {filteredPOs.length > 0 ? filteredPOs.map((po) => (
-          <Card key={po.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden cursor-pointer" onClick={() => setViewingPO(po)}>
-            <CardContent className="p-4 space-y-4">
-              <div className="flex justify-between items-start gap-4" onClick={(e) => e.stopPropagation()}>
-                <div className="flex flex-col gap-1 min-w-0" onClick={() => setViewingPO(po)}>
-                  <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{po.orderDate}</span>
-                  <h3 className="font-bold text-sm leading-tight text-foreground truncate">{po.poNumber}</h3>
+        {filteredPOs.length > 0 ? filteredPOs.map((po) => {
+          const isCreator = po.history && po.history[0]?.userId === user?.uid;
+          
+          return (
+            <Card key={po.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden cursor-pointer" onClick={() => setViewingPO(po)}>
+              <CardContent className="p-4 space-y-4">
+                <div className="flex justify-between items-start gap-4" onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-col gap-1 min-w-0" onClick={() => setViewingPO(po)}>
+                    <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase">{po.orderDate}</span>
+                    <h3 className="font-bold text-sm leading-tight text-foreground truncate">{po.poNumber}</h3>
+                  </div>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge variant="outline" className={cn(
+                      "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                      po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                      po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                      po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                      "bg-muted text-muted-foreground"
+                    )}>{po.status || 'Pending'}</Badge>
+                    {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
+                      <span className="text-[7px] font-black text-muted-foreground uppercase">By: {po.processedByName}</span>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <Badge variant="outline" className={cn(
-                    "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                    po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
-                    po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                    po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                    "bg-muted text-muted-foreground"
-                  )}>{po.status || 'Pending'}</Badge>
-                  {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
-                    <span className="text-[7px] font-black text-muted-foreground uppercase">By: {po.processedByName}</span>
-                  )}
-                </div>
-              </div>
 
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                  <Building2 className="h-3.5 w-3.5" />
-                  {po.siteName}
+                <div className="flex flex-col gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <Building2 className="h-3.5 w-3.5" />
+                    {po.siteName}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <Truck className="h-3.5 w-3.5" />
+                    {po.supplierName}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+                    <User className="h-3.5 w-3.5" />
+                    {po.createdByName || '—'}
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase">
+                    <Clock className="h-3 w-3" />
+                    Created: {formatDateOnly(po.createdAt)}
+                  </div>
                 </div>
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                  <Truck className="h-3.5 w-3.5" />
-                  {po.supplierName}
-                </div>
-                <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                  <User className="h-3.5 w-3.5" />
-                  {po.createdByName || '—'}
-                </div>
-                <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase">
-                  <Clock className="h-3 w-3" />
-                  Created: {formatDateOnly(po.createdAt)}
-                </div>
-              </div>
 
-              <div className="flex items-center justify-between pt-2 border-t border-primary/5">
-                <span className="font-black text-primary text-sm font-mono">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                <div className="flex gap-1" onClick={e => e.stopPropagation()}>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => triggerWhatsApp(po)}>
-                    <MessageCircle className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingPO(po)}>
-                    <Eye className="h-4 w-4" />
-                  </Button>
+                <div className="flex items-center justify-between pt-2 border-t border-primary/5">
+                  <span className="font-black text-primary text-sm font-mono">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <div className="flex gap-1" onClick={e => e.stopPropagation()}>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600" onClick={() => triggerWhatsApp(po)}>
+                      <MessageCircle className="h-4 w-4" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => setViewingPO(po)}>
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    {(isAdmin || isCreator) && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => setPoToDelete(po)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        )) : (
+              </CardContent>
+            </Card>
+          );
+        }) : (
           <div className="text-center py-12 text-muted-foreground italic bg-muted/5 border-2 border-dashed rounded-sm">No records found.</div>
         )}
       </div>
@@ -632,115 +640,120 @@ export default function GlobalManagePOsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredPOs.length > 0 ? filteredPOs.map((po) => (
-                    <React.Fragment key={po.id}>
-                      <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer group" onClick={() => setViewingPO(po)}>
-                        <TableCell className="px-6 py-4">
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(po.id); }}>
-                              {expandedRows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                            </Button>
-                            <span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-sm font-semibold">{po.siteName}</TableCell>
-                        <TableCell className="text-xs font-medium text-muted-foreground">{po.supplierName}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2 text-xs font-medium">
-                            <User className="h-3.5 w-3.5 text-primary opacity-40" />
-                            {po.createdByName || '—'}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
-                          {formatDateOnly(po.createdAt)}
-                        </TableCell>
-                        <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
-                        <TableCell>
-                          <div className="flex flex-col gap-1">
-                            <Badge variant="outline" className={cn(
-                              "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                              po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
-                              po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                              po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                              "bg-muted text-muted-foreground"
-                            )}>{po.status || 'Pending'}</Badge>
-                            {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
-                              <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
-                                {po.status === 'Accepted' ? 'Approved' : 'Rejected'} by {po.processedByName}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right font-black text-sm font-mono text-foreground">
-                          ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                        </TableCell>
-                        <TableCell className="text-right px-6">
-                          <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
-                            {canApprove && po.status === 'Pending' && (
-                              <div className="flex gap-1 mr-2">
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setPoActionState({ po: po, type: 'Accepted' })} title="Accept PO">
-                                  <CircleCheck className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setPoActionState({ po: po, type: 'Rejected' })} title="Reject PO">
-                                  <CircleX className="h-4 w-4" />
-                                </Button>
-                              </div>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => triggerWhatsApp(po)}>
-                              <MessageCircle className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}>
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            {(isAdmin || isManager) && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
-                                <Link href={`/projects/${po.siteId}/procurement/${po.id}/edit`}>
-                                  <Pencil className="h-4 w-4" />
-                                </Link>
+                  {filteredPOs.length > 0 ? filteredPOs.map((po) => {
+                    const isCreator = po.history && po.history[0]?.userId === user?.uid;
+                    const canApproveThis = isAdmin || isProcurement || isCreator;
+                    
+                    return (
+                      <React.Fragment key={po.id}>
+                        <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer group" onClick={() => setViewingPO(po)}>
+                          <TableCell className="px-6 py-4">
+                            <div className="flex items-center gap-2">
+                              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(po.id); }}>
+                                {expandedRows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                               </Button>
-                            )}
-                            {isAdmin && (
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
-                                <Trash2 className="h-4 w-4" />
+                              <span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-sm font-semibold">{po.siteName}</TableCell>
+                          <TableCell className="text-xs font-medium text-muted-foreground">{po.supplierName}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2 text-xs font-medium">
+                              <User className="h-3.5 w-3.5 text-primary opacity-40" />
+                              {po.createdByName || '—'}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-[10px] font-mono font-bold text-muted-foreground uppercase">
+                            {formatDateOnly(po.createdAt)}
+                          </TableCell>
+                          <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
+                          <TableCell>
+                            <div className="flex flex-col gap-1">
+                              <Badge variant="outline" className={cn(
+                                "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                                po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
+                                po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
+                                po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                                "bg-muted text-muted-foreground"
+                              )}>{po.status || 'Pending'}</Badge>
+                              {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
+                                  {po.status === 'Accepted' ? 'Approved' : 'Rejected'} by {po.processedByName}
+                                </span>
+                              )}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right font-black text-sm font-mono text-foreground">
+                            ₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              {canApproveThis && po.status === 'Pending' && (
+                                <div className="flex gap-1 mr-2">
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setPoActionState({ po: po, type: 'Accepted' })} title="Accept PO">
+                                    <CircleCheck className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setPoActionState({ po: po, type: 'Rejected' })} title="Reject PO">
+                                    <CircleX className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => triggerWhatsApp(po)}>
+                                <MessageCircle className="h-4 w-4" />
                               </Button>
-                            )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {expandedRows.has(po.id) && po.items && (
-                        <TableRow className="bg-muted/20">
-                          <TableCell colSpan={9} className="p-0 border-b">
-                            <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Layers className="h-3.5 w-3.5 text-primary" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Order Item Breakdown</span>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                {getDisplayItems(po.items).map((item, idx) => (
-                                  <div key={idx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
-                                    <div className="flex justify-between items-start">
-                                      <span className="text-xs font-black text-foreground">{item.itemName}</span>
-                                      <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2 border-t pt-2">
-                                      <div className="flex flex-col">
-                                        <span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span>
-                                        <span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span>
-                                      </div>
-                                      <div className="flex flex-col text-right">
-                                        <span className="text-muted-foreground uppercase font-bold text-[8px]">Total</span>
-                                        <span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                                      </div>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}>
+                                <Eye className="h-4 w-4" />
+                              </Button>
+                              {(isAdmin || isManager || isCreator) && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild>
+                                  <Link href={`/projects/${po.siteId}/procurement/${po.id}/edit`}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Link>
+                                </Button>
+                              )}
+                              {(isAdmin || isCreator) && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              )}
                             </div>
                           </TableCell>
                         </TableRow>
-                      )}
-                    </React.Fragment>
-                  )) : (
+                        {expandedRows.has(po.id) && po.items && (
+                          <TableRow className="bg-muted/20">
+                            <TableCell colSpan={9} className="p-0 border-b">
+                              <div className="p-6 px-12 space-y-4 animate-in slide-in-from-top-1 duration-200">
+                                <div className="flex items-center gap-2 mb-2">
+                                  <Layers className="h-3.5 w-3.5 text-primary" />
+                                  <span className="text-[10px] font-black uppercase tracking-widest text-primary">Order Item Breakdown</span>
+                                </div>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                                  {getDisplayItems(po.items).map((item, idx) => (
+                                    <div key={idx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm">
+                                      <div className="flex justify-between items-start">
+                                        <span className="text-xs font-black text-foreground">{item.itemName}</span>
+                                        <Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge>
+                                      </div>
+                                      <div className="grid grid-cols-2 gap-2 border-t pt-2">
+                                        <div className="flex flex-col">
+                                          <span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span>
+                                          <span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span>
+                                        </div>
+                                        <div className="flex flex-col text-right">
+                                          <span className="text-muted-foreground uppercase font-bold text-[8px]">Total</span>
+                                          <span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  }) : (
                     <TableRow><TableCell colSpan={9} className="h-48 text-center text-muted-foreground italic">No purchase orders discovered in registry.</TableCell></TableRow>
                   )}
                 </TableBody>
@@ -925,12 +938,17 @@ export default function GlobalManagePOsPage() {
             </div>
             
             <div className="flex gap-2 items-center">
-              {canApprove && viewingPO?.status === 'Pending' && (
-                <div className="flex gap-2">
-                  <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-8" onClick={() => { setPoActionState({ po: viewingPO!, type: 'Accepted' }); setViewingPO(null); }}>Approve PO</Button>
-                  <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setPoActionState({ po: viewingPO!, type: 'Rejected' }); setViewingPO(null); }}>Reject PO</Button>
-                </div>
-              )}
+              {(() => {
+                const isCreatorOfViewingPO = viewingPO?.history && viewingPO.history[0]?.userId === user?.uid;
+                const canApproveViewingPO = isAdmin || isProcurement || isCreatorOfViewingPO;
+                
+                return canApproveViewingPO && viewingPO?.status === 'Pending' && (
+                  <div className="flex gap-2">
+                    <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-8" onClick={() => { setPoActionState({ po: viewingPO!, type: 'Accepted' }); setViewingPO(null); }}>Approve PO</Button>
+                    <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setPoActionState({ po: viewingPO!, type: 'Rejected' }); setViewingPO(null); }}>Reject PO</Button>
+                  </div>
+                );
+              })()}
               <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-10 tracking-widest">Close Audit</Button></DialogClose>
             </div>
           </DialogFooter>
