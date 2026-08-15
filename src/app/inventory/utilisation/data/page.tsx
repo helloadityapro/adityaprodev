@@ -1,8 +1,8 @@
 "use client";
 
 import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, orderBy, doc, limit, where } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, deleteDocumentNonBlocking } from "@/firebase";
+import { collection, query, orderBy, doc, limit, where, getDocs, increment, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -21,7 +21,12 @@ import {
   ArrowUp,
   ArrowDown,
   ListFilter,
-  FileDown
+  FileDown,
+  Pencil,
+  Trash2,
+  Loader2,
+  Save,
+  X
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -37,6 +42,28 @@ import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { slugifyRole } from "@/lib/access-control";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 type Utilisation = {
   id: string;
@@ -48,6 +75,7 @@ type Utilisation = {
   utilisationDate: string;
   remarks: string;
   userName: string;
+  userId: string;
   createdAt: any;
 };
 
@@ -77,6 +105,8 @@ type SortKey = 'date' | 'site' | 'item' | 'quantity' | 'personnel';
 export default function UtilisationDataPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
+  
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteFilter, setSiteFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
@@ -84,6 +114,10 @@ export default function UtilisationDataPage() {
     key: 'date', 
     direction: 'desc' 
   });
+
+  const [editingUtil, setEditingUtil] = React.useState<Utilisation | null>(null);
+  const [deletingUtil, setDeletingUtil] = React.useState<Utilisation | null>(null);
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -205,6 +239,86 @@ export default function UtilisationDataPage() {
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
   };
 
+  const handleEditSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    if (!editingUtil || !user) return;
+    setIsProcessing(true);
+
+    const formData = new FormData(e.currentTarget);
+    const newQty = parseFloat(formData.get('quantity') as string);
+    const newDate = formData.get('date') as string;
+    const newRemarks = formData.get('remarks') as string;
+
+    const diff = newQty - editingUtil.quantity;
+
+    try {
+      // 1. Reconciliation of stock levels
+      const invQ = query(
+        collection(firestore, 'project_inventory'), 
+        where('siteId', '==', editingUtil.siteId), 
+        where('itemName', '==', editingUtil.itemName)
+      );
+      const invSnap = await getDocs(invQ);
+      
+      if (!invSnap.empty) {
+        updateDocumentNonBlocking(doc(firestore, 'project_inventory', invSnap.docs[0].id), {
+          stockLevel: increment(-diff),
+          utilisedQuantity: increment(diff),
+          lastUpdated: serverTimestamp()
+        });
+      }
+
+      // 2. Update the log
+      updateDocumentNonBlocking(doc(firestore, 'material_utilisations', editingUtil.id), {
+        quantity: newQty,
+        utilisationDate: newDate,
+        remarks: newRemarks,
+        updatedAt: serverTimestamp(),
+        updatedBy: user.uid
+      });
+
+      toast({ title: "Updated", description: "Log corrected and stock reconciled." });
+      setEditingUtil(null);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: err.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingUtil || !firestore) return;
+    setIsProcessing(true);
+
+    try {
+      // 1. Revert stock adjustment
+      const invQ = query(
+        collection(firestore, 'project_inventory'), 
+        where('siteId', '==', deletingUtil.siteId), 
+        where('itemName', '==', deletingUtil.itemName)
+      );
+      const invSnap = await getDocs(invQ);
+      
+      if (!invSnap.empty) {
+        updateDocumentNonBlocking(doc(firestore, 'project_inventory', invSnap.docs[0].id), {
+          stockLevel: increment(deletingUtil.quantity),
+          utilisedQuantity: increment(-deletingUtil.quantity),
+          lastUpdated: serverTimestamp()
+        });
+      }
+
+      // 2. Remove log
+      deleteDocumentNonBlocking(doc(firestore, 'material_utilisations', deletingUtil.id));
+      
+      toast({ title: "Removed", description: "Utilisation log deleted and stock restored." });
+      setDeletingUtil(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleExport = () => {
     if (filteredData.length === 0) return;
     const exportData = filteredData.map(u => ({
@@ -233,17 +347,19 @@ export default function UtilisationDataPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-            <History className="h-8 w-8" /> Global Utilisation Data
-          </h1>
-          <p className="text-muted-foreground font-medium">Historical audit trail of material consumption across authorized project sites.</p>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+              <History className="h-8 w-8" /> Global Utilisation Data
+            </h1>
+            <p className="text-muted-foreground font-medium">Historical audit trail of material consumption across authorized project sites.</p>
+          </div>
+          <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+            <FileDown className="h-4 w-4 mr-2" />
+            Export to Excel
+          </Button>
         </div>
-        <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
-          <FileDown className="h-4 w-4 mr-2" />
-          Export to Excel
-        </Button>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
@@ -264,7 +380,7 @@ export default function UtilisationDataPage() {
           </Select>
           <Select value={siteFilter} onValueChange={setSiteFilter}>
             <SelectTrigger className="w-[180px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background">
-              <Building2 className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+              <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
               <SelectValue placeholder="All Sites" />
             </SelectTrigger>
             <SelectContent>
@@ -300,27 +416,99 @@ export default function UtilisationDataPage() {
                     <div className="flex items-center justify-center">Quantity <SortIcon column="quantity" /></div>
                   </TableHead>
                   <TableHead className="min-w-[200px]">Remarks</TableHead>
-                  <TableHead className="text-right px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('personnel')}>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('personnel')}>
                     <div className="flex items-center justify-end">Personnel <SortIcon column="personnel" /></div>
                   </TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredData.length > 0 ? filteredData.map((u) => (
-                  <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
-                    <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap"><div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{u.utilisationDate}</div></TableCell>
-                    <TableCell className="font-bold text-sm text-foreground"><div className="flex items-center gap-2"><Building2 className="h-3 w-3 text-primary" />{u.siteName}</div></TableCell>
-                    <TableCell><div className="flex flex-col"><span className="font-bold text-sm">{u.itemName}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">Inventory Consumption</span></div></TableCell>
-                    <TableCell className="text-center"><Badge variant="secondary" className="font-mono font-bold rounded-sm px-2 bg-amber-50 text-amber-700 border-amber-200">{u.quantity} {u.unit}</Badge></TableCell>
-                    <TableCell className="text-xs italic text-muted-foreground max-w-[250px] truncate" title={u.remarks}>"{u.remarks}"</TableCell>
-                    <TableCell className="text-right px-6"><div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground uppercase"><User className="h-3 w-3 text-primary" />{u.userName}</div></TableCell>
-                  </TableRow>
-                )) : <TableRow><TableCell colSpan={6} className="h-48 text-center text-muted-foreground italic">No consumption records discovered</TableCell></TableRow>}
+                {filteredData.length > 0 ? filteredData.map((u) => {
+                  const canManage = isAdmin || u.userId === user?.uid;
+                  return (
+                    <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
+                      <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap"><div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{u.utilisationDate}</div></TableCell>
+                      <TableCell className="font-bold text-sm text-foreground"><div className="flex items-center gap-2"><Building2 className="h-3 w-3 text-primary" />{u.siteName}</div></TableCell>
+                      <TableCell><div className="flex flex-col"><span className="font-bold text-sm">{u.itemName}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">Inventory Consumption</span></div></TableCell>
+                      <TableCell className="text-center"><Badge variant="secondary" className="font-mono font-bold rounded-sm px-2 bg-amber-50 text-amber-700 border-amber-200">{u.quantity} {u.unit}</Badge></TableCell>
+                      <TableCell className="text-xs italic text-muted-foreground max-w-[250px] truncate" title={u.remarks}>"{u.remarks}"</TableCell>
+                      <TableCell><div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground uppercase"><User className="h-3 w-3 text-primary" />{u.userName}</div></TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end items-center gap-1">
+                          {canManage && (
+                            <>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setEditingUtil(u)}>
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => setDeletingUtil(u)}>
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }) : <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No consumption records discovered</TableCell></TableRow>}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingUtil} onOpenChange={(o) => !o && setEditingUtil(null)}>
+        <DialogContent className="max-w-md rounded-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2"><Pencil className="h-5 w-5 text-primary" /> Edit Utilisation</DialogTitle>
+            <DialogDescription>Modify record for {editingUtil?.itemName}. Stock levels will re-sync.</DialogDescription>
+          </DialogHeader>
+          {editingUtil && (
+            <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase">Quantity ({editingUtil.unit})</Label>
+                  <Input name="quantity" type="number" step="0.01" defaultValue={editingUtil.quantity} required className="font-mono font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold uppercase">Date</Label>
+                  <Input name="date" type="date" defaultValue={editingUtil.utilisationDate} required />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase">Audit Remarks</Label>
+                <Textarea name="remarks" defaultValue={editingUtil.remarks} required rows={4} className="rounded-sm text-sm" />
+              </div>
+              <DialogFooter className="pt-4 gap-2">
+                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] flex-1">Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isProcessing} className="rounded-sm font-black uppercase text-[10px] shadow-lg flex-1">
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                  Save Changes
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation */}
+      <AlertDialog open={!!deletingUtil} onOpenChange={(o) => !o && setDeletingUtil(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2"><Trash2 className="h-5 w-5" /> Remove Consumption Log?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to permanently delete this log for <strong>{deletingUtil?.itemName}</strong>? The consumed quantity will be returned to Available Stock.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]">
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Confirm Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
