@@ -34,7 +34,8 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
-  ImagePlus
+  ImagePlus,
+  Sun
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -44,6 +45,7 @@ import { cn } from '@/lib/utils';
 import imageCompression from 'browser-image-compression';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 
 const breakageSchema = z.object({
   siteId: z.string().min(1, 'Site selection is required.'),
@@ -52,7 +54,8 @@ const breakageSchema = z.object({
   moduleMake: z.string().min(1, 'Module Make is required.'),
   breakageReason: z.string().min(1, "Please select a reason for breakage."),
   otherReason: z.string().optional(),
-  photoFile: z.any().refine((files) => files?.length > 0, "Module ID Sticker photo is required."),
+  idPhotoFile: z.any().refine((files) => files?.length > 0, "Module ID Sticker photo is required."),
+  sunnySidePhotoFile: z.any().refine((files) => files?.length > 0, "Sunny side photo with all corners visible is required."),
 }).refine(data => {
   if (data.breakageReason === "Other" && (!data.otherReason || data.otherReason.trim() === "")) {
     return false;
@@ -79,7 +82,8 @@ export default function ModuleBreakagePage() {
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
-  const [photoPreview, setPhotoPreview] = React.useState<string | null>(null);
+  const [idPhotoPreview, setIdPhotoPreview] = React.useState<string | null>(null);
+  const [sunnySidePhotoPreview, setSunnySidePhotoPreview] = React.useState<string | null>(null);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -106,11 +110,19 @@ export default function ModuleBreakagePage() {
   const watchReason = form.watch('breakageReason');
   const selectedSiteData = React.useMemo(() => assignedSites.find(s => s.id === watchSiteId), [assignedSites, watchSiteId]);
 
-  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleIdPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setPhotoPreview(URL.createObjectURL(file));
-      form.setValue('photoFile', e.target.files);
+      setIdPhotoPreview(URL.createObjectURL(file));
+      form.setValue('idPhotoFile', e.target.files);
+    }
+  };
+
+  const handleSunnySidePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSunnySidePhotoPreview(URL.createObjectURL(file));
+      form.setValue('sunnySidePhotoFile', e.target.files);
     }
   };
 
@@ -139,9 +151,15 @@ export default function ModuleBreakagePage() {
     setIsSubmitting(true);
 
     try {
-      const file = values.photoFile[0];
-      const storagePath = `module_breakages/${user.uid}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
-      const photoUrl = await uploadFile(file, storagePath);
+      const timestamp = Date.now();
+      
+      const idFile = values.idPhotoFile[0];
+      const idPath = `module_breakages/${user.uid}/${timestamp}_id_${idFile.name.replace(/\s+/g, '_')}`;
+      const idPhotoUrl = await uploadFile(idFile, idPath);
+
+      const sunnyFile = values.sunnySidePhotoFile[0];
+      const sunnyPath = `module_breakages/${user.uid}/${timestamp}_sunny_${sunnyFile.name.replace(/\s+/g, '_')}`;
+      const sunnySidePhotoUrl = await uploadFile(sunnyFile, sunnyPath);
 
       const finalReason = values.breakageReason === "Other" ? values.otherReason : values.breakageReason;
 
@@ -151,7 +169,9 @@ export default function ModuleBreakagePage() {
         siteName: values.siteName,
         serialNumber: values.serialNumber,
         moduleMake: values.moduleMake,
-        photoUrl: photoUrl,
+        photoUrl: idPhotoUrl,
+        idPhotoUrl: idPhotoUrl,
+        sunnySidePhotoUrl: sunnySidePhotoUrl,
         breakageReason: finalReason,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
@@ -195,7 +215,7 @@ export default function ModuleBreakagePage() {
                <p className="text-[10px] font-black uppercase text-emerald-600 tracking-widest mb-1">New Site Total</p>
                <p className="text-3xl font-black text-emerald-900">{(selectedSiteData?.moduleBreakageCount || 0) + 1}</p>
             </div>
-            <Button className="w-full h-12 text-sm font-black uppercase bg-emerald-600 shadow-lg" onClick={() => { setIsSuccess(false); form.reset(); setPhotoPreview(null); }}>
+            <Button className="w-full h-12 text-sm font-black uppercase bg-emerald-600 shadow-lg" onClick={() => { setIsSuccess(false); form.reset(); setIdPhotoPreview(null); setSunnySidePhotoPreview(null); }}>
               Log Another Module
             </Button>
             <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase" onClick={() => router.push('/dashboard')}>
@@ -247,7 +267,7 @@ export default function ModuleBreakagePage() {
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                       <div className="flex items-center border-b px-3">
                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                        <Input placeholder="Search assigned sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} />
+                        <Input placeholder="Search assigned sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} />
                       </div>
                       <ScrollArea className="h-[200px]">
                         <div className="p-1">
@@ -337,29 +357,29 @@ export default function ModuleBreakagePage() {
                 <Camera className="h-4 w-4 text-primary" /> Visual Documentation
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6">
-              <FormField control={form.control} name="photoFile" render={() => (
+            <CardContent className="pt-6 space-y-8">
+              <FormField control={form.control} name="idPhotoFile" render={() => (
                 <FormItem>
                   <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Module ID Sticker Photo *</FormLabel>
                   <FormControl>
                     <div className="space-y-4">
                       <div className="flex flex-col items-center justify-center w-full">
                         <label className={cn(
-                          "flex flex-col items-center justify-center w-full h-64 border-2 border-dashed rounded-sm cursor-pointer transition-all bg-muted/5",
-                          photoPreview ? "border-primary/50" : "border-primary/20 hover:bg-primary/5"
+                          "flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-sm cursor-pointer transition-all bg-muted/5",
+                          idPhotoPreview ? "border-primary/50" : "border-primary/20 hover:bg-primary/5"
                         )}>
-                          {photoPreview ? (
+                          {idPhotoPreview ? (
                             <div className="relative w-full h-full p-2">
-                               <img src={photoPreview} className="w-full h-full object-contain rounded-sm" alt="Preview" />
+                               <img src={idPhotoPreview} className="w-full h-full object-contain rounded-sm" alt="ID Sticker Preview" />
                                <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity rounded-sm">
                                   <Badge className="bg-white text-black font-black text-[10px] uppercase">Click to Retake</Badge>
                                </div>
                             </div>
                           ) : (
                             <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                              <ImagePlus className="w-12 h-12 mb-4 text-primary/40" />
-                              <p className="mb-2 text-sm font-bold text-foreground">Tap to Capture / Upload</p>
-                              <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">ID Sticker Mandatory</p>
+                              <ImagePlus className="w-8 h-8 mb-2 text-primary/40" />
+                              <p className="mb-1 text-xs font-bold text-foreground">Tap to Capture ID Sticker</p>
+                              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Mandatory Evidence</p>
                             </div>
                           )}
                           <input 
@@ -367,7 +387,46 @@ export default function ModuleBreakagePage() {
                             accept="image/*" 
                             capture="environment" 
                             className="hidden" 
-                            onChange={handlePhotoChange} 
+                            onChange={handleIdPhotoChange} 
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="sunnySidePhotoFile" render={() => (
+                <FormItem>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Sunny Side of the Module (All Corners Visible) *</FormLabel>
+                  <FormControl>
+                    <div className="space-y-4">
+                      <div className="flex flex-col items-center justify-center w-full">
+                        <label className={cn(
+                          "flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-sm cursor-pointer transition-all bg-muted/5",
+                          sunnySidePhotoPreview ? "border-primary/50" : "border-primary/20 hover:bg-primary/5"
+                        )}>
+                          {sunnySidePhotoPreview ? (
+                            <div className="relative w-full h-full p-2">
+                               <img src={sunnySidePhotoPreview} className="w-full h-full object-contain rounded-sm" alt="Sunny Side Preview" />
+                               <div className="absolute inset-0 bg-black/20 opacity-0 hover:opacity-100 flex items-center justify-center transition-opacity rounded-sm">
+                                  <Badge className="bg-white text-black font-black text-[10px] uppercase">Click to Retake</Badge>
+                               </div>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                              <Sun className="w-8 h-8 mb-2 text-primary/40" />
+                              <p className="mb-1 text-xs font-bold text-foreground">Tap to Capture Sunny Side</p>
+                              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Mandatory Evidence</p>
+                            </div>
+                          )}
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            capture="environment" 
+                            className="hidden" 
+                            onChange={handleSunnySidePhotoChange} 
                           />
                         </label>
                       </div>
