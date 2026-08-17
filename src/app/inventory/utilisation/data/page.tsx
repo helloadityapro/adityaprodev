@@ -329,7 +329,7 @@ export default function UtilisationDataPage() {
       'Unit': u.unit,
       'Remarks': u.remarks,
       'Personnel': u.userName,
-      'Log Timestamp': u.createdAt ? format(u.createdAt.toDate(), 'dd/MM/yyyy HH:mm:ss') : 'N/A'
+      'Log Timestamp': u.createdAt ? format(u.createdAt.toDate(), 'dd/MM/yyyy HH:mm:ss') : '—'
     }));
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
@@ -346,14 +346,14 @@ export default function UtilisationDataPage() {
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-500">
+    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col gap-1">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="flex flex-col gap-1">
-            <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-              <History className="h-8 w-8" /> Global Utilisation Data
+            <h1 className="text-2xl md:text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+              <History className="h-6 w-6 md:h-8 md:w-8" /> Global Utilisation Data
             </h1>
-            <p className="text-muted-foreground font-medium">Historical audit trail of material consumption across authorized project sites.</p>
+            <p className="text-muted-foreground font-medium text-xs md:text-sm">Historical audit trail of material consumption across authorized project sites.</p>
           </div>
           <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
             <FileDown className="h-4 w-4 mr-2" />
@@ -362,126 +362,192 @@ export default function UtilisationDataPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search..." className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-        </div>
-        
-        <div className="flex items-center gap-2">
-          <Select value={dateFilter} onValueChange={setDateFilter}>
-            <SelectTrigger className="w-[140px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background"><Calendar className="h-3.5 w-3.5 mr-2 opacity-50" /><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
-              <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
-              <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
-              <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={siteFilter} onValueChange={setSiteFilter}>
-            <SelectTrigger className="w-[180px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background">
-              <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="All Sites" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs font-bold uppercase">All Accessible Sites</SelectItem>
-              {accessibleSites.map(site => (
-                <SelectItem key={site.id} value={site.name} className="text-xs font-bold uppercase">{site.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary bg-primary/5">
-            {filteredData.length} Records
-          </Badge>
-          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm"><FilterX className="h-4 w-4" /></Button>
+      <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Search material or personnel..." className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex-1 md:flex-none">
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-full md:w-[140px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background"><Calendar className="h-3.5 w-3.5 mr-2 opacity-50" /><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                  <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+                  <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                  <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex-1 md:flex-none">
+              <Select value={siteFilter} onValueChange={setSiteFilter}>
+                <SelectTrigger className="w-full md:w-[180px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background">
+                  <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                  <SelectValue placeholder="All Sites" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all" className="text-xs font-bold uppercase">All Accessible Sites</SelectItem>
+                  {accessibleSites.map(site => (
+                    <SelectItem key={site.id} value={site.name} className="text-xs font-bold uppercase">{site.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary bg-primary/5 hidden sm:flex">
+              {filteredData.length} Records
+            </Badge>
+            <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm"><FilterX className="h-4 w-4" /></Button>
+          </div>
         </div>
       </div>
 
-      <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
-        <CardContent className="p-0">
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader className="bg-muted/30">
-                <TableRow>
-                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
-                    <div className="flex items-center">Date <SortIcon column="date" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
-                    <div className="flex items-center">Project Site <SortIcon column="site" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('item')}>
-                    <div className="flex items-center">Material Consumed <SortIcon column="item" /></div>
-                  </TableHead>
-                  <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('quantity')}>
-                    <div className="flex items-center justify-center">Quantity <SortIcon column="quantity" /></div>
-                  </TableHead>
-                  <TableHead className="min-w-[200px]">Remarks</TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('personnel')}>
-                    <div className="flex items-center justify-end">Personnel <SortIcon column="personnel" /></div>
-                  </TableHead>
-                  <TableHead className="text-right px-6">Actions</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredData.length > 0 ? filteredData.map((u) => {
-                  const canManage = isAdmin || u.userId === user?.uid;
-                  return (
-                    <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
-                      <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap"><div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{u.utilisationDate}</div></TableCell>
-                      <TableCell className="font-bold text-sm text-foreground"><div className="flex items-center gap-2"><Building2 className="h-3 w-3 text-primary" />{u.siteName}</div></TableCell>
-                      <TableCell><div className="flex flex-col"><span className="font-bold text-sm">{u.itemName}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">Inventory Consumption</span></div></TableCell>
-                      <TableCell className="text-center"><Badge variant="secondary" className="font-mono font-bold rounded-sm px-2 bg-amber-50 text-amber-700 border-amber-200">{u.quantity} {u.unit}</Badge></TableCell>
-                      <TableCell className="text-xs italic text-muted-foreground max-w-[250px] truncate" title={u.remarks}>"{u.remarks}"</TableCell>
-                      <TableCell><div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground uppercase"><User className="h-3 w-3 text-primary" />{u.userName}</div></TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end items-center gap-1">
-                          {canManage && (
-                            <>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setEditingUtil(u)}>
-                                <Pencil className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => setDeletingUtil(u)}>
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            </>
-                          )}
-                        </div>
-                      </TableCell>
+      <div className="space-y-4">
+        {/* Mobile-Responsive Card List */}
+        <div className="md:hidden space-y-4">
+          {filteredData.length > 0 ? filteredData.map((u) => {
+            const canManage = isAdmin || u.userId === user?.uid;
+            return (
+              <Card key={u.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden animate-in fade-in duration-300">
+                <CardContent className="p-4 space-y-4">
+                  <div className="flex justify-between items-start gap-4">
+                    <div className="flex flex-col gap-1 min-w-0">
+                      <span className="text-[10px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                        <Calendar className="h-3 w-3" />
+                        {u.utilisationDate}
+                      </span>
+                      <h3 className="font-bold text-sm text-foreground leading-tight">{u.itemName}</h3>
+                    </div>
+                    <Badge variant="secondary" className="font-mono font-bold rounded-sm px-2 h-6 bg-amber-50 text-amber-700 border-amber-200 shrink-0">
+                      {u.quantity} {u.unit}
+                    </Badge>
+                  </div>
+
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
+                      <Building2 className="h-3 w-3 text-primary/60" />
+                      <span>{u.siteName}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
+                      <User className="h-3 w-3 text-primary/60" />
+                      <span>{u.userName}</span>
+                    </div>
+                  </div>
+
+                  {u.remarks && (
+                    <p className="text-xs italic text-muted-foreground bg-muted/20 p-2.5 rounded-sm border border-primary/5">
+                      "{u.remarks}"
+                    </p>
+                  )}
+
+                  {canManage && (
+                    <div className="pt-2 border-t border-primary/5 flex justify-end gap-2">
+                      <Button variant="ghost" size="sm" className="h-8 rounded-sm text-primary hover:bg-primary/10 px-3 font-bold text-[10px] uppercase" onClick={() => setEditingUtil(u)}>
+                        <Pencil className="h-3.5 w-3.5 mr-1.5" /> Edit
+                      </Button>
+                      <Button variant="ghost" size="sm" className="h-8 rounded-sm text-destructive hover:bg-red-50 px-3 font-bold text-[10px] uppercase" onClick={() => setDeletingUtil(u)}>
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Delete
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            );
+          }) : (
+            <div className="text-center py-20 text-muted-foreground italic text-xs uppercase font-bold border-2 border-dashed rounded-sm opacity-30">No records discovered</div>
+          )}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block">
+          <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
+            <CardContent className="p-0">
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader className="bg-muted/30">
+                    <TableRow>
+                      <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
+                        <div className="flex items-center">Date <SortIcon column="date" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
+                        <div className="flex items-center">Project Site <SortIcon column="site" /></div>
+                      </TableHead>
+                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('item')}>
+                        <div className="flex items-center">Material Consumed <SortIcon column="item" /></div>
+                      </TableHead>
+                      <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('quantity')}>
+                        <div className="flex items-center justify-center">Quantity <SortIcon column="quantity" /></div>
+                      </TableHead>
+                      <TableHead className="min-w-[200px]">Remarks</TableHead>
+                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('personnel')}>
+                        <div className="flex items-center justify-end">Personnel <SortIcon column="personnel" /></div>
+                      </TableHead>
+                      <TableHead className="text-right px-6">Actions</TableHead>
                     </TableRow>
-                  );
-                }) : <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No consumption records discovered</TableCell></TableRow>}
-              </TableBody>
-            </Table>
-          </div>
-        </CardContent>
-      </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredData.length > 0 ? filteredData.map((u) => {
+                      const canManage = isAdmin || u.userId === user?.uid;
+                      return (
+                        <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
+                          <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap"><div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{u.utilisationDate}</div></TableCell>
+                          <TableCell className="font-bold text-sm text-foreground"><div className="flex items-center gap-2"><Building2 className="h-3 w-3 text-primary" />{u.siteName}</div></TableCell>
+                          <TableCell><div className="flex flex-col"><span className="font-bold text-sm">{u.itemName}</span><span className="text-[9px] font-bold text-muted-foreground uppercase">Inventory Consumption</span></div></TableCell>
+                          <TableCell className="text-center"><Badge variant="secondary" className="font-mono font-bold rounded-sm px-2 bg-amber-50 text-amber-700 border-amber-200">{u.quantity} {u.unit}</Badge></TableCell>
+                          <TableCell className="text-xs italic text-muted-foreground max-w-[250px] truncate" title={u.remarks}>"{u.remarks}"</TableCell>
+                          <TableCell><div className="flex items-center justify-end gap-2 text-xs font-bold text-muted-foreground uppercase"><User className="h-3 w-3 text-primary" />{u.userName}</div></TableCell>
+                          <TableCell className="text-right px-6">
+                            <div className="flex justify-end items-center gap-1">
+                              {canManage && (
+                                <>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setEditingUtil(u)}>
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => setDeletingUtil(u)}>
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    }) : <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No consumption records discovered</TableCell></TableRow>}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
 
       {/* Edit Dialog */}
       <Dialog open={!!editingUtil} onOpenChange={(o) => !o && setEditingUtil(null)}>
-        <DialogContent className="max-w-md rounded-sm">
-          <DialogHeader>
+        <DialogContent className="max-w-md w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl">
+          <DialogHeader className="p-6 bg-primary/5 border-b">
             <DialogTitle className="flex items-center gap-2"><Pencil className="h-5 w-5 text-primary" /> Edit Utilisation</DialogTitle>
-            <DialogDescription>Modify record for {editingUtil?.itemName}. Stock levels will re-sync.</DialogDescription>
+            <DialogDescription className="text-xs">Modify record for {editingUtil?.itemName}. Stock levels will re-sync.</DialogDescription>
           </DialogHeader>
           {editingUtil && (
-            <form onSubmit={handleEditSubmit} className="space-y-4 py-4">
+            <form onSubmit={handleEditSubmit} className="p-6 space-y-5">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase">Quantity ({editingUtil.unit})</Label>
-                  <Input name="quantity" type="number" step="0.01" defaultValue={editingUtil.quantity} required className="font-mono font-bold" />
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Quantity ({editingUtil.unit})</Label>
+                  <Input name="quantity" type="number" step="0.01" defaultValue={editingUtil.quantity} required className="font-mono font-bold h-11" />
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase">Date</Label>
-                  <Input name="date" type="date" defaultValue={editingUtil.utilisationDate} required />
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Date</Label>
+                  <Input name="date" type="date" defaultValue={editingUtil.utilisationDate} required className="h-11 font-bold" />
                 </div>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase">Audit Remarks</Label>
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Audit Remarks</Label>
                 <Textarea name="remarks" defaultValue={editingUtil.remarks} required rows={4} className="rounded-sm text-sm" />
               </div>
-              <DialogFooter className="pt-4 gap-2">
-                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] flex-1">Cancel</Button></DialogClose>
-                <Button type="submit" disabled={isProcessing} className="rounded-sm font-black uppercase text-[10px] shadow-lg flex-1">
+              <DialogFooter className="pt-4 gap-3 flex flex-col sm:flex-row">
+                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Cancel</Button></DialogClose>
+                <Button type="submit" disabled={isProcessing} className="rounded-sm font-black uppercase text-[10px] h-11 shadow-lg flex-1">
                   {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                   Save Changes
                 </Button>
@@ -493,16 +559,16 @@ export default function UtilisationDataPage() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deletingUtil} onOpenChange={(o) => !o && setDeletingUtil(null)}>
-        <AlertDialogContent className="rounded-sm">
+        <AlertDialogContent className="rounded-sm max-w-md w-[95vw]">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive flex items-center gap-2"><Trash2 className="h-5 w-5" /> Remove Consumption Log?</AlertDialogTitle>
-            <AlertDialogDescription>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2 font-black uppercase tracking-tight"><Trash2 className="h-5 w-5" /> Remove Consumption Log?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
               Are you sure you want to permanently delete this log for <strong>{deletingUtil?.itemName}</strong>? The consumed quantity will be returned to Available Stock.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]">
+          <AlertDialogFooter className="gap-2 flex flex-col sm:flex-row">
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px] h-11 flex-1 shadow-lg">
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
               Confirm Delete
             </AlertDialogAction>

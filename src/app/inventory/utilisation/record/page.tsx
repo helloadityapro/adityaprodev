@@ -51,6 +51,7 @@ type UserProfile = {
   role: string;
   assignedProjectIds?: string[];
   siteManagerId?: string;
+  ownDataOnly?: boolean;
 };
 
 type MappingOverride = {
@@ -275,43 +276,47 @@ export default function RecordUtilisationPage() {
   }
 
   return (
-    <div className="space-y-8 max-w-2xl mx-auto pb-20">
+    <div className="space-y-6 md:space-y-8 max-w-2xl mx-auto pb-20 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-          <PieChart className="h-8 w-8" /> Record Utilisation
+        <h1 className="text-2xl md:text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase leading-none">
+          <PieChart className="h-6 w-6 md:h-8 md:w-8" /> Record Utilisation
         </h1>
-        <p className="text-muted-foreground">Log material consumption from available site inventory.</p>
+        <p className="text-muted-foreground font-medium text-xs md:text-sm">Log material consumption from available site inventory.</p>
       </div>
 
-      <Card className="shadow-md border-primary/10 rounded-sm">
-        <CardHeader><CardTitle>Utilisation Entry Form</CardTitle></CardHeader>
-        <CardContent>
+      <Card className="shadow-md border-primary/10 rounded-sm overflow-hidden">
+        <CardHeader className="bg-primary/5 border-b p-4 sm:p-6">
+          <CardTitle className="text-sm font-bold uppercase tracking-widest">Utilisation Entry Form</CardTitle>
+        </CardHeader>
+        <CardContent className="p-4 sm:p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <FormField control={form.control} name="siteId" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Project Site</FormLabel>
+                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Project Site</FormLabel>
                   <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
-                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
-                          {field.value ? accessibleSites.find(s => s.id === field.value)?.name : "Select site..."}
+                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-12 rounded-sm text-left px-4", !field.value && "text-muted-foreground")}>
+                          <span className="truncate">{field.value ? accessibleSites.find(s => s.id === field.value)?.name : "Select site..."}</span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                      <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-2xl border-primary/10">
+                      <div className="flex items-center border-b px-3 bg-muted/20"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-10 border-none focus-visible:ring-0 text-sm bg-transparent" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
                       <ScrollArea className="h-[200px]">
-                        {filteredSites.map(site => (
-                          <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { field.onChange(site.id); form.setValue('siteName', site.name); setIsSitePopoverOpen(false); }}>
-                            <Check className={cn("mr-2 h-4 w-4 text-primary", site.id === field.value ? "opacity-100" : "opacity-0")} />
-                            <div className="flex flex-col items-start min-w-0">
-                              <span className="font-bold truncate w-full">{site.name}</span>
-                              <span className="text-[9px] text-muted-foreground uppercase">{site.projectCompany}</span>
-                            </div>
-                          </Button>
-                        ))}
+                        <div className="p-1">
+                          {filteredSites.map(site => (
+                            <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-auto py-3 px-4 mb-0.5 text-xs text-left rounded-sm group hover:bg-primary/5" onClick={() => { field.onChange(site.id); form.setValue('siteName', site.name); setIsSitePopoverOpen(false); }}>
+                              <Check className={cn("mr-2 h-4 w-4 text-primary shrink-0", site.id === field.value ? "opacity-100" : "opacity-0")} />
+                              <div className="flex flex-col items-start min-w-0">
+                                <span className={cn("font-bold truncate w-full", site.id === field.value ? "text-primary" : "text-foreground")}>{site.name}</span>
+                                <span className="text-[9px] text-muted-foreground uppercase opacity-60">{site.projectCompany}</span>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
                       </ScrollArea>
                     </PopoverContent>
                   </Popover>
@@ -321,30 +326,30 @@ export default function RecordUtilisationPage() {
 
               <FormField control={form.control} name="itemName" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Material to Consume (Authorized & Ordered)</FormLabel>
+                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Material to Consume</FormLabel>
                   <Popover open={isItemPopoverOpen} onOpenChange={setIsItemPopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
-                        <Button variant="outline" disabled={!selectedSiteId} className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
-                          <span className="truncate">{field.value ? `${field.value} (Stock: ${selectedItem?.stockLevel.toLocaleString()} ${getFriendlyUnit(selectedItem?.unit || "")})` : "Choose authorized material..."}</span>
+                        <Button variant="outline" disabled={!selectedSiteId} className={cn("w-full justify-between font-normal h-auto min-h-[3rem] rounded-sm text-left px-4 py-3", !field.value && "text-muted-foreground")}>
+                          <span className="whitespace-normal leading-tight">{field.value ? `${field.value} (Stock: ${selectedItem?.stockLevel.toLocaleString()} ${getFriendlyUnit(selectedItem?.unit || "")})` : "Choose material..."}</span>
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
                     </PopoverTrigger>
-                    <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0">
-                      <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search authorized items..." className="h-9 border-none" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
+                    <PopoverContent className="w-[--radix-popover-trigger-width] sm:w-[500px] p-0 shadow-2xl border-primary/10">
+                      <div className="flex items-center border-b px-3 bg-muted/20"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-10 border-none focus-visible:ring-0 text-sm bg-transparent" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
                       <ScrollArea className="h-[250px]">
                         <div className="p-1">
                           {filteredMaterials.length > 0 ? filteredMaterials.map(item => (
-                            <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-auto min-h-12 py-3 px-3 text-sm rounded-sm mb-0.5" onClick={() => { field.onChange(item.itemName); setIsItemPopoverOpen(false); }}>
+                            <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-auto min-h-12 py-3 px-4 text-sm rounded-sm mb-0.5 group hover:bg-primary/5" onClick={() => { field.onChange(item.itemName); setIsItemPopoverOpen(false); }}>
                               <div className="flex items-center justify-between w-full gap-4">
-                                <span className="font-bold truncate text-foreground">{item.itemName}</span>
-                                <span className={cn("text-[10px] font-black uppercase whitespace-nowrap shrink-0", item.stockLevel > 0 ? "text-primary" : "text-red-500")}>
-                                  (Stock: {item.stockLevel.toLocaleString()} {getFriendlyUnit(item.unit)})
+                                <span className={cn("font-bold truncate flex-1 text-left", item.itemName === field.value ? "text-primary" : "text-foreground")}>{item.itemName}</span>
+                                <span className={cn("text-[10px] font-black uppercase whitespace-nowrap shrink-0 px-2 py-0.5 rounded-sm", item.stockLevel > 0 ? "bg-primary/5 text-primary" : "bg-red-50 text-red-500")}>
+                                  {item.stockLevel.toLocaleString()} {getFriendlyUnit(item.unit)}
                                 </span>
                               </div>
                             </Button>
-                          )) : <div className="p-8 text-center text-xs text-muted-foreground italic leading-relaxed">No materials found for this site.</div>}
+                          )) : <div className="p-10 text-center text-xs text-muted-foreground italic leading-relaxed uppercase font-black opacity-30 tracking-widest">No materials found</div>}
                         </div>
                       </ScrollArea>
                     </PopoverContent>
@@ -356,11 +361,11 @@ export default function RecordUtilisationPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <FormField control={form.control} name="quantity" render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Quantity Utilised</FormLabel>
+                    <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quantity Consumed</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input type="number" step="0.01" {...field} className="h-11 font-mono font-bold" />
-                        {selectedItem && <span className="absolute right-3 top-3 text-[10px] font-black uppercase text-muted-foreground">{getFriendlyUnit(selectedItem.unit)}</span>}
+                        <Input type="number" step="0.01" {...field} onFocus={e => e.target.select()} className="h-12 font-mono font-black text-lg rounded-sm pr-12 focus:ring-primary/20" />
+                        {selectedItem && <span className="absolute right-4 top-3.5 text-[10px] font-black uppercase text-primary bg-primary/5 px-1.5 py-0.5 rounded-sm">{getFriendlyUnit(selectedItem.unit)}</span>}
                       </div>
                     </FormControl>
                     <FormMessage />
@@ -368,25 +373,38 @@ export default function RecordUtilisationPage() {
                 )} />
 
                 <FormField control={form.control} name="utilisationDate" render={({ field }) => (
-                  <FormItem><FormLabel>Date of Consumption</FormLabel><FormControl><Input type="date" {...field} className="h-11 rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Consumption Date</FormLabel>
+                    <FormControl>
+                      <div className="relative">
+                        <Input type="date" {...field} className="h-12 rounded-sm font-bold bg-background pr-10" />
+                        <Calendar className="absolute right-3 top-4 h-4 w-4 text-muted-foreground pointer-events-none" />
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
                 )} />
               </div>
 
               <FormField control={form.control} name="remarks" render={({ field }) => (
-                <FormItem><FormLabel>Utilisation Remarks</FormLabel><FormControl><Textarea placeholder="e.g. Used for mounting structure at Block A..." rows={3} {...field} /></FormControl><FormMessage /></FormItem>
+                <FormItem>
+                  <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Audit Remarks</FormLabel>
+                  <FormControl><Textarea placeholder="Explain the context or reason for this consumption..." rows={4} {...field} className="rounded-sm text-sm focus:ring-primary/20 min-h-[100px]" /></FormControl>
+                  <FormMessage />
+                </FormItem>
               )} />
 
               {selectedItem && (
-                <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 flex items-start gap-3">
+                <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 flex items-start gap-3 animate-in slide-in-from-top-1 duration-300">
                   <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                  <p className="text-xs text-muted-foreground leading-relaxed">
-                    Submitting this will reduce <strong>{selectedItem.itemName}</strong> stock by <strong>{form.watch('quantity')} {selectedItem.unit}</strong>. Current stock: {selectedItem.stockLevel} {selectedItem.unit}.
-                  </p>
+                  <div className="text-xs text-muted-foreground leading-relaxed">
+                    <strong>Inventory Adjustment:</strong> Submitting this will reduce <strong>{selectedItem.itemName}</strong> stock by <strong>{form.watch('quantity')} {selectedItem.unit}</strong>. Current balance: <span className="font-bold text-foreground">{selectedItem.stockLevel} {selectedItem.unit}</span>.
+                  </div>
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-14 text-base font-black uppercase shadow-xl" disabled={isSubmitting || !selectedItem}>
-                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : "Publish Utilisation"}
+              <Button type="submit" className="w-full h-14 text-base font-black uppercase tracking-widest shadow-xl shadow-primary/20 transition-all active:scale-[0.98]" disabled={isSubmitting || !selectedItem}>
+                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Save className="mr-2 h-5 w-5" /> PUBLISH UTILISATION</>}
               </Button>
             </form>
           </Form>
