@@ -1,12 +1,12 @@
-"use client";
+'use client';
 
-import * as React from "react";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, deleteDocumentNonBlocking } from "@/firebase";
-import { collection, query, orderBy, doc, limit, where } from "firebase/firestore";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Skeleton } from "@/components/ui/skeleton";
-import { format, subDays, subMonths, subYears } from "date-fns";
+import * as React from 'react';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, deleteDocumentNonBlocking } from '@/firebase';
+import { collection, query, orderBy, doc, limit, where } from 'firebase/firestore';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import { format, subDays, subMonths, subYears } from 'date-fns';
 import { 
   Table as TableIcon, 
   Search, 
@@ -31,17 +31,17 @@ import {
   ShieldCheck,
   History,
   Loader2
-} from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+} from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { 
   Select, 
   SelectContent, 
   SelectItem, 
   SelectTrigger, 
   SelectValue 
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -50,7 +50,7 @@ import {
   DialogDescription,
   DialogFooter,
   DialogClose,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,15 +60,15 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+} from '@/components/ui/alert-dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Label } from '@/components/ui/label';
+import { cn } from '@/lib/utils';
 import * as XLSX from 'xlsx';
-import { isSuperAdmin } from "@/lib/auth-constants";
-import { slugifyRole } from "@/lib/access-control";
-import { useToast } from "@/hooks/use-toast";
+import { isSuperAdmin } from '@/lib/auth-constants';
+import { slugifyRole } from '@/lib/access-control';
+import { useToast } from '@/hooks/use-toast';
 
 type Attachment = {
   url: string;
@@ -83,8 +83,8 @@ type Movement = {
   itemName: string;
   quantity: number;
   unit: string;
-  movementType: "Inward" | "Outward";
-  sourceOrDestinationType: "Supplier" | "Site";
+  movementType: 'Inward' | 'Outward';
+  sourceOrDestinationType: 'Supplier' | 'Site';
   sourceOrDestination: string;
   movementDate: string;
   invoiceNumber?: string;
@@ -424,6 +424,9 @@ export default function MovementDataPage() {
                       <TableHead className="text-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('quantity')}>
                         <div className="flex items-center justify-center">Quantity <SortIcon column="quantity" /></div>
                       </TableHead>
+                      <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('personnel')}>
+                        <div className="flex items-center">Logged by <SortIcon column="personnel" /></div>
+                      </TableHead>
                       <TableHead className="text-right px-6">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -446,6 +449,12 @@ export default function MovementDataPage() {
                           </div>
                         </TableCell>
                         <TableCell className="text-center font-black text-primary font-mono text-sm">{m.quantity} {m.unit}</TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase">
+                            <User className="h-3 w-3 text-primary" />
+                            {m.userName}
+                          </div>
+                        </TableCell>
                         <TableCell className="text-right px-6 whitespace-nowrap">
                           <div className="flex justify-end items-center gap-1">
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingMovement(m)} title="View Details">
@@ -457,7 +466,7 @@ export default function MovementDataPage() {
                           </div>
                         </TableCell>
                       </TableRow>
-                    )) : <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic">No logs found.</TableCell></TableRow>}
+                    )) : <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic">No logs found.</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </div>
