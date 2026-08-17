@@ -104,7 +104,7 @@ export default function MovementDataPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteFilter, setSiteFilter] = React.useState("all");
-  const [dateFilter, setDateFilter] = React.useState("allTime");
+  const [dateFilter, setDateFilter] = React.useState("7days");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ 
     key: 'createdAt', 
     direction: 'desc' 
@@ -189,7 +189,7 @@ export default function MovementDataPage() {
       case 'allTime':
         return { start: '1970-01-01', end: '2099-12-31' };
       default:
-        return { start: '1970-01-01', end: '2099-12-31' };
+        return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
     }
   }, [dateFilter]);
 
@@ -248,7 +248,7 @@ export default function MovementDataPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setSiteFilter("all");
-    setDateFilter("allTime");
+    setDateFilter("7days");
   };
 
   const handleDeleteMovement = async () => {
@@ -313,12 +313,12 @@ export default function MovementDataPage() {
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger className="w-full md:w-[140px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background"><Calendar className="h-3.5 w-3.5 mr-2 opacity-50" /><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
                   <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
                   <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
                   <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
                   <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
                   <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
+                  <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -436,14 +436,12 @@ export default function MovementDataPage() {
                             {m.createdAt ? format(m.createdAt.toDate(), 'dd MMM, HH:mm') : '—'}
                           </div>
                         </TableCell>
-                        <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
-                          <div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{m.movementDate}</div>
-                        </TableCell>
+                        <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap"><div className="flex items-center gap-1.5"><Calendar className="h-3 w-3" />{m.movementDate}</div></TableCell>
                         <TableCell className="font-bold text-sm text-foreground"><div className="flex items-center gap-2"><MapPin className="h-3 w-3 text-primary" />{m.siteName}</div></TableCell>
                         <TableCell><Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm px-2 h-5", m.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>{m.movementType}</Badge></TableCell>
-                        <TableCell>
-                          <div className="flex flex-col max-w-[250px]">
-                            <span className="font-bold text-sm text-foreground leading-tight whitespace-normal break-words" title={m.itemName}>{m.itemName}</span>
+                        <TableCell className="whitespace-normal break-words max-w-[250px]">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-sm text-foreground leading-tight">{m.itemName}</span>
                             <span className="text-[9px] font-bold text-muted-foreground uppercase mt-1">{m.sourceOrDestination}</span>
                           </div>
                         </TableCell>

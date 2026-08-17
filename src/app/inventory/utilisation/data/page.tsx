@@ -6,7 +6,7 @@ import { collection, query, orderBy, doc, limit, where, getDocs, increment, serv
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { format, subDays, subMonths } from "date-fns";
+import { format, subDays, subMonths, subYears } from "date-fns";
 import { 
   History, 
   Search, 
@@ -183,6 +183,8 @@ export default function UtilisationDataPage() {
       case 'yesterday': return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
       case '7days': return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
       case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastYear': return { start: format(subYears(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime': return { start: '1970-01-01', end: '2099-12-31' };
       default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
     }
   }, [dateFilter]);
@@ -378,6 +380,8 @@ export default function UtilisationDataPage() {
                   <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
                   <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
                   <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                  <SelectItem value="lastYear" className="text-xs font-bold uppercase">Last Year</SelectItem>
+                  <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -548,7 +552,7 @@ export default function UtilisationDataPage() {
               <DialogFooter className="pt-4 gap-3 flex flex-col sm:flex-row">
                 <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Cancel</Button></DialogClose>
                 <Button type="submit" disabled={isProcessing} className="rounded-sm font-black uppercase text-[10px] h-11 shadow-lg flex-1">
-                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4 mr-2" />}
                   Save Changes
                 </Button>
               </DialogFooter>
@@ -559,14 +563,14 @@ export default function UtilisationDataPage() {
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deletingUtil} onOpenChange={(o) => !o && setDeletingUtil(null)}>
-        <AlertDialogContent className="rounded-sm max-w-md w-[95vw]">
+        <AlertDialogContent className="rounded-sm max-md w-[95vw]">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive flex items-center gap-2 font-black uppercase tracking-tight"><Trash2 className="h-5 w-5" /> Remove Consumption Log?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed">
               Are you sure you want to permanently delete this log for <strong>{deletingUtil?.itemName}</strong>? The consumed quantity will be returned to Available Stock.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 flex flex-col sm:flex-row">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDelete} disabled={isProcessing} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px] h-11 flex-1 shadow-lg">
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
