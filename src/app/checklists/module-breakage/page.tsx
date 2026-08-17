@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -43,6 +42,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import imageCompression from 'browser-image-compression';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const breakageSchema = z.object({
   siteId: z.string().min(1, 'Site selection is required.'),
