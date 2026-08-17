@@ -43,17 +43,24 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { cn } from '@/lib/utils';
 import imageCompression from 'browser-image-compression';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
 
 const breakageSchema = z.object({
   siteId: z.string().min(1, 'Site selection is required.'),
   siteName: z.string(),
   serialNumber: z.string().min(1, 'Module Serial Number is required.'),
   moduleMake: z.string().min(1, 'Module Make is required.'),
-  breakageReason: z.enum([
-    "Already breakage from the Pallet.",
-    "Handling Breakage from vendor ."
-  ], { required_error: "Please select a reason for breakage." }),
+  breakageReason: z.string().min(1, "Please select a reason for breakage."),
+  otherReason: z.string().optional(),
   photoFile: z.any().refine((files) => files?.length > 0, "Module ID Sticker photo is required."),
+}).refine(data => {
+  if (data.breakageReason === "Other" && (!data.otherReason || data.otherReason.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Please specify the other reason.",
+  path: ["otherReason"]
 });
 
 type Site = { id: string; name: string; moduleBreakageCount?: number };
@@ -90,11 +97,13 @@ export default function ModuleBreakagePage() {
       siteName: "",
       serialNumber: "",
       moduleMake: "",
-      breakageReason: undefined as any,
+      breakageReason: "",
+      otherReason: "",
     },
   });
 
   const watchSiteId = form.watch('siteId');
+  const watchReason = form.watch('breakageReason');
   const selectedSiteData = React.useMemo(() => assignedSites.find(s => s.id === watchSiteId), [assignedSites, watchSiteId]);
 
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -134,6 +143,8 @@ export default function ModuleBreakagePage() {
       const storagePath = `module_breakages/${user.uid}/${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
       const photoUrl = await uploadFile(file, storagePath);
 
+      const finalReason = values.breakageReason === "Other" ? values.otherReason : values.breakageReason;
+
       // Save record
       await addDocumentNonBlocking(collection(firestore, 'module_breakages'), {
         siteId: values.siteId,
@@ -141,7 +152,7 @@ export default function ModuleBreakagePage() {
         serialNumber: values.serialNumber,
         moduleMake: values.moduleMake,
         photoUrl: photoUrl,
-        breakageReason: values.breakageReason,
+        breakageReason: finalReason,
         createdAt: serverTimestamp(),
         createdBy: user.uid,
         createdByName: userProfile.username || user.email,
@@ -285,23 +296,38 @@ export default function ModuleBreakagePage() {
                 )} />
               </div>
 
-              <FormField control={form.control} name="breakageReason" render={({ field }) => (
-                <FormItem>
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Reason of Breakage *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
-                    <FormControl>
-                      <SelectTrigger className="h-11 rounded-sm font-medium">
-                        <SelectValue placeholder="Select exact reason..." />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      <SelectItem value="Already breakage from the Pallet." className="text-sm">Already breakage from the Pallet.</SelectItem>
-                      <SelectItem value="Handling Breakage from vendor ." className="text-sm">Handling Breakage from vendor .</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )} />
+              <div className="space-y-4">
+                <FormField control={form.control} name="breakageReason" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Reason of Breakage *</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl>
+                        <SelectTrigger className="h-11 rounded-sm font-medium">
+                          <SelectValue placeholder="Select exact reason..." />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="Already breakage from the Pallet." className="text-sm">Already breakage from the Pallet.</SelectItem>
+                        <SelectItem value="Handling Breakage from vendor ." className="text-sm">Handling Breakage from vendor .</SelectItem>
+                        <SelectItem value="Other" className="text-sm font-bold text-primary">Other (Specify Below)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                {watchReason === "Other" && (
+                  <FormField control={form.control} name="otherReason" render={({ field }) => (
+                    <FormItem className="animate-in slide-in-from-top-2 duration-300">
+                      <FormLabel className="text-[10px] font-black uppercase text-primary tracking-widest px-1">Other Specification *</FormLabel>
+                      <FormControl>
+                        <Textarea placeholder="Explain custom reason..." {...field} className="rounded-sm bg-primary/[0.02] border-primary/20 min-h-[100px]" />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                )}
+              </div>
             </CardContent>
           </Card>
 
@@ -358,7 +384,7 @@ export default function ModuleBreakagePage() {
               {isSubmitting ? (
                 <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> Finalizing Report...</>
               ) : (
-                <><Save className="mr-2 h-5 w-5" /> Submit Breakage Data</>
+                <><Save className="mr-2 h-4 w-4" /> Submit Breakage Data</>
               )}
             </Button>
           </div>
