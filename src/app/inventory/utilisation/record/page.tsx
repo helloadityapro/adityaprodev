@@ -276,8 +276,13 @@ export default function RecordUtilisationPage() {
     );
   }
 
+  function isSuperAdmin(email: string | null | undefined): boolean {
+    if (!email) return false;
+    return ['khalil@adityagreenenergy.com'].includes(email.toLowerCase());
+  }
+
   return (
-    <div className="space-y-6 md:space-y-8 max-w-2xl mx-auto pb-20 px-2 sm:px-4">
+    <div className="space-y-4 md:space-y-6 max-w-2xl mx-auto pb-20 px-2 sm:px-4">
       <div className="flex flex-col gap-1">
         <h1 className="text-2xl md:text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase leading-none">
           <PieChart className="h-6 w-6 md:h-8 md:w-8" /> Record Utilisation
@@ -291,7 +296,7 @@ export default function RecordUtilisationPage() {
         </CardHeader>
         <CardContent className="p-4 sm:p-8">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
               <FormField control={form.control} name="siteId" render={({ field }) => (
                 <FormItem className="flex flex-col">
                   <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Project Site</FormLabel>
@@ -339,7 +344,7 @@ export default function RecordUtilisationPage() {
                     </PopoverTrigger>
                     <PopoverContent className="w-[--radix-popover-trigger-width] sm:w-[500px] p-0 shadow-2xl border-primary/10">
                       <div className="flex items-center border-b px-3 bg-muted/20"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-10 border-none focus-visible:ring-0 text-sm bg-transparent" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
-                      <ScrollArea className="h-[250px]">
+                      <ScrollArea className="h-[200px]">
                         <div className="p-1">
                           {filteredMaterials.length > 0 ? filteredMaterials.map(item => (
                             <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-auto min-h-12 py-3 px-4 text-sm rounded-sm mb-0.5 group hover:bg-primary/5" onClick={() => { field.onChange(item.itemName); setIsItemPopoverOpen(false); }}>
@@ -359,7 +364,7 @@ export default function RecordUtilisationPage() {
                 </FormItem>
               )} />
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
                 <FormField control={form.control} name="quantity" render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quantity Consumed</FormLabel>
@@ -413,9 +418,4 @@ export default function RecordUtilisationPage() {
       </Card>
     </div>
   );
-}
-
-function isSuperAdmin(email: string | null | undefined): boolean {
-  if (!email) return false;
-  return ['khalil@adityagreenenergy.com'].includes(email.toLowerCase());
 }
