@@ -57,10 +57,29 @@
         "longitude": { "type": "number" },
         "drawingUrl": { "type": "string", "description": "URL to the Table Numbering Drawing PDF" },
         "drawingName": { "type": "string", "description": "Original filename of the drawing" },
+        "moduleBreakageCount": { "type": "number", "default": 0, "description": "Running counter of reported module breakages on site" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "projectCompany", "projectType"]
+    },
+    "ModuleBreakage": {
+      "title": "Module Breakage Data",
+      "type": "object",
+      "description": "Report of a broken solar module on site.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "moduleMake": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "breakageReason": { "type": "string", "enum": ["Already breakage from the Pallet.", "Handling Breakage from vendor ."] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "createdBy": { "type": "string" },
+        "createdByName": { "type": "string" }
+      },
+      "required": ["siteId", "serialNumber", "moduleMake", "photoUrl", "breakageReason"]
     },
     "SiteGroup": {
       "title": "Site Group",
@@ -644,6 +663,10 @@
       "schema": { "$ref": "#/backend/entities/MaterialUtilisation" },
       "description": "Consumption logs for project sites."
     },
+    "/material_movements/{movementId}": {
+      "schema": { "$ref": "#/backend/entities/MaterialMovements" },
+      "description": "Inward and Outward material logs."
+    },
     "/master_inventory/{itemId}": {
       "schema": { "$ref": "#/backend/entities/MasterInventoryItem" },
       "description": "Global master list of all inventory item types."
@@ -683,6 +706,10 @@
     "/ht_conductor_checklists/{checklistId}": {
       "schema": { "$ref": "#/backend/entities/HTConductorChecklist" },
       "description": "Sequential pole distance verification for HT conductors."
+    },
+    "/module_breakages/{breakageId}": {
+      "schema": { "$ref": "#/backend/entities/ModuleBreakage" },
+      "description": "Report of a broken solar module on site."
     },
     "/notifications/{notifId}": {
       "schema": { "$ref": "#/backend/entities/Notification" },

@@ -59,7 +59,8 @@ import {
   CalendarDays,
   AreaChart,
   Bell,
-  Cpu
+  Cpu,
+  GlassWater
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -829,6 +830,14 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                       <Link href="/checklists/ht-conductor">
                         <Zap className="h-4 w-4" />
                         <span>HT Conductor Checklist</span>
+                      </Link>
+                    </SidebarMenuSubButton>
+                  </SidebarMenuSubItem>
+                  <SidebarMenuSubItem>
+                    <SidebarMenuSubButton asChild isActive={pathname === '/checklists/module-breakage'} onClick={handleMobileClose}>
+                      <Link href="/checklists/module-breakage">
+                        <GlassWater className="h-4 w-4" />
+                        <span>Module Breakage Data</span>
                       </Link>
                     </SidebarMenuSubButton>
                   </SidebarMenuSubItem>

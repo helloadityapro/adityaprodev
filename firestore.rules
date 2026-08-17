@@ -41,9 +41,14 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (
         isSignedIn() && 
-        (!('drawingUrl' in resource.data) || resource.data.drawingUrl == null) && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['drawingUrl', 'drawingName', 'updatedAt'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['drawingUrl', 'drawingName', 'updatedAt', 'moduleBreakageCount'])
       );
+    }
+
+    match /module_breakages/{breakageId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
 
     match /site_groups/{groupId} {
