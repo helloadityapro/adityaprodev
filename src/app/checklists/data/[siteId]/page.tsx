@@ -13,7 +13,8 @@ import {
   Zap, 
   ChevronRight, 
   Building2,
-  Cpu
+  Cpu,
+  GlassWater
 } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Separator } from '@/components/ui/separator';
@@ -142,6 +143,25 @@ export default function ProjectChecklistHubPage({ params }: { params: Promise<{ 
             </div>
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+
+        <div className="py-1 px-1"><Separator className="opacity-30" /></div>
+
+        {/* Module Breakage */}
+        <div 
+          onClick={() => router.push(`/checklists/data/${siteId}/module-breakage`)}
+          className="group flex items-center justify-between p-3 rounded-lg border border-transparent hover:bg-primary/[0.03] hover:border-primary/10 transition-all cursor-pointer active:scale-[0.99]"
+        >
+          <div className="flex items-center gap-4 min-w-0">
+            <div className="p-2.5 bg-muted rounded-md group-hover:bg-primary/10 transition-colors shrink-0">
+              <GlassWater className="h-5 w-5 text-primary opacity-70 group-hover:opacity-100" />
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-bold text-foreground group-hover:text-primary transition-colors truncate">Module Breakage Data</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider truncate">Damage Registry & Photos</span>
+            </div>
+          </div>
+          <ChevronRight className="h-4 w-4 text-muted-foreground/30 group-hover:text-primary transition-all group-hover:translate-x-0.5" />
         </div>
       </div>
     </div>
