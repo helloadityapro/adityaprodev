@@ -88,11 +88,10 @@ export default function ModuleBreakagePage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
-  const assignedSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
-    const assignedIds = new Set(userProfile.assignedProjectIds || []);
-    return allSites.filter(s => assignedIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSites, userProfile]);
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites) return [];
+    return [...allSites].sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites]);
 
   const form = useForm<z.infer<typeof breakageSchema>>({
     resolver: zodResolver(breakageSchema),
@@ -108,7 +107,7 @@ export default function ModuleBreakagePage() {
 
   const watchSiteId = form.watch('siteId');
   const watchReason = form.watch('breakageReason');
-  const selectedSiteData = React.useMemo(() => assignedSites.find(s => s.id === watchSiteId), [assignedSites, watchSiteId]);
+  const selectedSiteData = React.useMemo(() => accessibleSites.find(s => s.id === watchSiteId), [accessibleSites, watchSiteId]);
 
   const handleIdPhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -254,12 +253,12 @@ export default function ModuleBreakagePage() {
             <CardContent className="pt-6">
               <FormField control={form.control} name="siteId" render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Assigned Project *</FormLabel>
+                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Project Site *</FormLabel>
                   <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>
-                          {field.value ? assignedSites.find(s => s.id === field.value)?.name : "Choose site..."}
+                          {field.value ? accessibleSites.find(s => s.id === field.value)?.name : "Choose site..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
@@ -267,11 +266,11 @@ export default function ModuleBreakagePage() {
                     <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                       <div className="flex items-center border-b px-3">
                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                        <Input placeholder="Search assigned sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} />
+                        <Input placeholder="Search all sites..." className="h-10 w-full border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} />
                       </div>
                       <ScrollArea className="h-[200px]">
                         <div className="p-1">
-                          {assignedSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())).map(site => (
+                          {filteredSites.map(site => (
                             <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs" onClick={() => { 
                               field.onChange(site.id); 
                               form.setValue('siteName', site.name); 
@@ -281,8 +280,8 @@ export default function ModuleBreakagePage() {
                               {site.name}
                             </Button>
                           ))}
-                          {assignedSites.length === 0 && (
-                            <div className="p-4 text-center text-xs text-muted-foreground italic">No projects assigned to your account.</div>
+                          {accessibleSites.length === 0 && (
+                            <div className="p-4 text-center text-xs text-muted-foreground italic">No projects found in registry.</div>
                           )}
                         </div>
                       </ScrollArea>
