@@ -20,7 +20,9 @@ import {
   History,
   X,
   Maximize2,
-  ImageIcon
+  ImageIcon,
+  FileDown,
+  FileText
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -40,6 +42,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Progress } from "@/components/ui/progress";
+import * as XLSX from 'xlsx';
 
 type ModuleBreakage = {
   id: string;
@@ -65,6 +69,8 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
   const [searchTerm, setSearchTerm] = React.useState("");
   const [deletingRecord, setDeletingRecord] = React.useState<ModuleBreakage | null>(null);
   const [viewingRecord, setViewingRecord] = React.useState<ModuleBreakage | null>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
+  const [generationProgress, setGenerationProgress] = React.useState(0);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -84,6 +90,129 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
       r.moduleMake.toLowerCase().includes(searchTerm.toLowerCase())
     ).sort((a, b) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0));
   }, [records, searchTerm]);
+
+  const handleExportExcel = () => {
+    if (filteredRecords.length === 0) return;
+    const exportData = filteredRecords.map(r => ({
+      'Date & Time': r.createdAt ? format(r.createdAt.toDate(), 'dd-MM-yyyy HH:mm') : '—',
+      'Serial Number': r.serialNumber,
+      'Module Make': r.moduleMake,
+      'Reason for Breakage': r.breakageReason,
+      'Auditor Name': r.createdByName,
+      'ID Photo Link': r.idPhotoUrl,
+      'Physical Condition Photo': r.sunnySidePhotoUrl || '—'
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(exportData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Module Breakages");
+    XLSX.writeFile(wb, `Module_Breakage_Registry_${site?.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    toast({ title: "Excel Exported" });
+  };
+
+  const handleExportPDF = async () => {
+    if (filteredRecords.length === 0) return;
+    setIsExporting(true);
+    setGenerationProgress(0);
+
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const logoUrl = '/icon.png';
+
+      let logoProps: any = null;
+      try {
+        logoProps = await doc.getImageProperties(logoUrl);
+      } catch (e) {
+        console.warn("Logo load failed", e);
+      }
+
+      const addHeaderLogo = (pdfDoc: any) => {
+        if (!logoProps) return;
+        try {
+          const areaSize = 25;
+          const startX = 210 - areaSize - 15;
+          const startY = 10;
+          const ratio = logoProps.width / logoProps.height;
+          let renderW = areaSize;
+          let renderH = areaSize;
+          if (ratio > 1) renderH = areaSize / ratio;
+          else renderW = areaSize * ratio;
+          const x = startX + (areaSize - renderW) / 2;
+          const y = startY + (areaSize - renderH) / 2;
+          pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
+        } catch (e) {
+          pdfDoc.addImage(logoUrl, 'PNG', 170, 10, 25, 25);
+        }
+      };
+
+      const margin = 15;
+      let currY = 40;
+      const rowHeight = 8;
+
+      addHeaderLogo(doc);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('MODULE BREAKAGE AUDIT REGISTRY', margin, currY - 10);
+      
+      doc.setFontSize(10);
+      doc.text(`PROJECT: ${site?.name || 'Unknown Site'}`, margin, currY);
+      doc.text(`COMPANY: ${site?.projectCompany || 'Aditya Green Energy'}`, margin, currY + 6);
+      doc.text(`REPORT DATE: ${format(new Date(), 'dd MMM yyyy')}`, margin, currY + 12);
+      
+      currY += 25;
+
+      // Table Header
+      doc.setFillColor(245, 245, 245);
+      doc.rect(margin, currY, 180, 10, 'F');
+      doc.setFontSize(8);
+      doc.text('DATE', margin + 2, currY + 6.5);
+      doc.text('SERIAL NUMBER', margin + 35, currY + 6.5);
+      doc.text('MAKE', margin + 80, currY + 6.5);
+      doc.text('REASON', margin + 110, currY + 6.5);
+      doc.text('PROOF', margin + 165, currY + 6.5);
+      
+      currY += 10;
+      doc.setFont('helvetica', 'normal');
+
+      for (let i = 0; i < filteredRecords.length; i++) {
+        const r = filteredRecords[i];
+        setGenerationProgress(Math.round(((i + 1) / filteredRecords.length) * 100));
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        if (currY > 270) {
+          doc.addPage();
+          currY = 30;
+          addHeaderLogo(doc);
+        }
+
+        const dateStr = r.createdAt ? format(r.createdAt.toDate(), 'dd/MM/yy HH:mm') : '—';
+        const reasonLines = doc.splitTextToSize(r.breakageReason, 50);
+        const h = Math.max(rowHeight, reasonLines.length * 4 + 4);
+
+        doc.rect(margin, currY, 180, h);
+        doc.text(dateStr, margin + 2, currY + 5);
+        doc.text(r.serialNumber, margin + 35, currY + 5);
+        doc.text(r.moduleMake, margin + 80, currY + 5);
+        doc.text(reasonLines, margin + 110, currY + 5);
+        
+        doc.setTextColor(0, 0, 255);
+        doc.text('View Photos', margin + 165, currY + 5);
+        doc.link(margin + 165, currY + 1, 15, 5, { url: r.idPhotoUrl });
+        doc.setTextColor(0, 0, 0);
+
+        currY += h;
+      }
+
+      doc.save(`Breakage_Audit_${site?.name.replace(/\s+/g, '_')}.pdf`);
+      toast({ title: 'PDF Exported' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
+    } finally {
+      setIsExporting(false);
+      setGenerationProgress(0);
+    }
+  };
 
   const handleDelete = () => {
     if (!deletingRecord) return;
@@ -108,13 +237,43 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
             </h2>
             <p className="text-muted-foreground text-[8px] md:text-xs font-bold uppercase tracking-[0.2em]">{site?.projectCompany}</p>
           </div>
+          <div className="flex items-center gap-2">
+            <Button 
+              onClick={handleExportExcel} 
+              disabled={filteredRecords.length === 0}
+              variant="outline" size="sm" 
+              className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary"
+            >
+              <FileDown className="h-3.5 w-3.5 mr-1.5" />
+              Excel
+            </Button>
+            <Button 
+              onClick={handleExportPDF} 
+              disabled={isExporting || filteredRecords.length === 0}
+              variant="outline" size="sm" 
+              className="h-9 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary/20 text-primary"
+            >
+              {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : <FileText className="h-3.5 w-3.5 mr-1.5" />}
+              PDF Report
+            </Button>
+          </div>
         </div>
       </div>
+
+      {isExporting && (
+        <div className="space-y-1.5 animate-in fade-in duration-300">
+          <div className="flex justify-between items-center text-[8px] font-black uppercase text-primary tracking-tighter">
+            <span>Rendering PDF Documents</span>
+            <span>{generationProgress}%</span>
+          </div>
+          <Progress value={generationProgress} className="h-1 rounded-none" />
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search Serial #, Make or Auditor..." className="pl-10 h-11 text-sm rounded-sm" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <Input placeholder="Search Serial #, Make or Auditor..." className="pl-10 h-11 text-sm rounded-sm value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
         </div>
         <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
           {filteredRecords.length} Breakages Logged
@@ -177,7 +336,7 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
 
       <Dialog open={!!viewingRecord} onOpenChange={o => !o && setViewingRecord(null)}>
         <DialogContent className="max-w-4xl w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b flex flex-row items-center justify-between space-y-0">
+          <DialogHeader className="p-6 bg-primary/5 border-b flex flex-row items-center justify-between space-y-0 text-left">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><GlassWater className="h-5 w-5 text-primary" /></div>
               <div>
