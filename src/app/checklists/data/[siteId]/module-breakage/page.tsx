@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, doc, limit, where } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -106,7 +106,7 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Module Breakages");
-    XLSX.writeFile(wb, `Module_Breakage_Registry_${site?.name.replace(/\s+/g, '_')}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    XLSX.writeFile(wb, `Module_Breakage_Registry_${site?.name?.replace(/\s+/g, '_') || 'Site'}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
     toast({ title: "Excel Exported" });
   };
 
@@ -162,7 +162,6 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
       
       currY += 25;
 
-      // Table Header
       doc.setFillColor(245, 245, 245);
       doc.rect(margin, currY, 180, 10, 'F');
       doc.setFontSize(8);
@@ -204,7 +203,7 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
         currY += h;
       }
 
-      doc.save(`Breakage_Audit_${site?.name.replace(/\s+/g, '_')}.pdf`);
+      doc.save(`Breakage_Audit_${site?.name?.replace(/\s+/g, '_') || 'Site'}.pdf`);
       toast({ title: 'PDF Exported' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Export Failed', description: e.message });
@@ -273,7 +272,12 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search Serial #, Make or Auditor..." className="pl-10 h-11 text-sm rounded-sm value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+          <Input 
+            placeholder="Search Serial #, Make or Auditor..." 
+            className="pl-10 h-11 text-sm rounded-sm" 
+            value={searchTerm} 
+            onChange={e => setSearchTerm(e.target.value)} 
+          />
         </div>
         <Badge variant="secondary" className="rounded-sm font-black uppercase text-[9px] tracking-widest px-3 h-8 border-none">
           {filteredRecords.length} Breakages Logged
