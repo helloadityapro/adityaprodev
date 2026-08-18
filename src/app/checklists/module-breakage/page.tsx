@@ -66,7 +66,7 @@ const breakageSchema = z.object({
   path: ["otherReason"]
 });
 
-type Site = { id: string; name: string; moduleBreakageCount?: number };
+type Site = { id: string; name: string; projectCompany?: string; moduleBreakageCount?: number };
 
 export default function ModuleBreakagePage() {
   const firestore = useFirestore();
@@ -90,8 +90,14 @@ export default function ModuleBreakagePage() {
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites) return [];
-    return [...allSites].sort((a, b) => a.name.localeCompare(b.name));
+    
+    // Display all sites to everyone for reporting breakages
+    return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
   }, [allSites]);
+
+  const filteredSites = React.useMemo(() => {
+    return accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+  }, [accessibleSites, siteSearchQuery]);
 
   const form = useForm<z.infer<typeof breakageSchema>>({
     resolver: zodResolver(breakageSchema),
