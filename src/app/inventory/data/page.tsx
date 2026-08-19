@@ -1,8 +1,8 @@
 'use client';
 
 import * as React from 'react';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, deleteDocumentNonBlocking } from '@/firebase';
-import { collection, query, orderBy, doc, limit, where } from 'firebase/firestore';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
+import { collection, query, orderBy, doc, limit, where, getDocs, writeBatch, increment, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -255,8 +255,33 @@ export default function MovementDataPage() {
     if (!deletingMovement) return;
     setIsProcessing(true);
     try {
-      await deleteDocumentNonBlocking(doc(firestore, 'material_movements', deletingMovement.id));
-      toast({ title: 'Record Removed', description: 'Material log has been deleted from registry.' });
+      // 1. Resolve reversal logic: -qty for Inward, +qty for Outward
+      const adjustment = deletingMovement.movementType === 'Inward' ? -deletingMovement.quantity : deletingMovement.quantity;
+
+      // 2. Find relevant inventory doc
+      const invQ = query(
+        collection(firestore, 'project_inventory'),
+        where('siteId', '==', deletingMovement.siteId),
+        where('itemName', '==', deletingMovement.itemName)
+      );
+      const invSnap = await getDocs(invQ);
+
+      const batch = writeBatch(firestore);
+
+      if (!invSnap.empty) {
+        const invDoc = invSnap.docs[0];
+        batch.update(invDoc.ref, {
+          stockLevel: increment(adjustment),
+          lastUpdated: serverTimestamp()
+        });
+      }
+
+      // 3. Delete the log
+      batch.delete(doc(firestore, 'material_movements', deletingMovement.id));
+      
+      await batch.commit();
+
+      toast({ title: 'Record Removed', description: 'Log deleted and site stock reconciled.' });
       setDeletingMovement(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
