@@ -24,7 +24,7 @@ import {
   X, 
   CheckCircle2, 
   FileImage, 
-  File, 
+  File as LucideFile, 
   RefreshCw,
   Plus
 } from 'lucide-react';
@@ -277,7 +277,7 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
                       </Card>
                     )) : (
                       <div className="col-span-full py-20 text-center border-2 border-dashed rounded-sm opacity-20">
-                        <File className="h-12 w-12 mx-auto mb-3" />
+                        <LucideFile className="h-12 w-12 mx-auto mb-3" />
                         <p className="text-[10px] font-black uppercase tracking-widest">No documentation found</p>
                       </div>
                     )}
@@ -298,7 +298,7 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[70]">
           <DialogHeader className="absolute top-0 left-0 right-0 z-[80] p-4 bg-gradient-to-b from-black/80 to-transparent flex flex-row items-center justify-between pointer-events-none">
             <div className="flex items-center gap-3">
-              <div className="bg-white/10 p-2 rounded-sm pointer-events-auto"><File className="h-5 w-5 text-white" /></div>
+              <div className="bg-white/10 p-2 rounded-sm pointer-events-auto"><LucideFile className="h-5 w-5 text-white" /></div>
               <div className="flex flex-col pointer-events-auto">
                 <DialogTitle className="text-white text-lg font-black uppercase tracking-tight">{viewingDoc?.name}</DialogTitle>
                 <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{viewingDoc?.type}</span>
@@ -315,7 +315,7 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
                 <img src={viewingDoc.url} className="max-w-full max-h-full object-contain shadow-2xl" alt={viewingDoc.name} />
               ) : (
                 <div className="p-20 text-center space-y-6">
-                  <AlertCircle className="h-16 w-16 text-white/20 mx-auto" />
+                  <Progress value={100} className="h-1 w-32 mx-auto mb-4" />
                   <div className="space-y-2">
                     <p className="text-white font-black uppercase tracking-widest">Preview Unavailable</p>
                     <p className="text-white/40 text-xs">This file type must be downloaded to be viewed.</p>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -190,20 +191,11 @@ export default function CheckInPage() {
         createdAt: serverTimestamp()
       };
 
-      // FIX: Wait for the document to be created before proceeding to show success
       await addDoc(collection(firestore, 'attendance'), checkInData);
 
       try {
         await Haptics.impact({ style: ImpactStyle.Light });
       } catch {}
-
-      // Play success chime
-      try {
-        const audio = new Audio(SUCCESS_SOUND_URL);
-        audio.play().catch(e => console.log('Audio play blocked or failed', e));
-      } catch (err) {
-        console.warn("Sound feedback failed", err);
-      }
 
       setIsProcessing(false);
       setShowSuccess(true);

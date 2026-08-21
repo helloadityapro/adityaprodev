@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -21,7 +22,6 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { slugifyRole } from "@/lib/access-control";
 import { Skeleton } from "@/components/ui/skeleton";
-import { sendNotification } from "@/lib/notifications";
 import { format } from "date-fns";
 
 const utilisationSchema = z.object({
@@ -100,22 +100,12 @@ export default function RecordUtilisationPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
   const isAdmin = userProfile?.role === 'Admin';
-  const isManager = userProfile?.role === 'Site Manager';
 
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<any>(roleConfigsQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
-
-  const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
-
-  const teamQuery = useMemoFirebase(() => {
-    if (!isManager || !user) return null;
-    return query(collection(firestore, 'users'), where('siteManagerId', '==', user.uid));
-  }, [firestore, user, isManager]);
-  const { data: teamMembers } = useCollection<UserProfile>(teamQuery);
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
@@ -227,14 +217,16 @@ export default function RecordUtilisationPage() {
       const overridesSnap = await getDocs(overridesQ);
       const effectiveSiteManagerId = !overridesSnap.empty ? overridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
 
-      await addDocumentNonBlocking(collection(firestore, 'material_utilisations'), {
+      const utilisationData = {
         ...values,
         unit: selectedItem.unit,
         userId: user.uid,
         userName: userProfile.username || user.email,
         siteManagerId: effectiveSiteManagerId,
         createdAt: serverTimestamp()
-      });
+      };
+
+      await addDocumentNonBlocking(collection(firestore, 'material_utilisations'), utilisationData);
 
       if (!selectedItem.id.startsWith('new-')) {
         updateDocumentNonBlocking(doc(firestore, 'project_inventory', selectedItem.id), {

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -14,7 +15,7 @@ import { Clock, LogIn } from 'lucide-react';
  * Handles reminders for check-in/check-out and automatic session cleanup.
  */
 export function AttendanceGate() {
-  const { user } = userUser();
+  const { user, isUserLoading: isAuthLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
   const pathname = usePathname();
@@ -120,7 +121,7 @@ export function AttendanceGate() {
   const { data: todayFinished, isLoading: isFinishedLoading } = useCollection(todayFinishedQuery);
 
   React.useEffect(() => {
-    if (isActiveLoading || isFinishedLoading || !user || isWaitingForCelebration) return;
+    if (isActiveLoading || isFinishedLoading || isAuthLoading || !user || isWaitingForCelebration) return;
     if (pathname.startsWith('/attendance')) return;
 
     const now = new Date();
@@ -157,7 +158,7 @@ export function AttendanceGate() {
         const ref = doc(firestore, 'attendance', activeSession.id);
         updateDocumentNonBlocking(ref, {
           status: 'completed',
-          checkOutTime: serverTimestamp(),
+          checkOutTime: Timestamp.now(),
           checkOutLat: activeSession.checkInLat || 0, 
           checkOutLng: activeSession.checkInLng || 0,
           checkOutType: 'System CheckOut',
@@ -186,7 +187,7 @@ export function AttendanceGate() {
         setShowCheckOut(true);
       }
     }
-  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, user, pathname, firestore, isWaitingForCelebration, checkInReminderCount, checkOutReminderCount, lastReminderTime, showCheckIn, showCheckOut]);
+  }, [activeSessions, todayFinished, isActiveLoading, isFinishedLoading, isAuthLoading, user, pathname, firestore, isWaitingForCelebration, checkInReminderCount, checkOutReminderCount, lastReminderTime, showCheckIn, showCheckOut]);
 
   const handleLater = (type: 'in' | 'out') => {
     if (type === 'in') {
@@ -246,13 +247,4 @@ export function AttendanceGate() {
       </Dialog>
     </>
   );
-}
-
-function userUser() {
-    const { user, isUserLoading, userError } = useUser();
-    return { user, isUserLoading, userError };
-}
-
-function serverTimestamp() {
-    return Timestamp.now();
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -173,7 +174,6 @@ export default function CheckOutPage() {
 
       const entryRef = doc(firestore, 'attendance', currentEntry.id);
       
-      // FIX: Wait for the document update to complete before showing success
       await updateDoc(entryRef, {
         checkOutTime: serverTimestamp(),
         checkOutLat: location.lat,
@@ -186,14 +186,6 @@ export default function CheckOutPage() {
       try {
         await Haptics.impact({ style: ImpactStyle.Light });
       } catch (hapticError) {}
-
-      // Play success chime
-      try {
-        const audio = new Audio(SUCCESS_SOUND_URL);
-        audio.play().catch(e => console.log('Audio play blocked or failed', e));
-      } catch (err) {
-        console.warn("Sound feedback failed", err);
-      }
 
       setIsProcessing(false);
       setShowSuccess(true);
