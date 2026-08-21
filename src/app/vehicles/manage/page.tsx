@@ -41,7 +41,13 @@ import {
   ShieldCheck,
   FileCheck,
   RefreshCcw,
-  Check
+  Check,
+  Maximize2,
+  ZoomIn,
+  ZoomOut,
+  RotateCw,
+  File as FileIcon,
+  FileImage
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
@@ -106,8 +112,10 @@ type Vehicle = {
   createdAt?: any;
   rcUrl?: string;
   rcName?: string;
+  rcType?: string;
   insuranceUrl?: string;
   insuranceName?: string;
+  insuranceType?: string;
 };
 
 type Assignment = {
@@ -679,6 +687,7 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
   const firebaseApp = useFirebaseApp();
   const { toast } = useToast();
   const [uploading, setUploading] = React.useState<Record<string, number>>({});
+  const [viewingDoc, setViewingDoc] = React.useState<{ url: string, name: string, type: string } | null>(null);
 
   const handleUpload = async (type: 'rc' | 'insurance', e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -707,9 +716,11 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
           if (type === 'rc') {
             updateData.rcUrl = url;
             updateData.rcName = file.name;
+            updateData.rcType = file.type;
           } else {
             updateData.insuranceUrl = url;
             updateData.insuranceName = file.name;
+            updateData.insuranceType = file.type;
           }
 
           updateDocumentNonBlocking(vehicleRef, { ...updateData, updatedAt: serverTimestamp() });
@@ -722,46 +733,162 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
     }
   };
 
+  const openViewer = (url: string, name: string, type?: string) => {
+    setViewingDoc({ 
+      url, 
+      name, 
+      type: type || (url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg') 
+    });
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-sm"><ShieldCheck className="h-5 w-5 text-primary" /></div>
+              <div>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight">Compliance Documents</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicle?.plateNumber}</DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+
+          <div className="p-6 space-y-8">
+            <DocSection 
+              label="Registration Certificate (RC)" 
+              url={vehicle?.rcUrl} 
+              name={vehicle?.rcName} 
+              type={vehicle?.rcType}
+              loading={uploading.rc} 
+              onUpload={(e) => handleUpload('rc', e)} 
+              onView={() => vehicle?.rcUrl && openViewer(vehicle.rcUrl, vehicle.rcName || 'RC', vehicle.rcType)}
+            />
+            <DocSection 
+              label="Insurance Document" 
+              url={vehicle?.insuranceUrl} 
+              name={vehicle?.insuranceName} 
+              type={vehicle?.insuranceType}
+              loading={uploading.insurance} 
+              onUpload={(e) => handleUpload('insurance', e)} 
+              onView={() => vehicle?.insuranceUrl && openViewer(vehicle.insuranceUrl, vehicle.insuranceName || 'Insurance', vehicle.insuranceType)}
+            />
+          </div>
+
+          <DialogFooter className="p-4 bg-muted/5 border-t">
+            <DialogClose asChild><Button variant="outline" className="w-full rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close Manager</Button></DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <DocumentViewerDialog 
+        file={viewingDoc} 
+        open={!!viewingDoc} 
+        onOpenChange={(o) => !o && setViewingDoc(null)} 
+      />
+    </>
+  );
+}
+
+function DocumentViewerDialog({ file, open, onOpenChange }: { file: { url: string, name: string, type: string } | null, open: boolean, onOpenChange: (o: boolean) => void }) {
+  const [scale, setScale] = React.useState(1);
+  const [position, setPosition] = React.useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = React.useState(false);
+  const [startPan, setStartPan] = React.useState({ x: 0, y: 0 });
+  const [rotation, setRotation] = React.useState(0);
+
+  const containerRef = React.useRef<HTMLDivElement>(null);
+  const mediaRef = React.useRef<HTMLDivElement>(null);
+
+  const isPdf = file?.type.includes('pdf') || file?.url.toLowerCase().endsWith('.pdf');
+  const isImg = file?.type.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(file?.url || '');
+
+  const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); setRotation(0); };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    if (!isImg) return;
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.2 : 0.2;
+    const newScale = Math.min(Math.max(scale + delta, 1), 4);
+    setScale(newScale);
+    if (newScale === 1) setPosition({ x: 0, y: 0 });
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    if (scale <= 1 || !isImg) return;
+    setIsDragging(true);
+    setStartPan({ x: e.clientX - position.x, y: e.clientY - position.y });
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDragging || scale <= 1) return;
+    const newX = e.clientX - startPan.x;
+    const newY = e.clientY - startPan.y;
+    const limitX = Math.max(0, (window.innerWidth * scale - window.innerWidth) / 2);
+    const limitY = Math.max(0, (window.innerHeight * scale - window.innerHeight) / 2);
+    setPosition({ x: Math.min(Math.max(newX, -limitX), limitX), y: Math.min(Math.max(newY, -limitY), limitY) });
+  };
+
+  const handleMouseUp = () => setIsDragging(false);
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
-        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
+      <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[100]">
+        <DialogHeader className="sr-only"><DialogTitle>Document Detail</DialogTitle></DialogHeader>
+        <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
           <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-2 rounded-sm"><ShieldCheck className="h-5 w-5 text-primary" /></div>
-            <div>
-              <DialogTitle className="text-xl font-black uppercase tracking-tight">Compliance Documents</DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicle?.plateNumber}</DialogDescription>
+            <div className="bg-white/10 p-1.5 rounded-sm"><FileIcon className="h-4 w-4 text-white" /></div>
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[200px]">{file?.name}</span>
+              <span className="text-[8px] font-bold text-white/50 uppercase tracking-tighter">Professional Registry Copy</span>
             </div>
           </div>
-        </DialogHeader>
-
-        <div className="p-6 space-y-8">
-          <DocSection 
-            label="Registration Certificate (RC)" 
-            url={vehicle?.rcUrl} 
-            name={vehicle?.rcName} 
-            loading={uploading.rc} 
-            onUpload={(e) => handleUpload('rc', e)} 
-          />
-          <DocSection 
-            label="Insurance Document" 
-            url={vehicle?.insuranceUrl} 
-            name={vehicle?.insuranceName} 
-            loading={uploading.insurance} 
-            onUpload={(e) => handleUpload('insurance', e)} 
-          />
+          <div className="flex items-center gap-1.5">
+            {isImg && (
+              <>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setRotation(prev => (prev + 90) % 360)}><RotateCw className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
+              </>
+            )}
+            <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
+            <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-red-500"><X className="h-6 w-6" /></Button></DialogClose>
+          </div>
         </div>
 
-        <DialogFooter className="p-4 bg-muted/5 border-t">
-          <DialogClose asChild><Button variant="outline" className="w-full rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close Manager</Button></DialogClose>
-        </DialogFooter>
+        <div 
+          ref={containerRef} 
+          className={cn("relative w-full h-full flex items-center justify-center overflow-hidden touch-none z-[105]", isImg && scale > 1 ? (isDragging ? "cursor-grabbing" : "cursor-grab") : "cursor-default")} 
+          onWheel={handleWheel} 
+          onMouseDown={handleMouseDown} 
+          onMouseMove={handleMouseMove} 
+          onMouseUp={handleMouseUp} 
+          onMouseLeave={handleMouseUp}
+        >
+          <div 
+            ref={mediaRef} 
+            className={cn("transition-transform duration-200 ease-out flex items-center justify-center pointer-events-none w-fit h-fit", isDragging && "transition-none")} 
+            style={{ transform: `translate(${position.x}px, ${position.y}px) scale(${scale}) rotate(${rotation}deg)` }}
+          >
+            {file && (
+              isPdf ? (
+                <div className="pointer-events-auto w-[90vw] h-[75vh] bg-white rounded-sm shadow-2xl"><iframe src={file.url} className="w-full h-full border-none" /></div>
+              ) : (
+                <img src={file.url} className="max-w-[90vw] max-h-[75vh] object-contain shadow-2xl rounded-sm" alt="Document" />
+              )
+            )}
+          </div>
+        </div>
       </DialogContent>
     </Dialog>
   );
 }
 
-function DocSection({ label, url, name, loading, onUpload }: { label: string, url?: string, name?: string, loading?: number, onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
+function DocSection({ label, url, name, type, loading, onUpload, onView }: { label: string, url?: string, name?: string, type?: string, loading?: number, onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void, onView: () => void }) {
   const isUploaded = !!url;
+  const isImg = type?.startsWith('image/') || (url && !url.toLowerCase().endsWith('.pdf'));
 
   return (
     <div className="space-y-3">
@@ -785,22 +912,35 @@ function DocSection({ label, url, name, loading, onUpload }: { label: string, ur
             <Progress value={loading} className="h-1" />
           </div>
         ) : isUploaded ? (
-          <div className="p-4 border rounded-sm bg-primary/5 flex items-center justify-between shadow-sm animate-in fade-in duration-300">
-            <div className="flex items-center gap-3 min-w-0">
-              <div className="bg-primary/10 p-2 rounded-sm"><FileCheck className="h-4 w-4 text-primary" /></div>
-              <div className="flex flex-col min-w-0">
-                <span className="text-xs font-bold truncate max-w-[150px]">{name}</span>
-                <span className="text-[8px] font-black uppercase text-muted-foreground">Professional Copy</span>
+          <div className="space-y-2">
+            {isImg && (
+              <div className="relative aspect-video w-full rounded-sm overflow-hidden border bg-muted cursor-pointer group/preview" onClick={onView}>
+                <img src={url} className="w-full h-full object-cover transition-transform group-hover/preview:scale-105" alt={label} />
+                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/preview:opacity-100 flex items-center justify-center transition-opacity">
+                  <Maximize2 className="h-6 w-6 text-white" />
+                </div>
               </div>
-            </div>
-            <div className="flex gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
-                <a href={url} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
-              </Button>
-              <label className="cursor-pointer h-8 w-8 flex items-center justify-center rounded-sm text-primary hover:bg-primary/10 transition-colors">
-                <RefreshCcw className="h-4 w-4" />
-                <input type="file" className="hidden" accept="image/*,application/pdf" onChange={onUpload} />
-              </label>
+            )}
+            <div className="p-4 border rounded-sm bg-primary/5 flex items-center justify-between shadow-sm animate-in fade-in duration-300">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="bg-primary/10 p-2 rounded-sm"><FileCheck className="h-4 w-4 text-primary" /></div>
+                <div className="flex flex-col min-w-0">
+                  <span className="text-xs font-bold truncate max-w-[150px]">{name}</span>
+                  <span className="text-[8px] font-black uppercase text-muted-foreground">Professional Copy</span>
+                </div>
+              </div>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={onView} title="View Details">
+                  <Eye className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
+                  <a href={url} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
+                </Button>
+                <label className="cursor-pointer h-8 w-8 flex items-center justify-center rounded-sm text-primary hover:bg-primary/10 transition-colors">
+                  <RefreshCcw className="h-4 w-4" />
+                  <input type="file" className="hidden" accept="image/*,application/pdf" onChange={onUpload} />
+                </label>
+              </div>
             </div>
           </div>
         ) : (
