@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -24,7 +23,7 @@ import {
   X, 
   CheckCircle2, 
   FileImage, 
-  File as LucideFile, 
+  File as FileIcon, 
   RefreshCw,
   Plus
 } from 'lucide-react';
@@ -46,14 +45,14 @@ interface UserDocument {
   uploadedAt: string;
 }
 
-interface User {
+interface UserDocProfile {
   id: string;
   username?: string;
   documents?: UserDocument[];
 }
 
 interface UserDocumentsDialogProps {
-  user: User | null;
+  user: UserDocProfile | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
@@ -125,10 +124,8 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
       const storage = getStorage(firebaseApp);
       const storageRef = ref(storage, docToDelete.storagePath);
       
-      // 1. Delete from Storage
       await deleteObject(storageRef).catch(e => console.warn("Storage deletion failed or file already missing", e));
       
-      // 2. Remove from Firestore array
       const userRef = doc(firestore, 'users', user.id);
       updateDocumentNonBlocking(userRef, {
         documents: arrayRemove(docToDelete),
@@ -162,7 +159,7 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-3xl w-[95vw] h-[90vh] flex flex-col p-0 border-none shadow-2xl bg-background rounded-sm overflow-hidden">
+        <DialogContent className="sm:max-w-[500px] rounded-sm h-[90vh] max-h-[90vh] flex flex-col p-0 border-none shadow-2xl overflow-hidden">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2.5 rounded-sm"><FileText className="h-5 w-5 text-primary" /></div>
@@ -176,7 +173,6 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
           <div className="flex-1 overflow-hidden flex flex-col min-h-0">
             <ScrollArea className="flex-1">
               <div className="p-6 space-y-10">
-                {/* Upload Section */}
                 <section className="space-y-4">
                   <div className="flex items-center gap-2 border-b pb-2">
                     <Plus className="h-4 w-4 text-primary" />
@@ -227,11 +223,10 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
                   {isUploading && <Progress value={uploadProgress} className="h-1 rounded-none bg-primary/10" />}
                 </section>
 
-                {/* List Section */}
                 <section className="space-y-4">
                   <div className="flex items-center justify-between border-b pb-2">
                     <div className="flex items-center gap-2">
-                      <History className="h-4 w-4 text-primary" />
+                      <RefreshCw className="h-4 w-4 text-primary" />
                       <h3 className="text-[10px] font-black uppercase tracking-widest text-foreground">Stored Documents</h3>
                     </div>
                     <Badge variant="secondary" className="rounded-full h-5 px-2 text-[9px] font-black bg-primary/5 text-primary border-none">
@@ -277,7 +272,7 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
                       </Card>
                     )) : (
                       <div className="col-span-full py-20 text-center border-2 border-dashed rounded-sm opacity-20">
-                        <LucideFile className="h-12 w-12 mx-auto mb-3" />
+                        <FileIcon className="h-12 w-12 mx-auto mb-3" />
                         <p className="text-[10px] font-black uppercase tracking-widest">No documentation found</p>
                       </div>
                     )}
@@ -293,12 +288,11 @@ export function UserDocumentsDialog({ user, open, onOpenChange }: UserDocumentsD
         </DialogContent>
       </Dialog>
 
-      {/* Internal Viewer Dialog */}
       <Dialog open={!!viewingDoc} onOpenChange={(o) => !o && setViewingDoc(null)}>
         <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[70]">
           <DialogHeader className="absolute top-0 left-0 right-0 z-[80] p-4 bg-gradient-to-b from-black/80 to-transparent flex flex-row items-center justify-between pointer-events-none">
             <div className="flex items-center gap-3">
-              <div className="bg-white/10 p-2 rounded-sm pointer-events-auto"><LucideFile className="h-5 w-5 text-white" /></div>
+              <div className="bg-white/10 p-2 rounded-sm pointer-events-auto"><FileIcon className="h-5 w-5 text-white" /></div>
               <div className="flex flex-col pointer-events-auto">
                 <DialogTitle className="text-white text-lg font-black uppercase tracking-tight">{viewingDoc?.name}</DialogTitle>
                 <span className="text-[10px] font-bold text-white/50 uppercase tracking-widest">{viewingDoc?.type}</span>

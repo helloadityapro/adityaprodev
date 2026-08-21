@@ -16,7 +16,7 @@ import {
   Loader2,
   Trash2,
   GlassWater,
-  User,
+  User as UserIcon,
   History,
   X,
   Maximize2,
@@ -305,7 +305,7 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
                     <TableCell className="font-black text-sm text-primary">{record.serialNumber}</TableCell>
                     <TableCell className="font-bold text-xs uppercase">{record.moduleMake}</TableCell>
                     <TableCell className="max-w-[200px] truncate text-xs text-muted-foreground" title={record.breakageReason}>{record.breakageReason}</TableCell>
-                    <TableCell><div className="flex items-center gap-2 text-xs font-medium"><User className="h-3.5 w-3.5 text-primary opacity-50" />{record.createdByName}</div></TableCell>
+                    <TableCell><div className="flex items-center gap-2 text-xs font-medium"><UserIcon className="h-3.5 w-3.5 text-primary opacity-50" />{record.createdByName}</div></TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingRecord(record)} title="View Photos"><Eye className="h-4 w-4" /></Button>
@@ -371,7 +371,7 @@ export default function ProjectModuleBreakageDataPage({ params }: { params: Prom
                 <p className="text-sm italic font-medium leading-relaxed">"{viewingRecord?.breakageReason}"</p>
               </div>
               <div className="flex items-center justify-between pt-4 border-t text-[10px] font-bold text-muted-foreground uppercase">
-                <div className="flex items-center gap-2"><User className="h-3.5 w-3.5 text-primary opacity-50" />Logged By {viewingRecord?.createdByName}</div>
+                <div className="flex items-center gap-2"><UserIcon className="h-3.5 w-3.5 text-primary opacity-50" />Logged By {viewingRecord?.createdByName}</div>
                 <div className="flex items-center gap-2"><History className="h-3.5 w-3.5 text-primary opacity-50" />{viewingRecord?.createdAt && format(viewingRecord.createdAt.toDate(), 'dd/MM/yyyy HH:mm')}</div>
               </div>
             </div>

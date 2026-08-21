@@ -13,7 +13,7 @@ import {
   FilterX, 
   Clock, 
   MapPin, 
-  User, 
+  User as UserIcon, 
   ArrowDownCircle, 
   ArrowUpCircle,
   Calendar,
@@ -255,10 +255,8 @@ export default function MovementDataPage() {
     if (!deletingMovement) return;
     setIsProcessing(true);
     try {
-      // 1. Resolve reversal logic: -qty for Inward, +qty for Outward
       const adjustment = deletingMovement.movementType === 'Inward' ? -deletingMovement.quantity : deletingMovement.quantity;
 
-      // 2. Find relevant inventory doc
       const invQ = query(
         collection(firestore, 'project_inventory'),
         where('siteId', '==', deletingMovement.siteId),
@@ -276,7 +274,6 @@ export default function MovementDataPage() {
         });
       }
 
-      // 3. Delete the log
       batch.delete(doc(firestore, 'material_movements', deletingMovement.id));
       
       await batch.commit();
@@ -370,7 +367,6 @@ export default function MovementDataPage() {
       </div>
 
       <div className="space-y-4">
-        {/* Mobile Responsive List View */}
         <div className="md:hidden space-y-4">
           {filteredData.length > 0 ? filteredData.map((m) => (
             <Card key={m.id} className="border-primary/10 rounded-sm shadow-sm overflow-hidden animate-in fade-in duration-300">
@@ -423,7 +419,6 @@ export default function MovementDataPage() {
           )}
         </div>
 
-        {/* Desktop Table View */}
         <div className="hidden md:block">
           <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
             <CardContent className="p-0">
@@ -476,16 +471,16 @@ export default function MovementDataPage() {
                         <TableCell className="text-center font-black text-primary font-mono text-sm">{m.quantity} {m.unit}</TableCell>
                         <TableCell>
                           <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase">
-                            <User className="h-3 w-3 text-primary" />
+                            <UserIcon className="h-3 w-3 text-primary" />
                             {m.userName}
                           </div>
                         </TableCell>
                         <TableCell className="text-right px-6 whitespace-nowrap">
                           <div className="flex justify-end items-center gap-1">
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingMovement(m)} title="View Details">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => setViewingMovement(m)} title="View Details">
                               <Eye className="h-4 w-4" />
                             </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingMovement(m)} title="Delete Record">
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => setDeletingMovement(m)} title="Delete Record">
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
@@ -500,7 +495,6 @@ export default function MovementDataPage() {
         </div>
       </div>
 
-      {/* View Detail Dialog */}
       <Dialog open={!!viewingMovement} onOpenChange={(o) => !o && setViewingMovement(null)}>
         <DialogContent className="max-w-2xl w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
@@ -602,7 +596,7 @@ export default function MovementDataPage() {
 
                 <div className="pt-6 border-t flex flex-col gap-2">
                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
-                     <User className="h-3 w-3" /> 
+                     <UserIcon className="h-3 w-3" /> 
                      Logged By: <span className="text-foreground">{viewingMovement.userName}</span>
                    </div>
                    <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase">
@@ -619,7 +613,6 @@ export default function MovementDataPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingMovement} onOpenChange={(o) => !o && setDeletingMovement(null)}>
         <AlertDialogContent className="rounded-sm max-w-md w-[95vw]">
           <AlertDialogHeader className="text-left">
