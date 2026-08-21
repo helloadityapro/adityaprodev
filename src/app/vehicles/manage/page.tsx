@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter }
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import { 
   Car, 
   Plus, 
@@ -638,6 +639,12 @@ export default function ManageVehiclesPage() {
         onOpenChange={(o) => !o && setVehicleHistory(null)} 
       />
 
+      <DocumentViewerDialog 
+        file={null} // Controlled by internal dialog state if needed or passed from parent
+        open={false} 
+        onOpenChange={() => {}} 
+      />
+
       {/* Delete Confirmation */}
       <AlertDialog open={!!vehicleToDelete} onOpenChange={(o) => !o && setVehicleToDelete(null)}>
         <AlertDialogContent className="rounded-sm">
@@ -1008,7 +1015,7 @@ function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { ve
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background h-[85vh] flex flex-col">
-        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-2 rounded-sm"><History className="h-5 w-5 text-primary" /></div>
             <div>
