@@ -39,7 +39,8 @@ import {
   Upload,
   Download,
   ShieldCheck,
-  FileCheck
+  FileCheck,
+  RefreshCcw
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
@@ -82,6 +83,7 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, subWeeks, subMonths, subYears, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
 import { Progress } from "@/components/ui/progress";
+import { Label } from '@/components/ui/label';
 
 const editVehicleSchema = z.object({
   make: z.string().min(1, 'Make is required.'),
@@ -265,7 +267,7 @@ export default function ManageVehiclesPage() {
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const filteredVehicles = React.useMemo(() => {
@@ -407,7 +409,7 @@ export default function ManageVehiclesPage() {
                     <TableCell>
                       {activeAssignment ? (
                         <div className="flex items-center gap-2">
-                          <User className="h-3.5 w-3.5 text-primary" />
+                          <UserIcon className="h-3.5 w-3.5 text-primary" />
                           <span className="text-xs font-bold">{activeAssignment.userName}</span>
                         </div>
                       ) : (
@@ -953,7 +955,7 @@ function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { ve
             </TableBody>
           </Table>
         </ScrollArea>
-        <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
+        <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
       </DialogContent>
     </Dialog>
   );
