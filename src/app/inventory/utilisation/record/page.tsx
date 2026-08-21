@@ -99,7 +99,7 @@ export default function RecordUtilisationPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isAdmin = userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
 
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
@@ -154,6 +154,7 @@ export default function RecordUtilisationPage() {
 
   const selectedSiteId = form.watch("siteId");
   const selectedItemName = form.watch("itemName");
+  const currentQuantity = form.watch("quantity");
 
   const inventoryQuery = useMemoFirebase(() => {
     if (!selectedSiteId) return null;
@@ -210,6 +211,7 @@ export default function RecordUtilisationPage() {
   }, [selectedSiteId, approvedBomItems, acceptedPOs, projectInventory, itemSearchQuery]);
 
   const selectedItem = filteredMaterials.find(m => m.itemName === selectedItemName);
+  const isOverStock = selectedItem && currentQuantity > selectedItem.stockLevel;
 
   const onSubmit = async (values: z.infer<typeof utilisationSchema>) => {
     if (!user || !userProfile || !selectedItem) return;
@@ -263,7 +265,7 @@ export default function RecordUtilisationPage() {
               <div className="bg-emerald-500/10 p-6 rounded-full"><CheckCircle2 className="h-16 w-16 text-emerald-600" /></div>
             </div>
             <CardTitle className="text-2xl font-black uppercase tracking-tight text-emerald-900">Utilisation Logged</CardTitle>
-            <CardDescription className="text-base font-medium text-emerald-800/70 mt-2">
+            <CardDescription className="text-base font-medium text-emerald-800/70 mt-2 text-center">
               The material consumption report for <strong>{selectedItemName}</strong> has been successfully archived.
             </CardDescription>
           </CardHeader>
@@ -274,11 +276,6 @@ export default function RecordUtilisationPage() {
         </Card>
       </div>
     );
-  }
-
-  function isSuperAdmin(email: string | null | undefined): boolean {
-    if (!email) return false;
-    return ['khalil@adityagreenenergy.com'].includes(email.toLowerCase());
   }
 
   return (
@@ -370,7 +367,14 @@ export default function RecordUtilisationPage() {
                     <FormLabel className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Quantity Consumed</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input type="number" step="0.01" {...field} onFocus={e => e.target.select()} className="h-12 font-mono font-black text-lg rounded-sm pr-12 focus:ring-primary/20" />
+                        <Input 
+                          type="number" 
+                          step="0.01" 
+                          {...field} 
+                          onFocus={e => e.target.select()} 
+                          className={cn("h-12 font-mono font-black text-lg rounded-sm pr-12 focus:ring-primary/20", isOverStock && "border-destructive text-destructive")} 
+                          max={selectedItem?.stockLevel}
+                        />
                         {selectedItem && <span className="absolute right-4 top-3.5 text-[10px] font-black uppercase text-primary bg-primary/5 px-1.5 py-0.5 rounded-sm">{getFriendlyUnit(selectedItem.unit)}</span>}
                       </div>
                     </FormControl>
@@ -401,15 +405,20 @@ export default function RecordUtilisationPage() {
               )} />
 
               {selectedItem && (
-                <div className="p-4 bg-primary/5 rounded-sm border border-primary/10 flex items-start gap-3 animate-in slide-in-from-top-1 duration-300">
-                  <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />
+                <div className={cn("p-4 rounded-sm border flex items-start gap-3 animate-in slide-in-from-top-1 duration-300", isOverStock ? "bg-red-50 border-red-200" : "bg-primary/5 border-primary/10")}>
+                  {isOverStock ? <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" /> : <AlertCircle className="h-5 w-5 text-primary shrink-0 mt-0.5" />}
                   <div className="text-xs text-muted-foreground leading-relaxed">
-                    <strong>Inventory Adjustment:</strong> Submitting this will reduce <strong>{selectedItem.itemName}</strong> stock by <strong>{form.watch('quantity')} {selectedItem.unit}</strong>. Current balance: <span className="font-bold text-foreground">{selectedItem.stockLevel} {selectedItem.unit}</span>.
+                    {isOverStock ? (
+                      <strong className="text-red-700 uppercase font-black">Error: Insufficient Stock! </strong>
+                    ) : (
+                      <strong>Inventory Adjustment: </strong>
+                    )}
+                    Submitting this will reduce <strong>{selectedItem.itemName}</strong> stock by <strong>{currentQuantity} {selectedItem.unit}</strong>. Current balance: <span className={cn("font-bold", isOverStock ? "text-red-800" : "text-foreground")}>{selectedItem.stockLevel} {selectedItem.unit}</span>.
                   </div>
                 </div>
               )}
 
-              <Button type="submit" className="w-full h-14 text-base font-black uppercase tracking-widest shadow-xl shadow-primary/20 transition-all active:scale-[0.98]" disabled={isSubmitting || !selectedItem}>
+              <Button type="submit" className="w-full h-14 text-base font-black uppercase tracking-widest shadow-xl shadow-primary/20 transition-all active:scale-[0.98]" disabled={isSubmitting || !selectedItem || isOverStock}>
                 {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Save className="mr-2 h-5 w-5" /> PUBLISH UTILISATION</>}
               </Button>
             </form>

@@ -1,8 +1,9 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, writeBatch } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, writeBatch, useFirebaseApp } from '@/firebase';
 import { collection, doc, query, orderBy, where, serverTimestamp, limit } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -33,7 +34,12 @@ import {
   MapPin,
   Calendar,
   Filter,
-  Eye
+  Eye,
+  FileText,
+  Upload,
+  Download,
+  ShieldCheck,
+  FileCheck
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
@@ -75,6 +81,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format, subWeeks, subMonths, subYears, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
+import { Progress } from "@/components/ui/progress";
 
 const editVehicleSchema = z.object({
   make: z.string().min(1, 'Make is required.'),
@@ -94,6 +101,10 @@ type Vehicle = {
   status: 'Available' | 'Allotted' | 'Ongoing';
   currentReading: number;
   createdAt?: any;
+  rcUrl?: string;
+  rcName?: string;
+  insuranceUrl?: string;
+  insuranceName?: string;
 };
 
 type Assignment = {
@@ -137,6 +148,7 @@ export default function ManageVehiclesPage() {
   const [vehicleToDelete, setVehicleToDelete] = React.useState<Vehicle | null>(null);
   const [vehicleToRelease, setVehicleToRelease] = React.useState<Vehicle | null>(null);
   const [vehicleHistory, setVehicleHistory] = React.useState<Vehicle | null>(null);
+  const [vehicleDocs, setVehicleDocs] = React.useState<Vehicle | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const vehiclesQuery = useMemoFirebase(() => collection(firestore, 'vehicles'), [firestore]);
@@ -216,7 +228,6 @@ export default function ManageVehiclesPage() {
     try {
       const batch = writeBatch(firestore);
       
-      // Find and cancel any active assignments for this vehicle
       const activeAssignments = allAssignments.filter(a => 
         a.vehicleId === vehicleToRelease.id && 
         (a.status === 'Approved' || a.status === 'Ongoing')
@@ -254,7 +265,7 @@ export default function ManageVehiclesPage() {
 
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const filteredVehicles = React.useMemo(() => {
@@ -434,6 +445,15 @@ export default function ManageVehiclesPage() {
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8 rounded-sm text-primary hover:bg-primary/10"
+                          onClick={() => setVehicleDocs(v)}
+                          title="Vehicle Documents"
+                        >
+                          <FileText className="h-4 w-4" />
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="h-8 w-8 rounded-sm text-primary hover:bg-primary/10"
                           onClick={() => setVehicleHistory(v)}
                           title="View History"
                         >
@@ -591,6 +611,12 @@ export default function ManageVehiclesPage() {
         </DialogContent>
       </Dialog>
 
+      <VehicleDocumentsDialog 
+        vehicle={vehicleDocs} 
+        open={!!vehicleDocs} 
+        onOpenChange={(o) => !o && setVehicleDocs(null)} 
+      />
+
       {/* History Dialog */}
       <VehicleHistoryDialog 
         vehicle={vehicleHistory} 
@@ -639,6 +665,149 @@ export default function ManageVehiclesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+    </div>
+  );
+}
+
+function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehicle | null, open: boolean, onOpenChange: (o: boolean) => void }) {
+  const firestore = useFirestore();
+  const firebaseApp = useFirebaseApp();
+  const { toast } = useToast();
+  const [uploading, setUploading] = React.useState<Record<string, number>>({});
+
+  const handleUpload = async (type: 'rc' | 'insurance', e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !vehicle) return;
+
+    try {
+      const storage = getStorage(firebaseApp);
+      const storagePath = `fleet_docs/${vehicle.id}/${type}_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+      const storageRef = ref(storage, storagePath);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploading(prev => ({ ...prev, [type]: progress }));
+        },
+        (error) => {
+          toast({ variant: 'destructive', title: 'Upload Failed', description: error.message });
+          setUploading(prev => { const n = {...prev}; delete n[type]; return n; });
+        },
+        async () => {
+          const url = await getDownloadURL(uploadTask.snapshot.ref);
+          const vehicleRef = doc(firestore, 'vehicles', vehicle.id);
+          
+          const updateData: any = {};
+          if (type === 'rc') {
+            updateData.rcUrl = url;
+            updateData.rcName = file.name;
+          } else {
+            updateData.insuranceUrl = url;
+            updateData.insuranceName = file.name;
+          }
+
+          updateDocumentNonBlocking(vehicleRef, { ...updateData, updatedAt: serverTimestamp() });
+          toast({ title: 'Document Saved', description: `${type.toUpperCase()} updated for ${vehicle.plateNumber}.` });
+          setUploading(prev => { const n = {...prev}; delete n[type]; return n; });
+        }
+      );
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
+          <div className="flex items-center gap-3">
+            <div className="bg-primary/10 p-2 rounded-sm"><ShieldCheck className="h-5 w-5 text-primary" /></div>
+            <div>
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Compliance Documents</DialogTitle>
+              <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicle?.plateNumber}</DialogDescription>
+            </div>
+          </div>
+        </DialogHeader>
+
+        <div className="p-6 space-y-8">
+          <DocSection 
+            label="Registration Certificate (RC)" 
+            url={vehicle?.rcUrl} 
+            name={vehicle?.rcName} 
+            loading={uploading.rc} 
+            onUpload={(e) => handleUpload('rc', e)} 
+          />
+          <DocSection 
+            label="Insurance Document" 
+            url={vehicle?.insuranceUrl} 
+            name={vehicle?.insuranceName} 
+            loading={uploading.insurance} 
+            onUpload={(e) => handleUpload('insurance', e)} 
+          />
+        </div>
+
+        <DialogFooter className="p-4 bg-muted/5 border-t">
+          <DialogClose asChild><Button variant="outline" className="w-full rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close Manager</Button></DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function DocSection({ label, url, name, loading, onUpload }: { label: string, url?: string, name?: string, loading?: number, onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void }) {
+  const isUploaded = !!url;
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{label}</Label>
+        <Badge variant={isUploaded ? "default" : "outline"} className={cn(
+          "rounded-sm text-[8px] font-black uppercase h-5",
+          isUploaded ? "bg-emerald-600 text-white border-none" : "text-muted-foreground/40 border-muted"
+        )}>
+          {isUploaded ? <><Check className="h-2 w-2 mr-1" /> Available</> : "Missing"}
+        </Badge>
+      </div>
+
+      <div className="relative group">
+        {loading !== undefined ? (
+          <div className="p-4 border rounded-sm bg-muted/5 space-y-2">
+            <div className="flex items-center justify-between text-[10px] font-bold uppercase text-primary">
+              <span>Transferring...</span>
+              <span>{Math.round(loading)}%</span>
+            </div>
+            <Progress value={loading} className="h-1" />
+          </div>
+        ) : isUploaded ? (
+          <div className="p-4 border rounded-sm bg-primary/5 flex items-center justify-between shadow-sm animate-in fade-in duration-300">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="bg-primary/10 p-2 rounded-sm"><FileCheck className="h-4 w-4 text-primary" /></div>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-bold truncate max-w-[150px]">{name}</span>
+                <span className="text-[8px] font-black uppercase text-muted-foreground">Professional Copy</span>
+              </div>
+            </div>
+            <div className="flex gap-1">
+              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
+                <a href={url} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
+              </Button>
+              <label className="cursor-pointer h-8 w-8 flex items-center justify-center rounded-sm text-primary hover:bg-primary/10 transition-colors">
+                <RefreshCcw className="h-4 w-4" />
+                <input type="file" className="hidden" accept="image/*,application/pdf" onChange={onUpload} />
+              </label>
+            </div>
+          </div>
+        ) : (
+          <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-sm cursor-pointer hover:bg-muted/50 transition-all bg-muted/5 group">
+            <div className="flex flex-col items-center justify-center pt-5 pb-6">
+              <Upload className="w-6 h-6 mb-2 text-muted-foreground/40 group-hover:text-primary transition-colors" />
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 group-hover:text-primary transition-colors">Select {label}</p>
+            </div>
+            <input type="file" className="hidden" accept="image/*,application/pdf" onChange={onUpload} />
+          </label>
+        )}
+      </div>
     </div>
   );
 }
