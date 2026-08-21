@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, writeBatch, useFirebaseApp } from '@/firebase';
-import { collection, doc, query, orderBy, where, serverTimestamp, limit, getDocs } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, serverTimestamp, limit, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -89,7 +90,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { format, subWeeks, subMonths, subYears, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
+import { format, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear, isWithinInterval } from 'date-fns';
 import { Progress } from "@/components/ui/progress";
 import { Label } from '@/components/ui/label';
 
@@ -102,6 +103,14 @@ const editVehicleSchema = z.object({
   status: z.enum(['Available', 'Allotted', 'Ongoing']),
 });
 
+type VehicleDocument = {
+  url: string;
+  name: string;
+  type: string;
+  storagePath: string;
+  uploadedAt: string;
+};
+
 type Vehicle = {
   id: string;
   make: string;
@@ -111,12 +120,8 @@ type Vehicle = {
   status: 'Available' | 'Allotted' | 'Ongoing';
   currentReading: number;
   createdAt?: any;
-  rcUrl?: string;
-  rcName?: string;
-  rcType?: string;
-  insuranceUrl?: string;
-  insuranceName?: string;
-  insuranceType?: string;
+  rcDocs?: VehicleDocument[];
+  insuranceDocs?: VehicleDocument[];
 };
 
 type Assignment = {
@@ -631,7 +636,6 @@ export default function ManageVehiclesPage() {
         onOpenChange={(o) => !o && setVehicleDocs(null)} 
       />
 
-      {/* History Dialog */}
       <VehicleHistoryDialog 
         vehicle={vehicleHistory} 
         assignments={allAssignments || []} 
@@ -639,13 +643,6 @@ export default function ManageVehiclesPage() {
         onOpenChange={(o) => !o && setVehicleHistory(null)} 
       />
 
-      <DocumentViewerDialog 
-        file={null} // Controlled by internal dialog state if needed or passed from parent
-        open={false} 
-        onOpenChange={() => {}} 
-      />
-
-      {/* Delete Confirmation */}
       <AlertDialog open={!!vehicleToDelete} onOpenChange={(o) => !o && setVehicleToDelete(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
@@ -665,7 +662,6 @@ export default function ManageVehiclesPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Release Confirmation */}
       <AlertDialog open={!!vehicleToRelease} onOpenChange={(o) => !o && setVehicleToRelease(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
@@ -694,15 +690,17 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
   const firebaseApp = useFirebaseApp();
   const { toast } = useToast();
   const [uploading, setUploading] = React.useState<Record<string, number>>({});
-  const [viewingDoc, setViewingDoc] = React.useState<{ url: string, name: string, type: string } | null>(null);
+  const [viewingDoc, setViewingDoc] = React.useState<VehicleDocument | null>(null);
 
-  const handleUpload = async (type: 'rc' | 'insurance', e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !vehicle) return;
+  const handleUpload = async (type: 'rcDocs' | 'insuranceDocs', e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !vehicle) return;
 
-    try {
-      const storage = getStorage(firebaseApp);
-      const storagePath = `fleet_docs/${vehicle.id}/${type}_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
+    const storage = getStorage(firebaseApp);
+    
+    for (const file of Array.from(files)) {
+      const timestamp = Date.now();
+      const storagePath = `fleet_docs/${vehicle.id}/${type}_${timestamp}_${file.name.replace(/\s+/g, '_')}`;
       const storageRef = ref(storage, storagePath);
       const uploadTask = uploadBytesResumable(storageRef, file);
 
@@ -717,73 +715,80 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
         },
         async () => {
           const url = await getDownloadURL(uploadTask.snapshot.ref);
-          const vehicleRef = doc(firestore, 'vehicles', vehicle.id);
-          
-          const updateData: any = {};
-          if (type === 'rc') {
-            updateData.rcUrl = url;
-            updateData.rcName = file.name;
-            updateData.rcType = file.type;
-          } else {
-            updateData.insuranceUrl = url;
-            updateData.insuranceName = file.name;
-            updateData.insuranceType = file.type;
-          }
+          const newDoc: VehicleDocument = {
+            url,
+            name: file.name,
+            type: file.type,
+            storagePath,
+            uploadedAt: new Date().toISOString()
+          };
 
-          updateDocumentNonBlocking(vehicleRef, { ...updateData, updatedAt: serverTimestamp() });
-          toast({ title: 'Document Saved', description: `${type.toUpperCase()} updated for ${vehicle.plateNumber}.` });
+          const vehicleRef = doc(firestore, 'vehicles', vehicle.id);
+          updateDocumentNonBlocking(vehicleRef, {
+            [type]: arrayUnion(newDoc),
+            updatedAt: serverTimestamp()
+          });
+
+          toast({ title: 'Document Added', description: `${file.name} saved to vehicle record.` });
           setUploading(prev => { const n = {...prev}; delete n[type]; return n; });
         }
       );
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
     }
   };
 
-  const openViewer = (url: string, name: string, type?: string) => {
-    setViewingDoc({ 
-      url, 
-      name, 
-      type: type || (url.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg') 
-    });
+  const handleDeleteDoc = async (type: 'rcDocs' | 'insuranceDocs', docToDelete: VehicleDocument) => {
+    if (!vehicle) return;
+    try {
+      const storage = getStorage(firebaseApp);
+      await deleteObject(ref(storage, docToDelete.storagePath)).catch(e => console.warn("Missing from storage", e));
+      
+      const vehicleRef = doc(firestore, 'vehicles', vehicle.id);
+      updateDocumentNonBlocking(vehicleRef, {
+        [type]: arrayRemove(docToDelete),
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: 'Removed', description: 'Document deleted from registry.' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    }
   };
 
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-md rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background">
+        <DialogContent className="sm:max-w-xl rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[85vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><ShieldCheck className="h-5 w-5 text-primary" /></div>
               <div>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight">Compliance Documents</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicle?.plateNumber}</DialogDescription>
+                <DialogTitle className="text-xl font-black uppercase tracking-tight leading-none">Fleet Documents</DialogTitle>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{vehicle?.plateNumber} Registry</DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
-          <div className="p-6 space-y-8">
-            <DocSection 
-              label="Registration Certificate (RC)" 
-              url={vehicle?.rcUrl} 
-              name={vehicle?.rcName} 
-              type={vehicle?.rcType}
-              loading={uploading.rc} 
-              onUpload={(e) => handleUpload('rc', e)} 
-              onView={() => vehicle?.rcUrl && openViewer(vehicle.rcUrl, vehicle.rcName || 'RC', vehicle.rcType)}
-            />
-            <DocSection 
-              label="Insurance Document" 
-              url={vehicle?.insuranceUrl} 
-              name={vehicle?.insuranceName} 
-              type={vehicle?.insuranceType}
-              loading={uploading.insurance} 
-              onUpload={(e) => handleUpload('insurance', e)} 
-              onView={() => vehicle?.insuranceUrl && openViewer(vehicle.insuranceUrl, vehicle.insuranceName || 'Insurance', vehicle.insuranceType)}
-            />
-          </div>
+          <ScrollArea className="flex-1">
+            <div className="p-6 space-y-10">
+              <DocSection 
+                label="Registration Certificate (RC)" 
+                docs={vehicle?.rcDocs} 
+                loading={uploading.rcDocs} 
+                onUpload={(e) => handleUpload('rcDocs', e)} 
+                onView={(d) => setViewingDoc(d)}
+                onDelete={(d) => handleDeleteDoc('rcDocs', d)}
+              />
+              <DocSection 
+                label="Insurance Certificates" 
+                docs={vehicle?.insuranceDocs} 
+                loading={uploading.insuranceDocs} 
+                onUpload={(e) => handleUpload('insuranceDocs', e)} 
+                onView={(d) => setViewingDoc(d)}
+                onDelete={(d) => handleDeleteDoc('insuranceDocs', d)}
+              />
+            </div>
+          </ScrollArea>
 
-          <DialogFooter className="p-4 bg-muted/5 border-t">
+          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0">
             <DialogClose asChild><Button variant="outline" className="w-full rounded-sm font-bold uppercase text-[10px] h-10 px-8">Close Manager</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -798,7 +803,81 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
   );
 }
 
-function DocumentViewerDialog({ file, open, onOpenChange }: { file: { url: string, name: string, type: string } | null, open: boolean, onOpenChange: (o: boolean) => void }) {
+function DocSection({ label, docs, loading, onUpload, onView, onDelete }: { 
+  label: string, 
+  docs?: VehicleDocument[], 
+  loading?: number, 
+  onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void, 
+  onView: (doc: VehicleDocument) => void,
+  onDelete: (doc: VehicleDocument) => void
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between border-b pb-2">
+        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{label}</Label>
+        <div className="flex items-center gap-2">
+          <Badge variant={docs?.length ? "default" : "outline"} className={cn(
+            "rounded-sm text-[8px] font-black uppercase h-5",
+            docs?.length ? "bg-emerald-600 text-white border-none" : "text-muted-foreground/40 border-muted"
+          )}>
+            {docs?.length || 0} Files
+          </Badge>
+          <label className="cursor-pointer">
+            <Badge variant="outline" className="h-5 rounded-sm border-primary/20 text-primary hover:bg-primary/5 transition-colors text-[8px] font-black uppercase">
+              <Plus className="h-2 w-2 mr-1" /> Add File
+            </Badge>
+            <input type="file" multiple className="hidden" onChange={onUpload} />
+          </label>
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        {loading !== undefined && (
+          <div className="p-3 border rounded-sm bg-muted/5 space-y-1.5">
+            <div className="flex items-center justify-between text-[8px] font-bold uppercase text-primary">
+              <span>Transferring...</span>
+              <span>{Math.round(loading)}%</span>
+            </div>
+            <Progress value={loading} className="h-0.5" />
+          </div>
+        )}
+
+        {docs && docs.length > 0 ? (
+          <div className="grid gap-2">
+            {docs.map((doc, idx) => {
+              const isImg = doc.type.startsWith('image/');
+              return (
+                <div key={idx} className="p-3 border rounded-sm bg-background flex items-center justify-between group hover:border-primary/20 transition-all shadow-sm">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-8 w-12 bg-muted rounded-sm overflow-hidden border shrink-0">
+                       {isImg ? <img src={doc.url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-primary/5"><FileText className="h-4 w-4 text-primary/40" /></div>}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[10px] font-bold truncate max-w-[200px] text-foreground uppercase tracking-tight">{doc.name}</span>
+                      <span className="text-[8px] font-medium text-muted-foreground/60">{format(new Date(doc.uploadedAt), 'dd MMM yyyy')}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary rounded-sm hover:bg-primary/10" onClick={() => onView(doc)}><Eye className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary rounded-sm hover:bg-primary/10" asChild><a href={doc.url} download={doc.name} target="_blank"><Download className="h-4 w-4" /></a></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm hover:bg-red-50" onClick={() => onDelete(doc)}><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="py-8 text-center border-2 border-dashed rounded-sm opacity-20 bg-muted/5 flex flex-col items-center gap-2">
+             <FileIcon className="h-8 w-8" />
+             <p className="text-[9px] font-black uppercase tracking-widest">No documentation logged</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function DocumentViewerDialog({ file, open, onOpenChange }: { file: VehicleDocument | null, open: boolean, onOpenChange: (o: boolean) => void }) {
   const [scale, setScale] = React.useState(1);
   const [position, setPosition] = React.useState({ x: 0, y: 0 });
   const [isDragging, setIsDragging] = React.useState(false);
@@ -809,7 +888,7 @@ function DocumentViewerDialog({ file, open, onOpenChange }: { file: { url: strin
   const mediaRef = React.useRef<HTMLDivElement>(null);
 
   const isPdf = file?.type.includes('pdf') || file?.url.toLowerCase().endsWith('.pdf');
-  const isImg = file?.type.startsWith('image/') || /\.(jpg|jpeg|png|webp)$/i.test(file?.url || '');
+  const isImg = file?.type.startsWith('image/') || (file && /\.(jpg|jpeg|png|webp)$/i.test(file.url));
 
   const resetViewer = () => { setScale(1); setPosition({ x: 0, y: 0 }); setRotation(0); };
 
@@ -842,13 +921,13 @@ function DocumentViewerDialog({ file, open, onOpenChange }: { file: { url: strin
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-[95vw] h-[90vh] p-0 border-none bg-black/95 flex flex-col items-center justify-center rounded-sm overflow-hidden shadow-2xl z-[100]">
-        <DialogHeader className="sr-only"><DialogTitle>Document Detail</DialogTitle></DialogHeader>
+        <DialogHeader className="sr-only"><DialogTitle>Audit Document Detail</DialogTitle></DialogHeader>
         <div className="absolute top-0 left-0 right-0 z-[110] flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent no-print">
           <div className="flex items-center gap-3">
             <div className="bg-white/10 p-1.5 rounded-sm"><FileIcon className="h-4 w-4 text-white" /></div>
             <div className="flex flex-col">
               <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[200px]">{file?.name}</span>
-              <span className="text-[8px] font-bold text-white/50 uppercase tracking-tighter">Professional Registry Copy</span>
+              <span className="text-[8px] font-bold text-white/50 uppercase tracking-tighter">Fleet Compliance Copy</span>
             </div>
           </div>
           <div className="flex items-center gap-1.5">
@@ -857,7 +936,7 @@ function DocumentViewerDialog({ file, open, onOpenChange }: { file: { url: strin
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
                 <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={() => setRotation(prev => (prev + 90) % 360)}><RotateCw className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-white hover:bg-white/10" onClick={resetViewer}><RotateIcon className="h-5 w-5" /></Button>
               </>
             )}
             <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
@@ -893,219 +972,72 @@ function DocumentViewerDialog({ file, open, onOpenChange }: { file: { url: strin
   );
 }
 
-function DocSection({ label, url, name, type, loading, onUpload, onView }: { label: string, url?: string, name?: string, type?: string, loading?: number, onUpload: (e: React.ChangeEvent<HTMLInputElement>) => void, onView: () => void }) {
-  const isUploaded = !!url;
-  const isImg = type?.startsWith('image/') || (url && !url.toLowerCase().endsWith('.pdf'));
-
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{label}</Label>
-        <Badge variant={isUploaded ? "default" : "outline"} className={cn(
-          "rounded-sm text-[8px] font-black uppercase h-5",
-          isUploaded ? "bg-emerald-600 text-white border-none" : "text-muted-foreground/40 border-muted"
-        )}>
-          {isUploaded ? <><Check className="h-2 w-2 mr-1" /> Available</> : "Missing"}
-        </Badge>
-      </div>
-
-      <div className="relative group">
-        {loading !== undefined ? (
-          <div className="p-4 border rounded-sm bg-muted/5 space-y-2">
-            <div className="flex items-center justify-between text-[10px] font-bold uppercase text-primary">
-              <span>Transferring...</span>
-              <span>{Math.round(loading)}%</span>
-            </div>
-            <Progress value={loading} className="h-1" />
-          </div>
-        ) : isUploaded ? (
-          <div className="space-y-2">
-            {isImg && (
-              <div className="relative aspect-video w-full rounded-sm overflow-hidden border bg-muted cursor-pointer group/preview" onClick={onView}>
-                <img src={url} className="w-full h-full object-cover transition-transform group-hover/preview:scale-105" alt={label} />
-                <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/preview:opacity-100 flex items-center justify-center transition-opacity">
-                  <Maximize2 className="h-6 w-6 text-white" />
-                </div>
-              </div>
-            )}
-            <div className="p-4 border rounded-sm bg-primary/5 flex items-center justify-between shadow-sm animate-in fade-in duration-300">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="bg-primary/10 p-2 rounded-sm"><FileCheck className="h-4 w-4 text-primary" /></div>
-                <div className="flex flex-col min-w-0">
-                  <span className="text-xs font-bold truncate max-w-[150px]">{name}</span>
-                  <span className="text-[8px] font-black uppercase text-muted-foreground">Professional Copy</span>
-                </div>
-              </div>
-              <div className="flex gap-1">
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={onView} title="View Details">
-                  <Eye className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" asChild>
-                  <a href={url} target="_blank" rel="noopener noreferrer"><Download className="h-4 w-4" /></a>
-                </Button>
-                <label className="cursor-pointer h-8 w-8 flex items-center justify-center rounded-sm text-primary hover:bg-primary/10 transition-colors">
-                  <RefreshCcw className="h-4 w-4" />
-                  <input type="file" className="hidden" accept="image/*,application/pdf" onChange={onUpload} />
-                </label>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <label className="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed rounded-sm cursor-pointer hover:bg-muted/50 transition-all bg-muted/5 group">
-            <div className="flex flex-col items-center justify-center pt-5 pb-6">
-              <Upload className="w-6 h-6 mb-2 text-muted-foreground/40 group-hover:text-primary transition-colors" />
-              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60 group-hover:text-primary transition-colors">Select {label}</p>
-            </div>
-            <input type="file" className="hidden" accept="image/*,application/pdf" onChange={onUpload} />
-          </label>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { vehicle: Vehicle | null, assignments: Assignment[], open: boolean, onOpenChange: (o: boolean) => void }) {
   const [filter, setFilter] = React.useState<string>("all");
-  const [customStart, setCustomStart] = React.useState("");
-  const [customEnd, setCustomEnd] = React.useState("");
 
   const filteredHistory = React.useMemo(() => {
     if (!vehicle || !assignments) return [];
-    
-    let list = assignments.filter(a => a.vehicleId === vehicle.id && a.status === 'Completed');
-    
-    const now = new Date();
-    if (filter === 'week') {
-      const start = startOfWeek(now);
-      const end = endOfWeek(now);
-      list = list.filter(a => {
-        const d = a.endTime?.toDate?.() || new Date(a.endTime);
-        return isWithinInterval(d, { start, end });
-      });
-    } else if (filter === 'month') {
-      const start = startOfMonth(now);
-      const end = endOfMonth(now);
-      list = list.filter(a => {
-        const d = a.endTime?.toDate?.() || new Date(a.endTime);
-        return isWithinInterval(d, { start, end });
-      });
-    } else if (filter === 'year') {
-      const start = startOfYear(now);
-      const end = endOfYear(now);
-      list = list.filter(a => {
-        const d = a.endTime?.toDate?.() || new Date(a.endTime);
-        return isWithinInterval(d, { start, end });
-      });
-    } else if (filter === 'custom' && customStart && customEnd) {
-      const start = new Date(customStart);
-      const end = new Date(customEnd);
-      list = list.filter(a => {
-        const d = a.endTime?.toDate?.() || new Date(a.endTime);
-        return isWithinInterval(d, { start, end });
-      });
-    }
-
+    const list = assignments.filter(a => a.vehicleId === vehicle.id && a.status === 'Completed');
     return list.sort((a, b) => {
       const da = a.endTime?.toDate?.()?.getTime() || 0;
       const db = b.endTime?.toDate?.()?.getTime() || 0;
       return db - da;
     });
-  }, [vehicle, assignments, filter, customStart, customEnd]);
+  }, [vehicle, assignments]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background h-[85vh] flex flex-col">
-        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
+      <DialogContent className="max-w-3xl w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background h-[80vh] flex flex-col">
+        <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
           <div className="flex items-center gap-3">
             <div className="bg-primary/10 p-2 rounded-sm"><History className="h-5 w-5 text-primary" /></div>
             <div>
-              <DialogTitle className="text-xl font-black uppercase tracking-tight">Trip Audit Trail</DialogTitle>
-              <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicle?.plateNumber} — {vehicle?.make} {vehicle?.model}</DialogDescription>
+              <DialogTitle className="text-xl font-black uppercase tracking-tight">Vehicle Deployment History</DialogTitle>
+              <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{vehicle?.plateNumber}</DialogDescription>
             </div>
           </div>
         </DialogHeader>
-
-        <div className="p-4 border-b bg-muted/10 flex flex-col sm:flex-row items-center gap-4 shrink-0">
-          <div className="flex items-center gap-2">
-            <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-            <Select value={filter} onValueChange={setFilter}>
-              <SelectTrigger className="w-40 h-9 rounded-sm text-xs font-bold uppercase">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs font-bold uppercase">All Time</SelectItem>
-                <SelectItem value="week" className="text-xs font-bold uppercase">This Week</SelectItem>
-                <SelectItem value="month" className="text-xs font-bold uppercase">This Month</SelectItem>
-                <SelectItem value="year" className="text-xs font-bold uppercase">This Year</SelectItem>
-                <SelectItem value="custom" className="text-xs font-bold uppercase text-primary">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {filter === 'custom' && (
-            <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-              <Input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="h-9 w-36 rounded-sm text-xs" />
-              <span className="text-xs font-black text-muted-foreground">TO</span>
-              <Input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="h-9 w-36 rounded-sm text-xs" />
-            </div>
-          )}
-
-          <div className="ml-auto">
-            <Badge variant="secondary" className="rounded-sm font-black uppercase text-[10px] bg-primary/10 text-primary border-none">{filteredHistory.length} Trip(s)</Badge>
-          </div>
-        </div>
-
-        <ScrollArea className="flex-1 p-0">
+        <ScrollArea className="flex-1">
           <Table>
-            <TableHeader className="bg-muted/30 sticky top-0 z-10">
+            <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
               <TableRow>
                 <TableHead className="px-6">Timeline</TableHead>
-                <TableHead>User</TableHead>
-                <TableHead className="min-w-[200px]">Itinerary</TableHead>
-                <TableHead className="text-right px-6">Distance (KM)</TableHead>
+                <TableHead>Requester</TableHead>
+                <TableHead>Itinerary</TableHead>
+                <TableHead className="text-right px-6">KM Run</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredHistory.length > 0 ? filteredHistory.map((a) => (
-                <TableRow key={a.id} className="hover:bg-muted/5 transition-colors">
+              {filteredHistory.map((a) => (
+                <TableRow key={a.id} className="hover:bg-muted/5">
                   <TableCell className="px-6 py-4">
-                    <div className="flex flex-col gap-0.5">
-                      <span className="text-xs font-bold text-foreground">{a.tripDate}</span>
-                      <span className="text-[10px] text-muted-foreground font-mono uppercase">{a.startTime ? format(a.startTime.toDate(), 'HH:mm') : '—'} TO {a.endTime ? format(a.endTime.toDate(), 'HH:mm') : '—'}</span>
+                    <div className="flex flex-col gap-0.5 whitespace-nowrap">
+                      <span className="text-xs font-bold">{a.tripDate}</span>
+                      <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{format(a.startTime.toDate(), 'HH:mm')} - {format(a.endTime.toDate(), 'HH:mm')}</span>
                     </div>
                   </TableCell>
+                  <TableCell className="text-xs font-medium uppercase">{a.userName}</TableCell>
                   <TableCell>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold">{a.userName}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase font-medium">{a.id.slice(0, 8)}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1 text-[10px] font-bold text-emerald-700 uppercase">
-                        <MapPin className="h-2.5 w-2.5" /> {a.pickupLocation}
-                      </div>
-                      {a.intermediateStops?.map((stop, sIdx) => (
-                        <div key={sIdx} className="flex items-center gap-1 text-[9px] font-medium text-muted-foreground ml-3">
-                          <ArrowRight className="h-2.5 w-2.5 opacity-50" /> {stop.location}
-                        </div>
-                      ))}
-                      <div className="flex items-center gap-1 text-[10px] font-bold text-red-700 uppercase ml-3">
-                        <ArrowRight className="h-2.5 w-2.5" /> {a.dropLocation}
-                      </div>
+                    <div className="flex items-center gap-1 text-[10px] font-bold text-muted-foreground">
+                      <span className="truncate max-w-[100px]">{a.pickupLocation}</span>
+                      <ArrowRight className="h-3 w-3 shrink-0" />
+                      <span className="truncate max-w-[100px]">{a.dropLocation}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-right px-6 font-mono font-black text-primary">
                     {a.startReading && a.endReading ? (a.endReading - a.startReading).toFixed(1) : '—'}
                   </TableCell>
                 </TableRow>
-              )) : (
-                <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic text-xs uppercase font-bold opacity-40">No historical records discovered for this range</TableCell></TableRow>
+              ))}
+              {filteredHistory.length === 0 && (
+                <TableRow><TableCell colSpan={4} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-30">No completed journeys logged</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
         </ScrollArea>
-        <DialogFooter className="p-4 bg-muted/5 border-t shrink-0"><DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
+        <DialogFooter className="p-4 bg-muted/5 border-t">
+          <DialogClose asChild><Button variant="outline" className="w-full rounded-sm font-bold h-10 px-8">Close Audit</Button></DialogClose>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

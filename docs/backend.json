@@ -156,7 +156,33 @@
         "ownership": { "type": "string", "enum": ["Owned", "Rented"] },
         "currentReading": { "type": "number" },
         "status": { "type": "string", "enum": ["Available", "Allotted", "Ongoing"] },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "createdAt": { "type": "string", "format": "date-time" },
+        "rcDocs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string" },
+              "storagePath": { "type": "string" },
+              "uploadedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
+        "insuranceDocs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string" },
+              "storagePath": { "type": "string" },
+              "uploadedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
       }
     },
     "Supplier": {
