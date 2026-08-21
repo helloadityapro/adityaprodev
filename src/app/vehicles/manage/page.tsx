@@ -2,9 +2,9 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, writeBatch, useFirebaseApp } from '@/firebase';
-import { collection, doc, query, orderBy, where, serverTimestamp, limit } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, serverTimestamp, limit, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -40,7 +40,8 @@ import {
   Download,
   ShieldCheck,
   FileCheck,
-  RefreshCcw
+  RefreshCcw,
+  Check
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
@@ -132,7 +133,7 @@ type UserProfile = {
   role: string;
 };
 
-type SortKey = 'plate' | 'reading' | 'status';
+type SortOrderKey = 'plate' | 'reading' | 'status';
 
 export default function ManageVehiclesPage() {
   const firestore = useFirestore();
@@ -145,7 +146,7 @@ export default function ManageVehiclesPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   const [vehicleSearch, setVehicleSearch] = React.useState("");
-  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'plate', direction: 'asc' });
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortOrderKey; direction: 'asc' | 'desc' }>({ key: 'plate', direction: 'asc' });
   const [vehicleToEdit, setVehicleToEdit] = React.useState<Vehicle | null>(null);
   const [vehicleToDelete, setVehicleToDelete] = React.useState<Vehicle | null>(null);
   const [vehicleToRelease, setVehicleToRelease] = React.useState<Vehicle | null>(null);
@@ -258,16 +259,16 @@ export default function ManageVehiclesPage() {
     }
   };
 
-  const handleSort = (key: SortKey) => {
+  const handleSort = (key: SortOrderKey) => {
     setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
 
-  const SortIcon = ({ column }: { column: SortKey }) => {
+  const SortIconComponent = ({ column }: { column: SortOrderKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
 
   const filteredVehicles = React.useMemo(() => {
@@ -293,7 +294,7 @@ export default function ManageVehiclesPage() {
       });
   }, [vehicles, vehicleSearch, sortConfig]);
 
-  const stats = React.useMemo(() => {
+  const statsSummary = React.useMemo(() => {
     return {
       total: vehicles?.length || 0,
       available: vehicles?.filter(v => v.status === 'Available').length || 0,
@@ -318,31 +319,33 @@ export default function ManageVehiclesPage() {
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <Car className="h-6 w-6 text-primary" />
-            <h1>Fleet Registry</h1>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <Car className="h-6 w-6 text-primary" />
+              <h1>Fleet Registry</h1>
+            </div>
+            <p className="text-muted-foreground text-sm font-medium">Organizational asset management and availability audit.</p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Organizational asset management and availability audit.</p>
+          <Button asChild className="h-10 rounded-sm font-bold shadow-md px-6">
+            <Link href="/vehicles/add"><Plus className="h-4 w-4 mr-2" /> Register New Vehicle</Link>
+          </Button>
         </div>
-        <Button asChild className="h-10 rounded-sm font-bold shadow-md px-6">
-          <Link href="/vehicles/add"><Plus className="h-4 w-4 mr-2" /> Register New Vehicle</Link>
-        </Button>
       </div>
 
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <SummaryCard title="Total Fleet" value={stats.total} icon={Truck} color="primary" />
-        <SummaryCard title="Available" value={stats.available} icon={CheckCircle2} color="emerald" />
-        <SummaryCard title="Allotted" value={stats.allotted} icon={Clock} color="amber" />
-        <SummaryCard title="Ongoing" value={stats.ongoing} icon={Navigation} color="blue" />
+        <SummaryCard title="Total Fleet" value={statsSummary.total} icon={Truck} color="primary" />
+        <SummaryCard title="Available" value={statsSummary.available} icon={CheckCircle2} color="emerald" />
+        <SummaryCard title="Allotted" value={statsSummary.allotted} icon={Clock} color="amber" />
+        <SummaryCard title="Ongoing" value={statsSummary.ongoing} icon={Navigation} color="blue" />
       </div>
 
       <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
         <CardHeader className="bg-muted/5 border-b py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
             <CardTitle className="text-sm font-bold uppercase tracking-widest">Asset Inventory</CardTitle>
-            <CardDescription className="text-xs uppercase font-black text-primary">{stats.total} Records</CardDescription>
+            <CardDescription className="text-xs uppercase font-black text-primary">{statsSummary.total} Records</CardDescription>
           </div>
           
           <div className="flex items-center gap-2">
@@ -365,16 +368,16 @@ export default function ManageVehiclesPage() {
             <TableHeader className="bg-muted/30">
               <TableRow>
                 <TableHead className="px-6 cursor-pointer hover:bg-muted/50" onClick={() => handleSort('plate')}>
-                  <div className="flex items-center">Vehicle <SortIcon column="plate" /></div>
+                  <div className="flex items-center">Vehicle <SortIconComponent column="plate" /></div>
                 </TableHead>
                 <TableHead>Ownership</TableHead>
                 <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('status')}>
-                  <div className="flex items-center">Status <SortIcon column="status" /></div>
+                  <div className="flex items-center">Status <SortIconComponent column="status" /></div>
                 </TableHead>
                 <TableHead>Current User</TableHead>
                 <TableHead className="min-w-[200px]">Current Itinerary</TableHead>
                 <TableHead className="text-center cursor-pointer hover:bg-muted/50" onClick={() => handleSort('reading')}>
-                  <div className="flex items-center justify-center">Odometer (KM) <SortIcon column="reading" /></div>
+                  <div className="flex items-center justify-center">Odometer (KM) <SortIconComponent column="reading" /></div>
                 </TableHead>
                 <TableHead className="text-right px-6">Actions</TableHead>
               </TableRow>
@@ -981,4 +984,3 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
     </Card>
   );
 }
-
