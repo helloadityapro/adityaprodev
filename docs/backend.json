@@ -26,7 +26,21 @@
         "pointsMultiplier": { "type": "number", "default": 1 },
         "customPermissions": { "type": "array", "items": { "type": "string" }, "description": "Individual access overrides for sidebar pages" },
         "ownDataOnly": { "type": "boolean", "default": false, "description": "Strictly limit user to assigned projects only" },
-        "suspended": { "type": "boolean", "default": false, "description": "Whether the user account is suspended and excluded from active attendance reporting" }
+        "suspended": { "type": "boolean", "default": false, "description": "Whether the user account is suspended and excluded from active attendance reporting" },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "type": { "type": "string" },
+              "size": { "type": "number" },
+              "storagePath": { "type": "string" },
+              "uploadedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },

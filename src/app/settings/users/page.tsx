@@ -13,7 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2, Truck, Calendar, Fingerprint, CreditCard, FileDown } from "lucide-react"
+import { User, Eye, Pencil, Trash2, Users, UserPlus, Shield, UserCog, HardHat, CircleCheck, ArrowUpDown, ArrowUp, ArrowDown, Search, CircleHelp, Building2, Truck, Calendar, Fingerprint, CreditCard, FileDown, FolderOpen } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
@@ -22,6 +22,7 @@ import { AddUserDialog } from "@/components/add-user-dialog";
 import { EditUserDialog } from "@/components/edit-user-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { ViewUserDialog } from "@/components/view-user-dialog";
+import { UserDocumentsDialog } from "@/components/user-documents-dialog";
 import {
     AlertDialog,
     AlertDialogAction,
@@ -57,6 +58,7 @@ type User = {
   avatarUrl?: string;
   createdAt?: any;
   suspended?: boolean;
+  documents?: any[];
 };
 
 const getRoleIcon = (roleName: string) => {
@@ -126,6 +128,7 @@ export default function UsersPage() {
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
     const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
     const [userToView, setUserToView] = React.useState<User | null>(null);
+    const [userToDocs, setUserToDocs] = React.useState<User | null>(null);
     const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
     const [isRejecting, setIsRejecting] = React.useState(false);
 
@@ -365,6 +368,7 @@ export default function UsersPage() {
                                                 </>
                                             ) : (
                                                 <>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setUserToDocs(u as any)} title="Manage Documents"><FolderOpen className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setUserToView(u as any)} title="View Profile"><User className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setUserToEdit(u as any)} title="Edit Details"><Pencil className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDeleteClick(u)} title="Delete Account"><Trash2 className="h-4 w-4" /></Button>
@@ -386,6 +390,7 @@ export default function UsersPage() {
             <AddUserDialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen} />
             <EditUserDialog user={userToEdit as any} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
             <ViewUserDialog user={userToView as any} open={!!userToView} onOpenChange={() => setUserToView(null)} />
+            <UserDocumentsDialog user={userToDocs as any} open={!!userToDocs} onOpenChange={() => setUserToDocs(null)} />
             
             <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
                 <AlertDialogContent className="rounded-sm">
