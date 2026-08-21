@@ -30,7 +30,7 @@ import {
   History,
   Trash2,
   RotateCcw,
-  User,
+  User as UserIcon,
   MapPin,
   Calendar,
   Filter,
@@ -981,3 +981,4 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
     </Card>
   );
 }
+
