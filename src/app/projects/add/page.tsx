@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -35,7 +34,8 @@ import {
   MapPin,
   Download,
   LayoutGrid,
-  Globe
+  Globe,
+  RefreshCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -104,6 +104,7 @@ export default function AddNewProjectPage() {
   const [sortOrder, setSortOrder] = React.useState<SortOrder>('name');
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = React.useState(false);
+  const [isMovingBulk, setIsMovingBulk] = React.useState(false);
   const [isBulkDialogOpen, setIsBulkDialogOpen] = React.useState(false);
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [siteToEdit, setSiteToEdit] = React.useState<any | null>(null);
@@ -216,6 +217,37 @@ export default function AddNewProjectPage() {
     }
   };
 
+  const handleBulkMove = async () => {
+    if (selectedIds.length === 0) return;
+    setIsMovingBulk(true);
+    
+    try {
+      const targetType = activeTab === 'groundmount' ? 'rooftop' : 'groundmount';
+      const batchSize = 400;
+      for (let i = 0; i < selectedIds.length; i += batchSize) {
+        const batch = writeBatch(firestore);
+        const chunk = selectedIds.slice(i, i + batchSize);
+        chunk.forEach(id => {
+          batch.update(doc(firestore, 'sites', id), {
+            projectType: targetType,
+            updatedAt: serverTimestamp()
+          });
+        });
+        await batch.commit();
+      }
+      
+      toast({ 
+        title: 'Transfer Complete', 
+        description: `Moved ${selectedIds.length} projects to ${targetType === 'groundmount' ? 'Groundmount' : 'Rooftop'}.` 
+      });
+      setSelectedIds([]);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+    } finally {
+      setIsMovingBulk(false);
+    }
+  };
+
   const filteredSitesList = React.useMemo(() => {
     if (!sites) return [];
     
@@ -292,6 +324,8 @@ export default function AddNewProjectPage() {
           const name = row["Site Name"] || row["name"];
           const company = row["Project Company"] || row["company"];
           const type = row["Project Type (groundmount/rooftop)"] || row["projectType"] || 'groundmount';
+          const normalizedType = String(type).toLowerCase().trim();
+
           const ac = parseFloat(row["AC Capacity (MW)"] || row["ac"]);
           const dc = parseFloat(row["DC Capacity (MWp)"] || row["dc"]);
           const lat = parseFloat(row["Latitude"] || row["lat"] || 0);
@@ -302,7 +336,7 @@ export default function AddNewProjectPage() {
             batch.set(newDocRef, {
               name: String(name).trim(),
               projectCompany: String(company).trim(),
-              projectType: type === 'rooftop' ? 'rooftop' : 'groundmount',
+              projectType: normalizedType === 'rooftop' ? 'rooftop' : 'groundmount',
               acCapacity: isNaN(ac) ? 0 : ac,
               dcCapacity: isNaN(dc) ? 0 : dc,
               latitude: isNaN(lat) ? 0 : lat,
@@ -465,7 +499,7 @@ export default function AddNewProjectPage() {
               onChange={handleBulkImport} 
               disabled={isImporting}
             />
-            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="rounded-sm font-bold h-11 border-primary/20 text-primary hover:bg-primary/5">
+            <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
               {isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />}
               Bulk Import
             </Button>
@@ -602,7 +636,7 @@ export default function AddNewProjectPage() {
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-300">
           <div className="p-4 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-between shadow-sm">
             <div className="space-y-0.5">
-              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">Registry Count</p>
+              <p className="text-[9px] font-black uppercase text-muted-foreground tracking-[0.2em]">{countLabel}</p>
               <p className="text-2xl font-black text-primary leading-none">{summaryStats.count}</p>
               <p className="text-[8px] font-bold text-primary/60 uppercase">Project Locations</p>
             </div>
@@ -627,7 +661,7 @@ export default function AddNewProjectPage() {
         </div>
 
         <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
-          <CardHeader className="bg-muted/5 border-b py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <CardHeader className="bg-muted/5 border-b py-4 flex flex-row items-center justify-between gap-4">
             <div className="space-y-1">
               <CardTitle className="text-sm font-bold uppercase tracking-widest">Project Database</CardTitle>
               <CardDescription className="text-[10px] font-black uppercase text-primary">
@@ -678,7 +712,7 @@ export default function AddNewProjectPage() {
                 <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
                 <Input 
                   placeholder="Search..." 
-                  className="pl-8 rounded-sm h-9 border-primary/20 text-xs" 
+                  className="pl-8 h-9 rounded-sm border-primary/20 text-xs" 
                   value={searchTerm} 
                   onChange={(e) => setSearchTerm(e.target.value)} 
                 />
@@ -704,14 +738,26 @@ export default function AddNewProjectPage() {
                   <Badge className="bg-primary h-5 text-[10px] uppercase font-black">{selectedIds.length} Selected</Badge>
                   <span className="text-xs font-medium text-muted-foreground">Perform bulk action on selected sites</span>
                 </div>
-                <Button 
-                  variant="destructive" 
-                  size="sm" 
-                  className="h-8 rounded-sm font-bold text-[10px] uppercase"
-                  onClick={() => setIsBulkDialogOpen(true)}
-                >
-                  <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove Bulk
-                </Button>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm" 
+                    className="h-8 rounded-sm font-bold text-[10px] uppercase border-primary/20 text-primary"
+                    onClick={handleBulkMove}
+                    disabled={isMovingBulk}
+                  >
+                    {isMovingBulk ? <Loader2 className="h-3 w-3 animate-spin mr-1.5" /> : <RefreshCcw className="h-3.5 w-3.5 mr-1.5" />}
+                    Move to {activeTab === 'groundmount' ? 'Rooftop' : 'Groundmount'}
+                  </Button>
+                  <Button 
+                    variant="destructive" 
+                    size="sm" 
+                    className="h-8 rounded-sm font-bold text-[10px] uppercase"
+                    onClick={() => setIsBulkDialogOpen(true)}
+                  >
+                    <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove Bulk
+                  </Button>
+                </div>
               </div>
             )}
 
