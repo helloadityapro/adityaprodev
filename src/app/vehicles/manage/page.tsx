@@ -164,7 +164,7 @@ export default function ManageVehiclesPage() {
   const [vehicleToDelete, setVehicleToDelete] = React.useState<Vehicle | null>(null);
   const [vehicleToRelease, setVehicleToRelease] = React.useState<Vehicle | null>(null);
   const [vehicleHistory, setVehicleHistory] = React.useState<Vehicle | null>(null);
-  const [vehicleDocs, setVehicleDocs] = React.useState<Vehicle | null>(null);
+  const [vehicleIdForDocs, setVehicleIdForDocs] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
   const vehiclesQuery = useMemoFirebase(() => collection(firestore, 'vehicles'), [firestore]);
@@ -463,7 +463,7 @@ export default function ManageVehiclesPage() {
                           variant="ghost" 
                           size="icon" 
                           className="h-8 w-8 rounded-sm text-primary hover:bg-primary/10"
-                          onClick={() => setVehicleDocs(v)}
+                          onClick={() => setVehicleIdForDocs(v.id)}
                           title="Vehicle Documents"
                         >
                           <FileText className="h-4 w-4" />
@@ -630,9 +630,9 @@ export default function ManageVehiclesPage() {
       </Dialog>
 
       <VehicleDocumentsDialog 
-        vehicle={vehicleDocs} 
-        open={!!vehicleDocs} 
-        onOpenChange={(o) => !o && setVehicleDocs(null)} 
+        vehicleId={vehicleIdForDocs} 
+        open={!!vehicleIdForDocs} 
+        onOpenChange={(o) => !o && setVehicleIdForDocs(null)} 
       />
 
       <VehicleHistoryDialog 
@@ -684,10 +684,14 @@ export default function ManageVehiclesPage() {
   );
 }
 
-function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehicle | null, open: boolean, onOpenChange: (o: boolean) => void }) {
+function VehicleDocumentsDialog({ vehicleId, open, onOpenChange }: { vehicleId: string | null, open: boolean, onOpenChange: (o: boolean) => void }) {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
   const { toast } = useToast();
+
+  const vehicleRef = useMemoFirebase(() => vehicleId ? doc(firestore, 'vehicles', vehicleId) : null, [firestore, vehicleId]);
+  const { data: vehicle, isLoading: isVehicleLoading } = useDoc<Vehicle>(vehicleRef);
+
   const [uploading, setUploading] = React.useState<Record<string, number>>({});
   const [viewingDoc, setViewingDoc] = React.useState<VehicleDocument | null>(null);
 
@@ -722,8 +726,8 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
             uploadedAt: new Date().toISOString()
           };
 
-          const vehicleRef = doc(firestore, 'vehicles', vehicle.id);
-          updateDocumentNonBlocking(vehicleRef, {
+          const vRef = doc(firestore, 'vehicles', vehicle.id);
+          updateDocumentNonBlocking(vRef, {
             [type]: arrayUnion(newDoc),
             updatedAt: serverTimestamp()
           });
@@ -739,10 +743,10 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
     if (!vehicle) return;
     try {
       const storage = getStorage(firebaseApp);
-      await deleteObject(ref(storage, docToDelete.storagePath)).catch(e => console.warn("Missing from storage", e));
+      await deleteObject(ref(storage, docToDelete.storagePath)).catch(e => console.warn("Storage deletion failed or file already missing", e));
       
-      const vehicleRef = doc(firestore, 'vehicles', vehicle.id);
-      updateDocumentNonBlocking(vehicleRef, {
+      const vRef = doc(firestore, 'vehicles', vehicle.id);
+      updateDocumentNonBlocking(vRef, {
         [type]: arrayRemove(docToDelete),
         updatedAt: serverTimestamp()
       });
@@ -761,30 +765,36 @@ function VehicleDocumentsDialog({ vehicle, open, onOpenChange }: { vehicle: Vehi
               <div className="bg-primary/10 p-2 rounded-sm"><ShieldCheck className="h-5 w-5 text-primary" /></div>
               <div>
                 <DialogTitle className="text-xl font-black uppercase tracking-tight leading-none">Fleet Documents</DialogTitle>
-                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{vehicle?.plateNumber} Registry</DialogDescription>
+                <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1">{isVehicleLoading ? 'Synchronizing...' : vehicle?.plateNumber} Registry</DialogDescription>
               </div>
             </div>
           </DialogHeader>
 
           <ScrollArea className="flex-1">
-            <div className="p-6 space-y-10">
-              <DocSection 
-                label="Registration Certificate (RC)" 
-                docs={vehicle?.rcDocs} 
-                loading={uploading.rcDocs} 
-                onUpload={(e) => handleUpload('rcDocs', e)} 
-                onView={(d) => setViewingDoc(d)}
-                onDelete={(d) => handleDeleteDoc('rcDocs', d)}
-              />
-              <DocSection 
-                label="Insurance Certificates" 
-                docs={vehicle?.insuranceDocs} 
-                loading={uploading.insuranceDocs} 
-                onUpload={(e) => handleUpload('insuranceDocs', e)} 
-                onView={(d) => setViewingDoc(d)}
-                onDelete={(d) => handleDeleteDoc('insuranceDocs', d)}
-              />
-            </div>
+            {isVehicleLoading ? (
+              <div className="flex items-center justify-center py-20">
+                <Loader2 className="h-8 w-8 animate-spin text-primary opacity-20" />
+              </div>
+            ) : (
+              <div className="p-6 space-y-10">
+                <DocSection 
+                  label="Registration Certificate (RC)" 
+                  docs={vehicle?.rcDocs} 
+                  loading={uploading.rcDocs} 
+                  onUpload={(e) => handleUpload('rcDocs', e)} 
+                  onView={(d) => setViewingDoc(d)}
+                  onDelete={(d) => handleDeleteDoc('rcDocs', d)}
+                />
+                <DocSection 
+                  label="Insurance Certificates" 
+                  docs={vehicle?.insuranceDocs} 
+                  loading={uploading.insuranceDocs} 
+                  onUpload={(e) => handleUpload('insuranceDocs', e)} 
+                  onView={(d) => setViewingDoc(d)}
+                  onDelete={(d) => handleDeleteDoc('insuranceDocs', d)}
+                />
+              </div>
+            )}
           </ScrollArea>
 
           <DialogFooter className="p-4 bg-muted/5 border-t shrink-0">

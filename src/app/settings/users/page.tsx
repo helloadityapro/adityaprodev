@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -41,7 +40,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import * as XLSX from 'xlsx';
 
-type User = {
+type UserType = {
   id: string;
   username?: string;
   email?: string;
@@ -70,7 +69,7 @@ const getRoleIcon = (roleName: string) => {
     return <User className="h-4 w-4" />;
 };
 
-function StatusBadge({ user }: { user: User }) {
+function StatusBadge({ user }: { user: UserType }) {
   if (user.suspended) {
     return (
       <Badge className="bg-red-100 text-red-800 hover:bg-red-100/80 border-transparent text-xs font-medium uppercase px-2">
@@ -117,7 +116,7 @@ export default function UsersPage() {
         if (!isAdmin) return null;
         return collection(firestore, 'users');
     }, [firestore, isAdmin]);
-    const { data: users, isLoading: isUsersLoading } = useCollection<User>(usersQuery);
+    const { data: users, isLoading: isUsersLoading } = useCollection<UserType>(usersQuery);
 
     const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
     const { data: dbRoles } = useCollection<{ name: string }>(rolesQuery);
@@ -126,10 +125,10 @@ export default function UsersPage() {
     const [searchTerm, setSearchTerm] = React.useState('');
     const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'createdAt', direction: 'desc' });
     const [isAddUserDialogOpen, setIsAddUserDialogOpen] = React.useState(false);
-    const [userToEdit, setUserToEdit] = React.useState<User | null>(null);
-    const [userToView, setUserToView] = React.useState<User | null>(null);
-    const [userToDocs, setUserToDocs] = React.useState<User | null>(null);
-    const [userToDelete, setUserToDelete] = React.useState<User | null>(null);
+    const [userToEdit, setUserToEdit] = React.useState<UserType | null>(null);
+    const [userToView, setUserToView] = React.useState<UserType | null>(null);
+    const [userIdForDocs, setUserIdForDocs] = React.useState<string | null>(null);
+    const [userToDelete, setUserToDelete] = React.useState<UserType | null>(null);
     const [isRejecting, setIsRejecting] = React.useState(false);
 
     const handleApproveRegistration = (userId: string) => {
@@ -138,12 +137,12 @@ export default function UsersPage() {
         toast({ title: 'User Approved', description: 'User approved.' });
     }
     
-    const handleRejectClick = (u: User) => {
+    const handleRejectClick = (u: UserType) => {
         setIsRejecting(true);
         setUserToDelete(u);
     }
 
-    const handleDeleteClick = (u: User) => {
+    const handleDeleteClick = (u: UserType) => {
         if (u.id === currentUser?.uid) {
             toast({ variant: "destructive", title: "Restricted", description: "You cannot delete yourself." });
             return;
@@ -368,7 +367,7 @@ export default function UsersPage() {
                                                 </>
                                             ) : (
                                                 <>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setUserToDocs(u as any)} title="Manage Documents"><FolderOpen className="h-4 w-4" /></Button>
+                                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setUserIdForDocs(u.id)} title="Manage Documents"><FolderOpen className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setUserToView(u as any)} title="View Profile"><User className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" onClick={() => setUserToEdit(u as any)} title="Edit Details"><Pencil className="h-4 w-4" /></Button>
                                                     <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => handleDeleteClick(u)} title="Delete Account"><Trash2 className="h-4 w-4" /></Button>
@@ -390,7 +389,7 @@ export default function UsersPage() {
             <AddUserDialog open={isAddUserDialogOpen} onOpenChange={setIsAddUserDialogOpen} />
             <EditUserDialog user={userToEdit as any} open={!!userToEdit} onOpenChange={() => setUserToEdit(null)} />
             <ViewUserDialog user={userToView as any} open={!!userToView} onOpenChange={() => setUserToView(null)} />
-            <UserDocumentsDialog user={userToDocs as any} open={!!userToDocs} onOpenChange={() => setUserToDocs(null)} />
+            <UserDocumentsDialog userId={userIdForDocs} open={!!userIdForDocs} onOpenChange={() => setUserIdForDocs(null)} />
             
             <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
                 <AlertDialogContent className="rounded-sm">
