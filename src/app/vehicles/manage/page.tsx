@@ -810,6 +810,23 @@ function DocSection({ label, docs, loading, onUpload, onView, onDelete }: {
   onView: (doc: VehicleDocument) => void,
   onDelete: (doc: VehicleDocument) => void
 }) {
+  const handleDownload = async (url: string, name: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      window.open(url, '_blank');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between border-b pb-2">
@@ -842,14 +859,14 @@ function DocSection({ label, docs, loading, onUpload, onView, onDelete }: {
         )}
 
         {docs && docs.length > 0 ? (
-          <div className="grid gap-2">
+          <div className="grid gap-3">
             {docs.map((doc, idx) => {
               const isImg = doc.type.startsWith('image/');
               return (
-                <div key={idx} className="p-3 border rounded-sm bg-background flex items-center justify-between group hover:border-primary/20 transition-all shadow-sm">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-8 w-12 bg-muted rounded-sm overflow-hidden border shrink-0">
-                       {isImg ? <img src={doc.url} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center bg-primary/5"><FileText className="h-4 w-4 text-primary/40" /></div>}
+                <div key={idx} className="p-4 border rounded-sm bg-background flex items-center justify-between group hover:border-primary/20 transition-all shadow-sm">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="h-16 w-24 bg-muted rounded-sm overflow-hidden border shrink-0 flex items-center justify-center">
+                       {isImg ? <img src={doc.url} className="w-full h-full object-cover" alt="Preview" /> : <div className="w-full h-full flex flex-col items-center justify-center bg-primary/5 gap-1"><FileText className="h-6 w-6 text-primary/40" /><span className="text-[8px] font-black uppercase text-primary/40">PDF</span></div>}
                     </div>
                     <div className="flex flex-col min-w-0">
                       <span className="text-[10px] font-bold truncate max-w-[200px] text-foreground uppercase tracking-tight">{doc.name}</span>
@@ -857,18 +874,18 @@ function DocSection({ label, docs, loading, onUpload, onView, onDelete }: {
                     </div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary rounded-sm hover:bg-primary/10" onClick={() => onView(doc)}><Eye className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary rounded-sm hover:bg-primary/10" asChild><a href={doc.url} download={doc.name} target="_blank"><Download className="h-4 w-4" /></a></Button>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm hover:bg-red-50" onClick={() => onDelete(doc)}><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary rounded-sm hover:bg-primary/10" onClick={() => onView(doc)} title="Quick View"><Eye className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-primary rounded-sm hover:bg-primary/10" onClick={() => handleDownload(doc.url, doc.name)} title="Download"><Download className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive rounded-sm hover:bg-red-50" onClick={() => onDelete(doc)} title="Remove Document"><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </div>
               );
             })}
           </div>
         ) : (
-          <div className="py-8 text-center border-2 border-dashed rounded-sm opacity-20 bg-muted/5 flex flex-col items-center gap-2">
-             <FileIcon className="h-8 w-8" />
-             <p className="text-[9px] font-black uppercase tracking-widest">No documentation logged</p>
+          <div className="py-12 text-center border-2 border-dashed rounded-sm opacity-20 bg-muted/5 flex flex-col items-center gap-2">
+             <FileIcon className="h-10 w-10" />
+             <p className="text-[9px] font-black uppercase tracking-widest">No documentation found</p>
           </div>
         )}
       </div>
