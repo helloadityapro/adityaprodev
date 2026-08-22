@@ -18,7 +18,8 @@ export default function MapViewComponent({
   visibility = {
     showUsers: true,
     showUserNames: true,
-    showSites: true,
+    showGroundmountSites: true,
+    showRooftopSites: true,
     showSiteNames: true
   }
 }: { 
@@ -29,7 +30,8 @@ export default function MapViewComponent({
   visibility?: {
     showUsers: boolean;
     showUserNames: boolean;
-    showSites: boolean;
+    showGroundmountSites: boolean;
+    showRooftopSites: boolean;
     showSiteNames: boolean;
   }
 }) {
@@ -161,21 +163,33 @@ export default function MapViewComponent({
     const layer = sitesLayerRef.current;
     layer.clearLayers();
 
-    if (!visibility.showSites) return;
-
-    const siteIcon = L.divIcon({
+    const groundmountIcon = L.divIcon({
       className: 'custom-site-icon',
       html: `<div class="bg-emerald-600 text-white p-1 rounded-sm shadow-md border border-white"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></div>`,
       iconSize: [24, 24],
       iconAnchor: [12, 12]
     });
 
+    const rooftopIcon = L.divIcon({
+      className: 'custom-site-icon',
+      html: `<div class="bg-indigo-600 text-white p-1 rounded-sm shadow-md border border-white"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 20h20"/><path d="M14 11V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v7"/><path d="M3 20h18"/><path d="m3 11 18 0"/><path d="m12 11 0 9"/></svg></div>`,
+      iconSize: [24, 24],
+      iconAnchor: [12, 12]
+    });
+
     sites.filter(s => s.latitude && s.longitude).forEach(site => {
-      const marker = L.marker([site.latitude, site.longitude], { icon: siteIcon });
+      const type = site.projectType || 'groundmount';
+      
+      // Filter by type visibility
+      if (type === 'groundmount' && !visibility.showGroundmountSites) return;
+      if (type === 'rooftop' && !visibility.showRooftopSites) return;
+
+      const icon = type === 'rooftop' ? rooftopIcon : groundmountIcon;
+      const marker = L.marker([site.latitude, site.longitude], { icon });
       
       if (visibility.showSiteNames) {
         marker.bindTooltip(
-          `<div class="bg-emerald-600 text-white text-[9px] font-bold px-2 py-0.5 rounded-sm shadow-sm uppercase tracking-tighter">${site.name}</div>`, 
+          `<div class="bg-background text-foreground text-[9px] font-bold px-2 py-0.5 rounded-sm shadow-sm border border-border uppercase tracking-tighter">${site.name}</div>`, 
           {
             direction: 'bottom',
             offset: [0, 16],
@@ -187,7 +201,10 @@ export default function MapViewComponent({
 
       marker.bindPopup(`
         <div class="p-2 space-y-1 text-left">
-          <p class="font-black text-xs text-emerald-700 uppercase tracking-tight">${site.name}</p>
+          <div class="flex items-center gap-2 mb-1">
+             <span class="text-[8px] font-black uppercase text-white bg-${type === 'rooftop' ? 'indigo' : 'emerald'}-600 px-1.5 rounded-sm">${type}</span>
+             <p class="font-black text-xs text-foreground uppercase tracking-tight">${site.name}</p>
+          </div>
           <p class="text-[10px] font-medium text-muted-foreground">${site.projectCompany}</p>
           <div class="pt-1 mt-1 border-t flex flex-col gap-0.5">
             <span class="text-[8px] font-bold uppercase opacity-50">Capacity</span>
@@ -198,7 +215,7 @@ export default function MapViewComponent({
 
       marker.addTo(layer);
     });
-  }, [sites, visibility.showSites, visibility.showSiteNames]);
+  }, [sites, visibility.showGroundmountSites, visibility.showRooftopSites, visibility.showSiteNames]);
 
   // 4. Interaction Handlers
   React.useEffect(() => {

@@ -43,7 +43,8 @@ export default function AttendanceMapPage() {
   // Visibility states - Only show users by default
   const [showUsers, setShowUsers] = React.useState(true);
   const [showUserNames, setShowUserNames] = React.useState(false);
-  const [showSites, setShowSites] = React.useState(false);
+  const [showGroundmountSites, setShowGroundmountSites] = React.useState(false);
+  const [showRooftopSites, setShowRooftopSites] = React.useState(false);
   const [showSiteNames, setShowSiteNames] = React.useState(false);
 
   // Location search states
@@ -222,12 +223,16 @@ export default function AttendanceMapPage() {
                   </div>
                   <Separator className="my-2" />
                   <div className="flex items-center space-x-2">
-                    <Checkbox id="toggle-sites" checked={showSites} onCheckedChange={(val) => setShowSites(!!val)} />
-                    <Label htmlFor="toggle-sites" className="text-xs font-bold uppercase tracking-tight cursor-pointer">Show Site Pins</Label>
+                    <Checkbox id="toggle-groundmount" checked={showGroundmountSites} onCheckedChange={(val) => setShowGroundmountSites(!!val)} />
+                    <Label htmlFor="toggle-groundmount" className="text-xs font-bold uppercase tracking-tight cursor-pointer">Show Groundmount</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox id="toggle-rooftop" checked={showRooftopSites} onCheckedChange={(val) => setShowRooftopSites(!!val)} />
+                    <Label htmlFor="toggle-rooftop" className="text-xs font-bold uppercase tracking-tight cursor-pointer text-indigo-600">Show Rooftop</Label>
                   </div>
                   <div className="flex items-center space-x-2 pl-6">
-                    <Checkbox id="toggle-site-names" checked={showSiteNames} onCheckedChange={(val) => setShowSiteNames(!!val)} disabled={!showSites} />
-                    <Label htmlFor="toggle-site-names" className={cn("text-[10px] font-bold uppercase tracking-tight cursor-pointer", !showSites && "opacity-40")}>Show Site Names</Label>
+                    <Checkbox id="toggle-site-names" checked={showSiteNames} onCheckedChange={(val) => setShowSiteNames(!!val)} disabled={!showGroundmountSites && !showRooftopSites} />
+                    <Label htmlFor="toggle-site-names" className={cn("text-[10px] font-bold uppercase tracking-tight cursor-pointer", (!showGroundmountSites && !showRooftopSites) && "opacity-40")}>Show Site Names</Label>
                   </div>
                 </div>
               </div>
@@ -402,7 +407,8 @@ export default function AttendanceMapPage() {
             visibility={{
               showUsers,
               showUserNames,
-              showSites,
+              showGroundmountSites,
+              showRooftopSites,
               showSiteNames
             }}
           />
