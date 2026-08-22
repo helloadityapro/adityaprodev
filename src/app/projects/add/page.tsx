@@ -631,6 +631,8 @@ export default function AddNewProjectPage() {
   );
 
   function renderSummaryAndTable() {
+    const countLabel = selectedGroupIds.length > 0 ? 'Filtered Sites' : 'Total Locations';
+
     return (
       <>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-in slide-in-from-top-2 duration-300">
@@ -684,7 +686,7 @@ export default function AddNewProjectPage() {
                   </div>
                   <ScrollArea className="h-[200px]">
                     <div className="p-2 space-y-1">
-                      {groups?.sort((a, b) => a.name.localeCompare(b.name)).map(group => (
+                      {groups?.sort((a: any, b: any) => a.name.localeCompare(b.name)).map((group: any) => (
                         <div 
                           key={group.id} 
                           className={cn(
