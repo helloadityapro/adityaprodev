@@ -13,6 +13,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
 import { 
   FileText, 
   Upload, 
@@ -35,6 +36,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { Progress } from '@/components/ui/progress';
+import { format } from 'date-fns';
 
 interface UserDocument {
   name: string;
