@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, deleteDocumentNonBlocking, addDocumentNonBlocking } from '@/firebase';
+import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, orderBy, or, and, getDoc, increment, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -466,10 +466,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     return result;
   }, [bomItems, bomTableSearch, bomStatusFilter, bomCategoryFilter, bomSortConfig]);
 
-  const posQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'project_pos'), where('siteId', '==', projectId)), 
-    [firestore, projectId]
-  );
+  const posQuery = useMemoFirebase(() => {
+    if (!siteName) return null;
+    return query(
+      collection(firestore, 'project_pos'), 
+      or(
+        where('siteId', '==', projectId),
+        where('siteName', '==', siteName)
+      )
+    );
+  }, [firestore, projectId, siteName]);
   const { data: purchaseOrders } = useCollection<PurchaseOrder>(posQuery);
 
   const wosQuery = useMemoFirebase(() => 
@@ -668,13 +674,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   }, [workOrders, woSearch, woSortConfig]);
 
   const handlePOSort = (key: POSortKey) => {
-    setSortConfig(prev => ({
+    setPoSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
 
-  const POSortIcon = ({ column }: { column: SortKey }) => {
+  const POSortIcon = ({ column }: { column: POSortKey }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
   };
@@ -711,8 +717,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const PaymentSortIcon = ({ column }: { column: PaymentSortKey }) => {
-    if (paymentSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return paymentSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    if (paymentSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return paymentSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1421,7 +1427,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
               <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search PO or Supplier" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={poSearch} onChange={e => setPoSearch(e.target.value)} /></div>
-              <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/procurement/create`}><Plus className="h-4 w-4 mr-2" /> Create PO</Link></Button>
+              <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/purchase-orders/create?siteId=${projectId}`}><Plus className="h-4 w-4 mr-2" /> Create PO</Link></Button>
             </div>
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
               <CardContent className="p-0">
@@ -2116,7 +2122,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </div>
           </div>
           <DialogFooter>
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
             <Button 
               className={cn("min-w-[120px]", woActionState?.type === 'Accepted' ? "bg-green-600 hover:bg-green-700" : "bg-red-600 hover:bg-red-700")}
               disabled={isActionProcessing}
@@ -2200,7 +2206,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </Dialog>
 
       <Dialog open={!!viewingWO} onOpenChange={(o) => !o && handleCloseDetail()}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Gavel className="h-5 w-5 text-primary" /></div>

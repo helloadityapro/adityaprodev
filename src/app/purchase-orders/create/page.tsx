@@ -1,10 +1,11 @@
+
 'use client';
 
 import * as React from 'react';
 import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { 
   useFirestore, 
   useUser, 
@@ -109,6 +110,7 @@ export default function CreatePOPage() {
   const { user, isUserLoading } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
@@ -239,6 +241,18 @@ export default function CreatePOPage() {
       return sum + lineTotal;
     }, 0);
   }, [watchedItems]);
+
+  // Handle site selection from URL query param
+  React.useEffect(() => {
+    const siteIdFromUrl = searchParams.get('siteId');
+    if (siteIdFromUrl && allSites && allSites.length > 0) {
+      const targetSite = allSites.find(s => s.id === siteIdFromUrl);
+      if (targetSite) {
+        form.setValue('siteId', targetSite.id);
+        form.setValue('siteName', targetSite.name);
+      }
+    }
+  }, [searchParams, allSites, form]);
 
   React.useEffect(() => {
     watchedItems.forEach((item, index) => {
