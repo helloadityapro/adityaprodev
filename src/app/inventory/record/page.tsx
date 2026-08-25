@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -9,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc, and } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc, and, or } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -25,6 +26,7 @@ import { format } from "date-fns";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
+import { slugifyRole } from "@/lib/access-control";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -189,19 +191,29 @@ export default function RecordMovementPage() {
   const selectedSiteId = React.useMemo(() => allSites?.find(s => s.name === watchSiteName)?.id, [allSites, watchSiteName]);
 
   React.useEffect(() => {
-    if (selectedSiteId) {
+    if (selectedSiteId && watchSiteName) {
       const fetchData = async () => {
+        // 1. Fetch approved BoM
         const bomQ = query(collection(firestore, 'project_boms'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
         const bomSnap = await getDocs(bomQ);
         setApprovedBomItems(bomSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
 
-        const poQ = query(collection(firestore, 'project_pos'), where('siteId', '==', selectedSiteId), where('status', '==', 'Accepted'));
+        // 2. Fetch approved POs for inward supplier restriction
+        // Integrated sync logic: Check both siteId and siteName
+        const poQ = query(
+          collection(firestore, 'project_pos'), 
+          where('status', '==', 'Accepted'),
+          or(
+            where('siteId', '==', selectedSiteId),
+            where('siteName', '==', watchSiteName)
+          )
+        );
         const poSnap = await getDocs(poQ);
         setApprovedPOs(poSnap.docs.map(d => ({ id: d.id, ...d.data() } as PurchaseOrder)));
       };
       fetchData();
     }
-  }, [selectedSiteId, firestore]);
+  }, [selectedSiteId, watchSiteName, firestore]);
 
   React.useEffect(() => {
     if (sourceOrDestinationType === 'Site' && watchSource) {
@@ -462,7 +474,7 @@ export default function RecordMovementPage() {
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Recording Site</FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
-                        <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
+                        <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
