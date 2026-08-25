@@ -13,9 +13,6 @@ import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useColl
 import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, addDoc, and, or, setDoc } from "firebase/firestore";
 import { getStorage, ref, uploadString, getDownloadURL, uploadBytesResumable } from "firebase/storage";
 import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useRouter } from "next/navigation";
-import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -28,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
+import { isSuperAdmin } from "@/lib/auth-constants";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -200,7 +198,6 @@ export default function RecordMovementPage() {
         setApprovedBomItems(bomSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
 
         // 2. Fetch approved POs for inward supplier restriction
-        // Integrated sync logic: Check both siteId and siteName
         const poQ = query(
           collection(firestore, 'project_pos'), 
           and(
