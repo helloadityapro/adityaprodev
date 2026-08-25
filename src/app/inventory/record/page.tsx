@@ -10,21 +10,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, getDocs, setDoc, and, or } from "firebase/firestore";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, addDoc, and, or, setDoc } from "firebase/firestore";
+import { getStorage, ref, uploadString, getDownloadURL, uploadBytesResumable } from "firebase/storage";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { useRouter } from "next/navigation";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
+import Link from "next/link";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Badge } from "@/components/ui/badge";
+import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { isSuperAdmin } from "@/lib/auth-constants";
 import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
-import { format } from "date-fns";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
 
@@ -202,10 +203,12 @@ export default function RecordMovementPage() {
         // Integrated sync logic: Check both siteId and siteName
         const poQ = query(
           collection(firestore, 'project_pos'), 
-          where('status', '==', 'Accepted'),
-          or(
-            where('siteId', '==', selectedSiteId),
-            where('siteName', '==', watchSiteName)
+          and(
+            where('status', '==', 'Accepted'),
+            or(
+              where('siteId', '==', selectedSiteId),
+              where('siteName', '==', watchSiteName)
+            )
           )
         );
         const poSnap = await getDocs(poQ);
@@ -474,7 +477,7 @@ export default function RecordMovementPage() {
                     <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Recording Site</FormLabel>
                     <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                       <PopoverTrigger asChild>
-                        <FormControl><Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
+                        <FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
@@ -632,7 +635,7 @@ export default function RecordMovementPage() {
                   <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest flex items-center gap-2">
                     <ListPlus className="h-4 w-4 text-primary" /> Materials List
                   </h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="h-8 rounded-sm border-primary text-primary text-[10px] px-3">
+                  <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="h-8 rounded-sm font-bold border-primary text-primary text-[10px] px-3">
                     <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Line
                   </Button>
                 </div>
