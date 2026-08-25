@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -22,7 +21,7 @@ import {
   ArrowUp, 
   ArrowDown, 
   History, 
-  User, 
+  User as UserIcon, 
   ChevronDown, 
   ChevronUp, 
   Layers,
@@ -150,7 +149,7 @@ function getDisplayItems(items: POItem[]) {
 
 function SortIcon({ column, config }: { column: POSortKey, config: { key: POSortKey; direction: 'asc' | 'desc' } }) {
   if (config.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
 }
 
 export default function GlobalManagePOsPage() {
@@ -822,7 +821,7 @@ export default function GlobalManagePOsPage() {
                       <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">System Record</Label>
                       <div className="flex flex-col gap-1">
                         <div className="flex items-center gap-2 text-sm font-bold">
-                          <User className="h-4 w-4 text-primary opacity-40" />
+                          <UserIcon className="h-4 w-4 text-primary opacity-40" />
                           {viewingPO.createdByName || '—'}
                         </div>
                         <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-muted-foreground uppercase">
@@ -955,7 +954,7 @@ export default function GlobalManagePOsPage() {
                 return canApproveViewingPO && viewingPO?.status === 'Pending' && (
                   <div className="flex gap-2">
                     <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-8" onClick={() => { setPoActionState({ po: viewingPO!, type: 'Accepted' }); setViewingPO(null); }}>Approve PO</Button>
-                    <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setPoActionState({ po: viewingPO!, type: 'Rejected' }); setViewingPO(null); }}>Reject PO</Button>
+                    <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setWoActionState({ po: viewingPO!, type: 'Rejected' }); setViewingPO(null); }}>Reject PO</Button>
                   </div>
                 );
               })()}
