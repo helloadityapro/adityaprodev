@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -10,20 +9,23 @@ import { collection, doc, serverTimestamp, increment, query, where, limit, getDo
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { sendNotification } from "@/lib/notifications";
-import { slugifyRole } from "@/lib/access-control";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
+import { sendNotification } from "@/lib/notifications";
+import { slugifyRole } from "@/lib/access-control";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -133,7 +135,6 @@ export default function RecordMovementPage() {
     if (!allSites || !userProfile) return [];
     if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     
-    // Sovereignty Logic
     const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager) {
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
@@ -190,20 +191,15 @@ export default function RecordMovementPage() {
   React.useEffect(() => {
     if (selectedSiteId && watchSiteName) {
       const fetchData = async () => {
-        // 1. Fetch approved BoM
         const bomQ = query(collection(firestore, 'project_boms'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
         const bomSnap = await getDocs(bomQ);
         setApprovedBomItems(bomSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
 
-        // 2. Fetch approved POs for inward supplier restriction
         const poQ = query(
           collection(firestore, 'project_pos'), 
           and(
             where('status', '==', 'Accepted'),
-            or(
-              where('siteId', '==', selectedSiteId),
-              where('siteName', '==', watchSiteName)
-            )
+            or(where('siteId', '==', selectedSiteId), where('siteName', '==', watchSiteName))
           )
         );
         const poSnap = await getDocs(poQ);
