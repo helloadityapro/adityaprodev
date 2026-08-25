@@ -103,6 +103,11 @@ type PurchaseOrder = {
   processedAt?: any;
 };
 
+type Site = {
+  id: string;
+  name: string;
+};
+
 type AccessConfig = {
   id: string;
   ownDataOnly?: boolean;
@@ -173,6 +178,9 @@ export default function GlobalManagePOsPage() {
   const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
+  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const { data: allSites } = useCollection<Site>(sitesQuery);
+
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
@@ -180,7 +188,8 @@ export default function GlobalManagePOsPage() {
 
   const posQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
-    return query(collection(firestore, 'project_pos'), orderBy('createdAt', 'desc'), limit(500));
+    // Optimization: Remove orderBy here to ensure we get all docs, even those missing createdAt field
+    return query(collection(firestore, 'project_pos'), limit(1000));
   }, [firestore, user, isProfileLoading]);
 
   const { data: allPOs, isLoading: isPOsLoading } = useCollection<PurchaseOrder>(posQuery);
@@ -223,7 +232,15 @@ export default function GlobalManagePOsPage() {
 
     if (isOwnDataOnly && !isSuper) {
       const assignedIds = new Set(userProfile.assignedProjectIds || []);
-      result = result.filter(po => assignedIds.has(po.siteId));
+      // Map site names to IDs for assigned projects to handle POs missing siteId
+      const assignedNames = new Set(
+        allSites?.filter(s => assignedIds.has(s.id)).map(s => s.name) || []
+      );
+
+      result = result.filter(po => 
+        assignedIds.has(po.siteId) || 
+        assignedNames.has(po.siteName)
+      );
     }
 
     result = result.filter(po => {
@@ -262,14 +279,7 @@ export default function GlobalManagePOsPage() {
     });
 
     return result;
-  }, [allPOs, searchTerm, statusFilter, dateFilter, queryDateRange, sortConfig, userProfile, roleConfigs, isSuper]);
-
-  const handleSort = (key: POSortKey) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
+  }, [allPOs, searchTerm, statusFilter, dateFilter, queryDateRange, sortConfig, userProfile, roleConfigs, isSuper, allSites]);
 
   const toggleRow = (id: string) => {
     const newSet = new Set(expandedRows);
@@ -560,7 +570,7 @@ export default function GlobalManagePOsPage() {
                     {po.supplierName}
                   </div>
                   <div className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-                    <User className="h-3.5 w-3.5" />
+                    <UserIcon className="h-3.5 w-3.5" />
                     {po.createdByName || '—'}
                   </div>
                   <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground/60 uppercase">
@@ -659,7 +669,7 @@ export default function GlobalManagePOsPage() {
                           <TableCell className="text-xs font-medium text-muted-foreground">{po.supplierName}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2 text-xs font-medium">
-                              <User className="h-3.5 w-3.5 text-primary opacity-40" />
+                              <UserIcon className="h-3.5 w-3.5 text-primary opacity-40" />
                               {po.createdByName || '—'}
                             </div>
                           </TableCell>
@@ -766,7 +776,7 @@ export default function GlobalManagePOsPage() {
       {/* PO Detail Dialog */}
       <Dialog open={!!viewingPO} onOpenChange={(o) => !o && handleCloseDetail()}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><ShoppingBag className="h-5 w-5 text-primary" /></div>
               <div>
