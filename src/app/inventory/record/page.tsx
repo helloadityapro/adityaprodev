@@ -5,19 +5,16 @@ import * as React from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, addDoc, and, or, setDoc } from "firebase/firestore";
-import { getStorage, ref, uploadString, getDownloadURL, uploadBytesResumable } from "firebase/storage";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, and, or, setDoc } from "firebase/firestore";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
-import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -26,6 +23,7 @@ import { Separator } from "@/components/ui/separator";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
 import { isSuperAdmin } from "@/lib/auth-constants";
+import { format } from "date-fns";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -477,7 +475,7 @@ export default function RecordMovementPage() {
                         <FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
+                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none focus-visible:ring-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
                         <ScrollArea className="h-[200px]">{filteredSites.map(site => (
                           <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />{site.name}</Button>
                         ))}</ScrollArea>
@@ -523,7 +521,7 @@ export default function RecordMovementPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
+                          <Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredSuppliers.map(s => (
@@ -548,7 +546,7 @@ export default function RecordMovementPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
+                          <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
                           {allSites?.filter(s => s.name !== watchSiteName && s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())).map(s => (
