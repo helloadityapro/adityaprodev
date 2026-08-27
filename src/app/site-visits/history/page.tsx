@@ -23,7 +23,18 @@ import {
   FilterX, 
   ListFilter,
   Globe,
-  LayoutGrid
+  LayoutGrid,
+  ChevronDown,
+  ChevronUp,
+  Maximize2,
+  ImageIcon,
+  Film,
+  MapPin,
+  CheckCircle2,
+  Navigation,
+  Activity,
+  ShieldCheck,
+  PlayCircle
 } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
@@ -45,6 +56,11 @@ import { Label } from "@/components/ui/label";
 import { slugifyRole } from "@/lib/access-control";
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
+type TaskItem = {
+  text: string;
+  photoUrl: string | null;
+};
+
 type SiteVisit = {
   id: string;
   siteId: string;
@@ -55,7 +71,16 @@ type SiteVisit = {
   department?: string;
   startTime: any;
   endTime?: any;
+  startLat: number;
+  startLng: number;
+  endLat?: number;
+  endLng?: number;
   purpose?: string;
+  details?: string;
+  tasks?: TaskItem[];
+  selfieUrl?: string;
+  customerAvailable?: boolean;
+  customerNames?: string;
   status: 'ongoing' | 'completed';
   locationType?: 'site' | 'other';
 };
@@ -108,6 +133,7 @@ export default function SiteVisitsHistoryPage() {
   const [customStart, setCustomStart] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'startTime', direction: 'desc' });
+  const [expandedVisitIds, setExpandedVisitIds] = React.useState<Set<string>>(new Set());
 
   // Persistence logic for active tab
   React.useEffect(() => {
@@ -249,6 +275,14 @@ export default function SiteVisitsHistoryPage() {
     }));
   };
 
+  const toggleExpand = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const next = new Set(expandedVisitIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExpandedVisitIds(next);
+  };
+
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
@@ -259,6 +293,11 @@ export default function SiteVisitsHistoryPage() {
     setStatusFilter("all");
     setDeptFilter("all");
     setDateFilter("7days");
+  };
+
+  const isVideoUrl = (url: string) => {
+    const lowUrl = (url || "").toLowerCase();
+    return lowUrl.includes('.mp4') || lowUrl.includes('.mov') || lowUrl.includes('.webm') || lowUrl.includes('.ogg');
   };
 
   function renderResults() {
@@ -303,6 +342,7 @@ export default function SiteVisitsHistoryPage() {
                   <Table>
                     <TableHeader>
                       <TableRow>
+                        <TableHead className="w-12"></TableHead>
                         <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('startTime')}><div className="flex items-center">Start Date & Time <SortIcon column="startTime" /></div></TableHead>
                         <TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('siteName')}><div className="flex items-center">Location Name <SortIcon column="siteName" /></div></TableHead>
                         {(isAdmin || isManager) && (<TableHead className="cursor-pointer hover:bg-muted/50" onClick={() => handleSort('managerName')}><div className="flex items-center">Personnel <SortIcon column="managerName" /></div></TableHead>)}
@@ -314,27 +354,153 @@ export default function SiteVisitsHistoryPage() {
                     </TableHeader>
                     <TableBody>
                       {filteredVisits.length > 0 ? filteredVisits.map((visit) => (
-                        <TableRow key={visit.id} className="hover:bg-muted/5 transition-colors group" onClick={() => router.push(`/site-visits/${visit.id}`)}>
-                          <TableCell className="font-mono text-xs font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
-                          <TableCell className="font-black text-sm">
-                            <div className="flex items-center gap-2">
-                              {visit.locationType === 'other' ? <Globe className="h-3.5 w-3.5 text-primary/40" /> : <Building2 className="h-3.5 w-3.5 text-primary/40" />}
-                              {visit.siteName}
-                            </div>
-                          </TableCell>
-                          {(isAdmin || isManager) && (
-                            <TableCell>
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2 text-xs font-bold"><User className="h-3.5 w-3.5 text-primary" />{visit.managerName}</div>
-                                {visit.department && (<Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1 px-1.5"><Building2 className="h-3 w-3" /> {visit.department}</Badge>)}
+                        <React.Fragment key={visit.id}>
+                          <TableRow className="hover:bg-muted/5 transition-colors group cursor-pointer" onClick={(e) => toggleExpand(e, visit.id)}>
+                            <TableCell className="pl-4">
+                              <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm">
+                                {expandedVisitIds.has(visit.id) ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4" />}
+                              </Button>
+                            </TableCell>
+                            <TableCell className="font-mono text-xs font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
+                            <TableCell className="font-black text-sm">
+                              <div className="flex items-center gap-2">
+                                {visit.locationType === 'other' ? <Globe className="h-3.5 w-3.5 text-primary/40" /> : <Building2 className="h-3.5 w-3.5 text-primary/40" />}
+                                {visit.siteName}
                               </div>
                             </TableCell>
+                            {(isAdmin || isManager) && (
+                              <TableCell>
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2 text-xs font-bold"><User className="h-3.5 w-3.5 text-primary" />{visit.managerName}</div>
+                                  {visit.department && (<Badge className="w-fit text-[8px] h-4 font-black uppercase rounded-sm border-none bg-slate-900 text-white flex items-center gap-1 px-1.5">{visit.department}</Badge>)}
+                                </div>
+                              </TableCell>
+                            )}
+                            <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
+                            <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3.5 w-3.5" />{calculateDurationStr(calculateDurationMins(visit.startTime, visit.endTime))}</div></TableCell>
+                            <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
+                            <TableCell className="text-right px-6">
+                              <Button variant="ghost" size="sm" asChild className="rounded-sm text-primary" onClick={e => e.stopPropagation()}>
+                                <Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />Full Report</Link>
+                              </Button>
+                            </TableCell>
+                          </TableRow>
+                          {expandedVisitIds.has(visit.id) && (
+                            <TableRow className="bg-primary/[0.01]">
+                              <TableCell colSpan={isAdmin || isManager ? 8 : 7} className="p-0 border-b">
+                                <div className="p-6 px-12 space-y-8 animate-in slide-in-from-top-1 duration-300 text-left">
+                                  {/* Quick Preview Dashboard */}
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="space-y-6">
+                                      <div className="space-y-2">
+                                        <div className="flex items-center gap-2 border-b pb-2">
+                                          <Activity className="h-4 w-4 text-primary" />
+                                          <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Summary Narrative</h4>
+                                        </div>
+                                        <div className="p-4 bg-background border rounded-sm shadow-inner min-h-[80px]">
+                                          <p className="text-sm italic font-medium text-foreground/80 leading-relaxed whitespace-pre-wrap">
+                                            "{visit.details || 'Documentation provided without additional narrative.'}"
+                                          </p>
+                                        </div>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Presence Log</Label>
+                                          <div className="p-3 bg-muted/20 border rounded-sm space-y-2">
+                                            <div className="flex justify-between items-center text-[10px] font-bold">
+                                               <span className="uppercase text-muted-foreground">In</span>
+                                               <span className="font-mono text-primary">{formatTimestamp(visit.startTime).split(' ')[3]}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-[10px] font-bold border-t border-border/50 pt-2">
+                                               <span className="uppercase text-muted-foreground">Out</span>
+                                               <span className="font-mono text-primary">{visit.endTime ? formatTimestamp(visit.endTime).split(' ')[3] : 'Active'}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="space-y-2">
+                                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Audit Position</Label>
+                                          <div className="p-3 bg-muted/20 border rounded-sm space-y-2">
+                                            <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-muted-foreground truncate">
+                                              <MapPin className="h-3 w-3 text-primary opacity-40" />
+                                              {visit.startLat?.toFixed(4)}, {visit.startLng?.toFixed(4)}
+                                            </div>
+                                            {visit.customerAvailable && (
+                                              <div className="flex items-center gap-1.5 pt-2 border-t border-border/50 mt-2">
+                                                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                                                <span className="text-[8px] font-black uppercase text-emerald-700">Contact Met: {visit.customerNames || 'Verified'}</span>
+                                              </div>
+                                            )}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <div className="space-y-4">
+                                      <div className="flex items-center justify-between border-b pb-2">
+                                        <div className="flex items-center gap-2">
+                                          <ImageIcon className="h-4 w-4 text-primary" />
+                                          <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Evidence Artifacts</h4>
+                                        </div>
+                                        <Badge variant="secondary" className="rounded-full h-5 text-[8px] font-black uppercase bg-primary/10 text-primary border-none">
+                                          {(visit.tasks?.length || 0) + (visit.selfieUrl ? 1 : 0)} Files
+                                        </Badge>
+                                      </div>
+
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                                        {visit.selfieUrl && (
+                                          <div className="relative aspect-video rounded-sm overflow-hidden border bg-muted group shadow-sm">
+                                            {isVideoUrl(visit.selfieUrl) ? (
+                                               <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-5 w-5 text-white/40" /></div>
+                                            ) : (
+                                               <img src={visit.selfieUrl} className="w-full h-full object-cover" alt="Audit" />
+                                            )}
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity gap-1">
+                                               <Badge className="bg-white text-black text-[7px] font-black uppercase rounded-sm border-none h-4">Verification</Badge>
+                                               <Link href={`/site-visits/${visit.id}`} className="text-[8px] text-white underline font-bold">View Detail</Link>
+                                            </div>
+                                          </div>
+                                        )}
+                                        {visit.tasks?.filter(t => t.photoUrl).map((task, tIdx) => (
+                                          <div key={tIdx} className="relative aspect-video rounded-sm overflow-hidden border bg-muted group shadow-sm">
+                                            {isVideoUrl(task.photoUrl!) ? (
+                                               <div className="w-full h-full bg-slate-900 flex items-center justify-center"><Film className="h-5 w-5 text-white/40" /></div>
+                                            ) : (
+                                               <img src={task.photoUrl!} className="w-full h-full object-cover" alt={`Artifact ${tIdx + 1}`} />
+                                            )}
+                                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity gap-1">
+                                               <Badge className="bg-white text-black text-[7px] font-black uppercase rounded-sm border-none h-4">Finding #{tIdx + 1}</Badge>
+                                               <Link href={`/site-visits/${visit.id}`} className="text-[8px] text-white underline font-bold">View Detail</Link>
+                                            </div>
+                                          </div>
+                                        ))}
+                                        {(!visit.tasks || visit.tasks.length === 0) && !visit.selfieUrl && (
+                                           <div className="col-span-3 py-8 text-center bg-muted/5 border border-dashed rounded-sm opacity-20">
+                                              <p className="text-[9px] font-black uppercase tracking-widest">No Visual Assets Logged</p>
+                                           </div>
+                                        )}
+                                      </div>
+
+                                      {visit.tasks && visit.tasks.length > 0 && (
+                                        <div className="space-y-2 pt-4">
+                                          <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-1.5"><ShieldCheck className="h-3 w-3" /> Execution Log</Label>
+                                          <div className="space-y-1.5">
+                                            {visit.tasks.map((t, idx) => (
+                                              <div key={idx} className="flex gap-2 items-start text-[11px] leading-snug">
+                                                <span className="h-4 w-4 rounded-full bg-primary/10 text-primary flex items-center justify-center font-black text-[8px] shrink-0 mt-0.5">{idx + 1}</span>
+                                                <p className="font-medium text-foreground/80">{t.text}</p>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              </TableCell>
+                            </TableRow>
                           )}
-                          <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm px-1.5 py-0">{visit.purpose || '—'}</Badge></TableCell>
-                          <TableCell><div className="flex items-center gap-1.5 text-xs font-bold text-primary"><Timer className="h-3.5 w-3.5" />{calculateDurationStr(calculateDurationMins(visit.startTime, visit.endTime))}</div></TableCell>
-                          <TableCell><Badge className={cn("rounded-sm text-[9px] font-bold uppercase", visit.status === 'completed' ? "bg-green-100 text-green-800" : "bg-blue-100 text-blue-800")}>{visit.status}</Badge></TableCell>
-                          <TableCell className="text-right px-6"><Button variant="ghost" size="sm" asChild className="rounded-sm text-primary"><Link href={`/site-visits/${visit.id}`}><FileText className="h-4 w-4 mr-1.5" />View Report</Link></Button></TableCell>
-                        </TableRow>
+                        </React.Fragment>
                       )) : <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic">No records discovered in this category.</TableCell></TableRow>}
                     </TableBody>
                   </Table>
