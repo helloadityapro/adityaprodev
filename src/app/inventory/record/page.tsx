@@ -6,7 +6,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, and, or, setDoc } from "firebase/firestore";
+import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, setDoc, and, or } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -326,7 +326,7 @@ export default function RecordMovementPage() {
           } else {
             const inv = projectInventory?.find(i => i.itemName === item.itemName);
             list.push({
-              id: inv?.id || `new-${item.id}`,
+              id: inv?.id || `new-${bom.id}`,
               itemName: item.itemName,
               unit: item.unit,
               stockLevel: 999999
@@ -716,8 +716,10 @@ export default function RecordMovementPage() {
                                       <Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-11 text-xs py-2 px-3 text-left flex items-start gap-2 mb-0.5" onClick={() => { itemField.onChange(lookup.itemName); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}>
                                         <Check className={cn("mt-0.5 h-3.5 w-3.5 text-primary shrink-0", lookup.itemName === itemField.value ? "opacity-100" : "opacity-0")} />
                                         <div className="flex flex-col items-start min-w-0">
-                                          <span className="font-bold truncate w-full">{lookup.itemName}</span>
-                                          <span className="text-[10px] font-black uppercase whitespace-nowrap shrink-0 px-2 py-0.5 rounded-sm bg-primary/5 text-primary">Stock: {lookup.stockLevel.toLocaleString()} {lookup.unit}</span>
+                                          <span className="font-bold truncate w-full text-left">{lookup.itemName}</span>
+                                          {movementType === 'Outward' && (
+                                            <span className="text-[10px] font-black uppercase whitespace-nowrap shrink-0 px-2 py-0.5 rounded-sm bg-primary/5 text-primary">Stock: {lookup.stockLevel.toLocaleString()} {lookup.unit}</span>
+                                          )}
                                         </div>
                                       </Button>
                                     )) : (
