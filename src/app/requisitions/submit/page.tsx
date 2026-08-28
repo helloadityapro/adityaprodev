@@ -1,11 +1,10 @@
-
 'use client';
 
 import * as React from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { Button } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking } from "@/firebase";
@@ -14,12 +13,14 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Check, ChevronsUpDown, Loader2, ClipboardList, Plus, Trash2, CheckCircle2, Building2, Save } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { slugifyRole } from "@/lib/access-control";
+import { Skeleton } from "@/components/ui/skeleton";
 
 const itemSchema = z.object({
   itemId: z.string().min(1, "Material selection is required"),
@@ -100,6 +101,11 @@ export default function SubmitRequisitionPage() {
     }
   };
 
+  const accessibleSites = React.useMemo(() => {
+    if (!allSites) return [];
+    return allSites.sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites]);
+
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-10 w-48" /></div>;
 
   if (isSuccess) {
@@ -123,6 +129,8 @@ export default function SubmitRequisitionPage() {
       </div>
     );
   }
+
+  const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase()));
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-20">
@@ -149,7 +157,7 @@ export default function SubmitRequisitionPage() {
                     <PopoverTrigger asChild>
                       <FormControl>
                         <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
-                          {field.value ? allSites?.find(s => s.id === field.value)?.name : "Choose site..."}
+                          {field.value ? accessibleSites.find(s => s.id === field.value)?.name : "Choose site..."}
                           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                         </Button>
                       </FormControl>
