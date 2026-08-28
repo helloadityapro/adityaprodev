@@ -3,12 +3,37 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, orderBy, limit, serverTimestamp } from 'firebase/firestore';
+import { collection, doc, query, where, orderBy, limit, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
-import { ClipboardList, Search, FilterX, Building2, User, Clock, Calendar, CheckCircle2, XCircle, ArrowUpDown, ArrowUp, ArrowDown, ListFilter, Plus, Eye, History, Layers, Trash2, MapPin } from 'lucide-react';
+import { 
+  ClipboardList, 
+  Search, 
+  FilterX, 
+  Building2, 
+  User, 
+  Clock, 
+  Calendar, 
+  CheckCircle2, 
+  XCircle, 
+  ArrowUpDown, 
+  ArrowUp, 
+  ArrowDown, 
+  ListFilter, 
+  Plus, 
+  Eye, 
+  History, 
+  Layers, 
+  Trash2, 
+  MapPin,
+  ChevronUp,
+  ChevronDown,
+  UserPlus,
+  Loader2,
+  Check
+} from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +44,17 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
+import { Label } from '@/components/ui/label';
 
 type RequisitionItem = {
   itemId: string;
@@ -27,44 +63,67 @@ type RequisitionItem = {
   unit: string;
 };
 
+type TimelineEntry = {
+  action: string;
+  status: string;
+  remarks: string;
+  userName: string;
+  userId: string;
+  timestamp: string;
+};
+
 type Requisition = {
   id: string;
   siteId: string;
   siteName: string;
   items: RequisitionItem[];
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Fulfilled';
+  status: 'Pending' | 'ManagerApproved' | 'Approved' | 'Rejected' | 'Approved & Looking Into It' | 'Ordered' | 'Dispatched' | 'Delivered';
   urgency: 'Low' | 'Medium' | 'High';
   neededBy: string;
   remarks?: string;
   userId: string;
   userName: string;
+  siteManagerId: string | null;
+  assignedToId?: string;
+  assignedToName?: string;
+  timeline: TimelineEntry[];
   createdAt: any;
 };
 
+type UserProfile = { id: string; username: string; role: string; email: string };
 type SortKey = 'date' | 'site' | 'urgency' | 'status';
 
 export default function RequisitionsListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
+  
+  const [assignTarget, setAssignTarget] = React.useState<Requisition | null>(null);
+  const [assignUserSearch, setAssignUserSearch] = React.useState("");
+  const [isProcessing, setIsProcessing] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+  const isManager = userProfile?.role === 'Site Manager';
 
   const reqsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'material_requisitions');
     if (isAdmin) return query(colRef, limit(500));
-    return query(colRef, where('userId', '==', user.uid), limit(200));
+    return query(colRef, or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid), where('assignedToId', '==', user.uid)), limit(500));
   }, [firestore, user, isProfileLoading, isAdmin]);
 
   const { data: requisitions, isLoading: isReqsLoading } = useCollection<Requisition>(reqsQuery);
+
+  const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: allUsers } = useCollection<UserProfile>(allUsersQuery);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -74,8 +133,8 @@ export default function RequisitionsListPage() {
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const filteredReqs = React.useMemo(() => {
@@ -113,17 +172,67 @@ export default function RequisitionsListPage() {
     setExpandedIds(next);
   };
 
-  const handleUpdateStatus = (id: string, status: Requisition['status']) => {
-    if (!isAdmin) return;
-    updateDocumentNonBlocking(doc(firestore, 'material_requisitions', id), {
-      status,
+  const handleUpdateStatus = async (req: Requisition, targetStatus: Requisition['status'], remarks: string) => {
+    if (!user || !userProfile) return;
+    
+    const timelineEntry: TimelineEntry = {
+      action: "Status Updated",
+      status: targetStatus,
+      remarks: remarks || `Requirement moved to ${targetStatus}.`,
+      userName: userProfile.username,
+      userId: user.uid,
+      timestamp: new Date().toISOString()
+    };
+
+    updateDocumentNonBlocking(doc(firestore, 'material_requisitions', req.id), {
+      status: targetStatus,
       updatedAt: serverTimestamp(),
-      processedByName: userProfile?.username || user?.email
+      timeline: arrayUnion(timelineEntry)
     });
-    toast({ title: 'Requisition Updated', description: `Request status set to ${status}.` });
+
+    toast({ title: 'Status Updated', description: `Requisition is now ${targetStatus}.` });
+  };
+
+  const handleAssignPerson = async (targetUserId: string) => {
+    if (!assignTarget || !user || !userProfile) return;
+    setIsProcessing(true);
+    
+    const targetUser = allUsers?.find(u => u.id === targetUserId);
+    const targetStatus = 'Approved & Looking Into It';
+    
+    const timelineEntry: TimelineEntry = {
+      action: "Personnel Assigned",
+      status: targetStatus,
+      remarks: `Assigned to ${targetUser?.username} for fulfillment.`,
+      userName: userProfile.username,
+      userId: user.uid,
+      timestamp: new Date().toISOString()
+    };
+
+    try {
+      updateDocumentNonBlocking(doc(firestore, 'material_requisitions', assignTarget.id), {
+        status: targetStatus,
+        assignedToId: targetUserId,
+        assignedToName: targetUser?.username || 'System',
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineEntry)
+      });
+
+      toast({ title: 'Assigned Successfully', description: `Request delegated to ${targetUser?.username}.` });
+      setAssignTarget(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Assignment Failed', description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (isProfileLoading || isReqsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+
+  const getFulfillmentOptions = (currentStatus: string) => {
+    const options = ["Approved & Looking Into It", "Ordered", "Dispatched", "Delivered"];
+    return options;
+  };
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
@@ -133,10 +242,10 @@ export default function RequisitionsListPage() {
             <ClipboardList className="h-6 w-6 text-primary" />
             <h1>Material Requisitions</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Track and manage site-level material demands.</p>
+          <p className="text-muted-foreground text-sm font-medium">Lifecycle tracking for site material demands.</p>
         </div>
         <Button asChild className="h-10 rounded-sm font-bold shadow-md px-6">
-          <Link href="/requisitions/submit"><Plus className="h-4 w-4 mr-2" /> Raise Requisition</Link>
+          <Link href="/requisitions/submit"><Plus className="h-4 w-4 mr-2" /> New Requisition</Link>
         </Button>
       </div>
 
@@ -152,18 +261,22 @@ export default function RequisitionsListPage() {
         </div>
         <div className="flex items-center gap-2">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[160px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20">
+            <SelectTrigger className="w-[180px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20">
               <SelectValue placeholder="All Status" />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
-              <SelectItem value="Pending" className="text-xs font-bold uppercase text-amber-600">Pending</SelectItem>
-              <SelectItem value="Approved" className="text-xs font-bold uppercase text-green-600">Approved</SelectItem>
-              <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-600">Rejected</SelectItem>
-              <SelectItem value="Fulfilled" className="text-xs font-bold uppercase text-emerald-600">Fulfilled</SelectItem>
+              <SelectItem value="Pending" className="text-xs font-bold uppercase text-yellow-700">Pending Manager</SelectItem>
+              <SelectItem value="ManagerApproved" className="text-xs font-bold uppercase text-blue-700">Pending Admin</SelectItem>
+              <SelectItem value="Approved" className="text-xs font-bold uppercase text-green-700">Approved</SelectItem>
+              <SelectItem value="Approved & Looking Into It" className="text-xs font-bold uppercase text-indigo-700">Looking Into It</SelectItem>
+              <SelectItem value="Ordered" className="text-xs font-bold uppercase text-purple-700">Ordered</SelectItem>
+              <SelectItem value="Dispatched" className="text-xs font-bold uppercase text-amber-700">Dispatched</SelectItem>
+              <SelectItem value="Delivered" className="text-xs font-bold uppercase text-emerald-700">Delivered</SelectItem>
+              <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-700">Rejected</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setStatusFilter("all"); }} className="h-10 w-10 text-muted-foreground">
+          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground">
             <FilterX className="h-4 w-4" />
           </Button>
         </div>
@@ -177,113 +290,131 @@ export default function RequisitionsListPage() {
                 <TableRow>
                   <TableHead className="w-12"></TableHead>
                   <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
-                    <div className="flex items-center">Logged Date <SortIcon column="date" /></div>
+                    <div className="flex items-center">Date <SortIcon column="date" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
-                    <div className="flex items-center">Project Site <SortIcon column="site" /></div>
+                    <div className="flex items-center">Site <SortIcon column="site" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('urgency')}>
                     <div className="flex items-center">Urgency <SortIcon column="urgency" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('status')}>
-                    <div className="flex items-center">Approval Status <SortIcon column="status" /></div>
+                    <div className="flex items-center">Status <SortIcon column="status" /></div>
                   </TableHead>
-                  <TableHead>Target Date</TableHead>
+                  <TableHead>Assigned To</TableHead>
                   <TableHead className="text-right px-6">Manage</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredReqs.length > 0 ? filteredReqs.map((req) => (
-                  <React.Fragment key={req.id}>
-                    <TableRow className="hover:bg-muted/5 transition-colors cursor-pointer group" onClick={() => toggleExpand(req.id)}>
-                      <TableCell className="pl-4">
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm">
-                          {expandedIds.has(req.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                        </Button>
-                      </TableCell>
-                      <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground uppercase">
-                        {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM yy HH:mm') : '—'}
-                      </TableCell>
-                      <TableCell className="font-bold text-sm text-foreground">
-                        <div className="flex flex-col">
-                          <span className="leading-tight">{req.siteName}</span>
-                          <span className="text-[9px] text-muted-foreground font-black uppercase tracking-tight">BY: {req.userName}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn(
-                          "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
-                          req.urgency === 'High' ? "bg-red-50 text-red-700 border-red-200" :
-                          req.urgency === 'Medium' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                          "bg-blue-50 text-blue-700 border-blue-200"
-                        )}>{req.urgency}</Badge>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className={cn(
-                          "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
-                          req.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                          req.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                          req.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
-                          "bg-emerald-500 text-white border-none"
-                        )}>{req.status}</Badge>
-                      </TableCell>
-                      <TableCell className="text-xs font-bold text-muted-foreground">{req.neededBy}</TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                          {isAdmin && req.status === 'Pending' && (
-                            <div className="flex gap-1">
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleUpdateStatus(req.id, 'Approved')}><CheckCircle2 className="h-4 w-4" /></Button>
-                              <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => handleUpdateStatus(req.id, 'Rejected')}><XCircle className="h-4 w-4" /></Button>
-                            </div>
-                          )}
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => toggleExpand(req.id)}><Eye className="h-4 w-4" /></Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    {expandedIds.has(req.id) && (
-                      <TableRow className="bg-primary/[0.01]">
-                        <TableCell colSpan={7} className="p-0 border-b shadow-inner">
-                          <div className="p-6 px-20 space-y-6 animate-in slide-in-from-top-1 duration-300">
-                             <div className="flex items-center gap-2 border-b pb-2">
-                                <Layers className="h-3.5 w-3.5 text-primary" />
-                                <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Required Material Details</h4>
-                             </div>
-                             
-                             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                               {req.items.map((item, idx) => (
-                                 <Card key={idx} className="bg-background rounded-sm border-primary/10 shadow-sm overflow-hidden">
-                                   <CardContent className="p-4 flex items-center justify-between gap-4">
-                                      <div className="flex flex-col min-w-0">
-                                        <span className="text-xs font-black text-foreground uppercase tracking-tight truncate" title={item.itemName}>{item.itemName}</span>
-                                        <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Master Catalog Item</span>
-                                      </div>
-                                      <div className="flex flex-col items-end shrink-0">
-                                        <span className="text-sm font-black text-primary font-mono">{item.quantity}</span>
-                                        <span className="text-[8px] font-bold text-muted-foreground uppercase">{item.unit}</span>
-                                      </div>
-                                   </CardContent>
-                                 </Card>
-                               ))}
-                             </div>
+                {filteredReqs.length > 0 ? filteredReqs.map((req) => {
+                  const isRequester = req.userId === user?.uid;
+                  const isMgrOfReq = req.siteManagerId === user?.uid && req.status === 'Pending';
+                  const canAdminApprove = isAdmin && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
+                  const canAssign = isAdmin && req.status === 'Approved';
+                  const isAssigned = req.assignedToId === user?.uid;
+                  const canUpdateFulfillment = isAssigned && ["Approved & Looking Into It", "Ordered", "Dispatched", "Delivered"].includes(req.status);
 
-                             {req.remarks && (
-                               <div className="p-4 bg-muted/20 border rounded-sm space-y-2">
-                                  <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Requester's Narrative</Label>
-                                  <p className="text-sm italic font-medium text-foreground/80 leading-relaxed">"{req.remarks}"</p>
-                               </div>
-                             )}
-
-                             {isAdmin && req.status === 'Approved' && (
-                                <div className="flex justify-end pt-2">
-                                   <Button size="sm" variant="outline" className="h-8 rounded-sm font-black text-[10px] uppercase border-primary/20 text-primary" onClick={() => handleUpdateStatus(req.id, 'Fulfilled')}>Mark as Fulfilled</Button>
-                                </div>
-                             )}
+                  return (
+                    <React.Fragment key={req.id}>
+                      <TableRow className={cn("hover:bg-muted/5 transition-colors cursor-pointer group", expandedIds.has(req.id) && "bg-primary/[0.02]")} onClick={() => toggleExpand(req.id)}>
+                        <TableCell className="pl-4" onClick={e => e.stopPropagation()}>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm" onClick={() => toggleExpand(req.id)}>
+                            {expandedIds.has(req.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                          </Button>
+                        </TableCell>
+                        <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground uppercase">
+                          {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM yy') : '—'}
+                        </TableCell>
+                        <TableCell className="font-bold text-sm text-foreground truncate max-w-[150px]">
+                           {req.siteName}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline" className={cn(
+                            "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
+                            req.urgency === 'High' ? "bg-red-50 text-red-700 border-red-200" :
+                            req.urgency === 'Medium' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                            "bg-blue-50 text-blue-700 border-blue-200"
+                          )}>{req.urgency}</Badge>
+                        </TableCell>
+                        <TableCell><StatusBadge status={req.status} /></TableCell>
+                        <TableCell>
+                           {req.assignedToName ? (
+                             <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                               <User className="h-3 w-3" /> {req.assignedToName}
+                             </div>
+                           ) : <span className="text-[10px] text-muted-foreground/30 italic uppercase font-bold">Unassigned</span>}
+                        </TableCell>
+                        <TableCell className="text-right px-6" onClick={e => e.stopPropagation()}>
+                          <div className="flex justify-end gap-1">
+                            {isMgrOfReq && (
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'ManagerApproved', 'Approved by Manager.')}><CheckCircle2 className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Rejected by Manager.')}><XCircle className="h-4 w-4" /></Button>
+                              </div>
+                            )}
+                            {canAdminApprove && (
+                              <div className="flex gap-1">
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'Approved', 'Final Approved by Admin.')}><CheckCircle2 className="h-4 w-4" /></Button>
+                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Final Rejected by Admin.')}><XCircle className="h-4 w-4" /></Button>
+                              </div>
+                            )}
+                            {canAssign && (
+                              <Button size="sm" variant="outline" className="h-8 px-3 rounded-sm font-black text-[9px] uppercase border-primary/20 text-primary" onClick={() => setAssignTarget(req)}><UserPlus className="h-3 w-3 mr-1" /> Assign</Button>
+                            )}
+                            {canUpdateFulfillment && (
+                              <Select defaultValue={req.status} onValueChange={(val: any) => handleUpdateStatus(req, val, `Status updated during fulfillment phase.`)}>
+                                <SelectTrigger className="h-8 w-[130px] text-[10px] font-black uppercase"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  {getFulfillmentOptions(req.status).map(opt => <SelectItem key={opt} value={opt} className="text-[10px] font-bold uppercase">{opt}</SelectItem>)}
+                                </SelectContent>
+                              </Select>
+                            )}
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => toggleExpand(req.id)}><Eye className="h-4 w-4" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>
-                    )}
-                  </React.Fragment>
-                )) : (
+                      {expandedIds.has(req.id) && (
+                        <TableRow className="bg-muted/10">
+                          <TableCell colSpan={7} className="p-0 border-b">
+                            <div className="p-8 px-20 space-y-8 animate-in slide-in-from-top-1 duration-300">
+                               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                 <div className="space-y-4">
+                                   <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><Layers className="h-4 w-4" /> Required Materials</Label>
+                                   <div className="grid gap-3">
+                                     {req.items.map((item, idx) => (
+                                       <div key={idx} className="p-3 bg-background border rounded-sm flex items-center justify-between shadow-sm">
+                                         <span className="text-sm font-bold">{item.itemName}</span>
+                                         <Badge className="font-mono bg-primary text-white border-none">{item.quantity} {item.unit}</Badge>
+                                       </div>
+                                     ))}
+                                   </div>
+                                   {req.remarks && (
+                                     <div className="p-4 bg-primary/5 border rounded-sm"><Label className="text-[9px] font-black uppercase text-primary/40 block mb-2">Requester Justification</Label><p className="text-sm italic font-medium leading-relaxed">"{req.remarks}"</p></div>
+                                   )}
+                                 </div>
+
+                                 <div className="space-y-6">
+                                   <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><History className="h-4 w-4" /> Workflow Audit Trail</Label>
+                                   <div className="relative border-l-2 border-muted pl-6 space-y-6">
+                                      {req.timeline?.map((t, tIdx) => (
+                                        <div key={tIdx} className="relative">
+                                           <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                                           <div className="flex flex-col gap-0.5">
+                                              <div className="flex justify-between items-center text-[10px] font-black uppercase"><span className="text-primary">{t.action}</span><span className="text-muted-foreground opacity-50">{format(new Date(t.timestamp), 'dd/MM HH:mm')}</span></div>
+                                              <p className="text-xs font-bold text-foreground">{t.userName}</p>
+                                              <p className="text-xs italic text-muted-foreground leading-relaxed mt-1">"{t.remarks}"</p>
+                                           </div>
+                                        </div>
+                                      ))}
+                                   </div>
+                                 </div>
+                               </div>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </React.Fragment>
+                  )) : (
                   <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No material requisitions discovered in registry</TableCell></TableRow>
                 )}
               </TableBody>
@@ -291,6 +422,37 @@ export default function RequisitionsListPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!assignTarget} onOpenChange={(o) => !o && setAssignTarget(null)}>
+        <DialogContent className="max-w-md w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[70vh] sm:h-auto">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
+             <DialogTitle className="text-xl font-black uppercase tracking-tight">Assign Fulfillment</DialogTitle>
+             <DialogDescription className="text-xs font-medium">Delegate the material collection for {assignTarget?.siteName}.</DialogDescription>
+          </DialogHeader>
+          <div className="p-6 space-y-6 flex-1 flex flex-col min-h-0">
+             <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input placeholder="Search personnel..." className="pl-10 h-11 rounded-sm border-primary/20" value={assignUserSearch} onChange={e => setAssignUserSearch(e.target.value)} />
+             </div>
+             <div className="flex-1 border rounded-sm bg-background shadow-inner overflow-hidden">
+                <ScrollArea className="h-[250px]">
+                  <div className="divide-y">
+                    {allUsers?.filter(u => u.username.toLowerCase().includes(assignUserSearch.toLowerCase())).map(u => (
+                      <button key={u.id} className="w-full p-4 flex items-center justify-between hover:bg-primary/[0.03] transition-all text-left group" onClick={() => handleAssignPerson(u.id)}>
+                         <div className="flex flex-col min-w-0">
+                            <span className="text-sm font-bold group-hover:text-primary transition-colors">{u.username}</span>
+                            <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter">{u.role}</span>
+                         </div>
+                         <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+             </div>
+          </div>
+          <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="w-full h-11 rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose></DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
