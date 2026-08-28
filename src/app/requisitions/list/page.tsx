@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -32,7 +31,8 @@ import {
   ChevronDown,
   UserPlus,
   Loader2,
-  Check
+  Check,
+  ChevronRight
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,8 @@ import {
   DialogClose,
 } from "@/components/ui/dialog";
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { slugifyRole } from '@/lib/access-control';
 
 type RequisitionItem = {
   itemId: string;
@@ -227,29 +229,56 @@ export default function RequisitionsListPage() {
     }
   };
 
-  if (isProfileLoading || isReqsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
-
-  const getFulfillmentOptions = (currentStatus: string) => {
-    const options = ["Approved & Looking Into It", "Ordered", "Dispatched", "Delivered"];
-    return options;
+  const clearFilters = () => {
+    setSearchTerm("");
+    setStatusFilter("all");
   };
+
+  function StatusBadge({ status, className }: { status: string, className?: string }) {
+    const config: Record<string, { label: string, color: string }> = {
+      Pending: { label: "Pending Manager", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+      ManagerApproved: { label: "Pending Admin", color: "bg-blue-100 text-blue-800 border-blue-200" },
+      Approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200" },
+      Rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" },
+      "Approved & Looking Into It": { label: "Looking Into It", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
+      Ordered: { label: "Ordered", color: "bg-purple-100 text-purple-800 border-purple-200" },
+      Dispatched: { label: "Dispatched", color: "bg-amber-100 text-amber-800 border-amber-200" },
+      Delivered: { label: "Delivered", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
+    };
+
+    const item = config[status] || { label: status, color: "bg-slate-100 text-slate-800 border-slate-200" };
+
+    return (
+      <Badge variant="outline" className={cn("rounded-sm text-[10px] font-bold uppercase", item.color, className)}>
+        {item.label}
+      </Badge>
+    );
+  }
+
+  const getFulfillmentOptions = () => {
+    return ["Approved & Looking Into It", "Ordered", "Dispatched", "Delivered"];
+  };
+
+  if (isProfileLoading || isReqsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="space-y-1">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="h-6 w-6 text-primary" />
-            <h1>Material Requisitions</h1>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-6 w-6 text-primary" />
+              <h1>Material Requisitions</h1>
+            </div>
+            <p className="text-muted-foreground text-sm font-medium">Lifecycle tracking for site material demands.</p>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Lifecycle tracking for site material demands.</p>
+          <Button asChild className="h-10 rounded-sm font-bold shadow-md px-6">
+            <Link href="/requisitions/submit"><Plus className="h-4 w-4 mr-2" /> New Requisition</Link>
+          </Button>
         </div>
-        <Button asChild className="h-10 rounded-sm font-bold shadow-md px-6">
-          <Link href="/requisitions/submit"><Plus className="h-4 w-4 mr-2" /> New Requisition</Link>
-        </Button>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -306,115 +335,118 @@ export default function RequisitionsListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredReqs.length > 0 ? filteredReqs.map((req) => {
-                  const isRequester = req.userId === user?.uid;
-                  const isMgrOfReq = req.siteManagerId === user?.uid && req.status === 'Pending';
-                  const canAdminApprove = isAdmin && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
-                  const canAssign = isAdmin && req.status === 'Approved';
-                  const isAssigned = req.assignedToId === user?.uid;
-                  const canUpdateFulfillment = isAssigned && ["Approved & Looking Into It", "Ordered", "Dispatched", "Delivered"].includes(req.status);
+                {filteredReqs.length > 0 ? (
+                  filteredReqs.map((req) => {
+                    const isOwner = req.userId === user?.uid;
+                    const isMgrOfReq = req.siteManagerId === user?.uid && req.status === 'Pending';
+                    const canAdminApprove = isAdmin && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
+                    const canAssign = isAdmin && req.status === 'Approved';
+                    const isAssigned = req.assignedToId === user?.uid;
+                    const canUpdateFulfillment = isAssigned && ["Approved & Looking Into It", "Ordered", "Dispatched", "Delivered"].includes(req.status);
 
-                  return (
-                    <React.Fragment key={req.id}>
-                      <TableRow className={cn("hover:bg-muted/5 transition-colors cursor-pointer group", expandedIds.has(req.id) && "bg-primary/[0.02]")} onClick={() => toggleExpand(req.id)}>
-                        <TableCell className="pl-4" onClick={e => e.stopPropagation()}>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm" onClick={() => toggleExpand(req.id)}>
-                            {expandedIds.has(req.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                          </Button>
-                        </TableCell>
-                        <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground uppercase">
-                          {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM yy') : '—'}
-                        </TableCell>
-                        <TableCell className="font-bold text-sm text-foreground truncate max-w-[150px]">
-                           {req.siteName}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline" className={cn(
-                            "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
-                            req.urgency === 'High' ? "bg-red-50 text-red-700 border-red-200" :
-                            req.urgency === 'Medium' ? "bg-amber-50 text-amber-700 border-amber-200" :
-                            "bg-blue-50 text-blue-700 border-blue-200"
-                          )}>{req.urgency}</Badge>
-                        </TableCell>
-                        <TableCell><StatusBadge status={req.status} /></TableCell>
-                        <TableCell>
-                           {req.assignedToName ? (
-                             <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
-                               <User className="h-3 w-3" /> {req.assignedToName}
-                             </div>
-                           ) : <span className="text-[10px] text-muted-foreground/30 italic uppercase font-bold">Unassigned</span>}
-                        </TableCell>
-                        <TableCell className="text-right px-6" onClick={e => e.stopPropagation()}>
-                          <div className="flex justify-end gap-1">
-                            {isMgrOfReq && (
-                              <div className="flex gap-1">
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'ManagerApproved', 'Approved by Manager.')}><CheckCircle2 className="h-4 w-4" /></Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Rejected by Manager.')}><XCircle className="h-4 w-4" /></Button>
-                              </div>
-                            )}
-                            {canAdminApprove && (
-                              <div className="flex gap-1">
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'Approved', 'Final Approved by Admin.')}><CheckCircle2 className="h-4 w-4" /></Button>
-                                <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Final Rejected by Admin.')}><XCircle className="h-4 w-4" /></Button>
-                              </div>
-                            )}
-                            {canAssign && (
-                              <Button size="sm" variant="outline" className="h-8 px-3 rounded-sm font-black text-[9px] uppercase border-primary/20 text-primary" onClick={() => setAssignTarget(req)}><UserPlus className="h-3 w-3 mr-1" /> Assign</Button>
-                            )}
-                            {canUpdateFulfillment && (
-                              <Select defaultValue={req.status} onValueChange={(val: any) => handleUpdateStatus(req, val, `Status updated during fulfillment phase.`)}>
-                                <SelectTrigger className="h-8 w-[130px] text-[10px] font-black uppercase"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                  {getFulfillmentOptions(req.status).map(opt => <SelectItem key={opt} value={opt} className="text-[10px] font-bold uppercase">{opt}</SelectItem>)}
-                                </SelectContent>
-                              </Select>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => toggleExpand(req.id)}><Eye className="h-4 w-4" /></Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                      {expandedIds.has(req.id) && (
-                        <TableRow className="bg-muted/10">
-                          <TableCell colSpan={7} className="p-0 border-b">
-                            <div className="p-8 px-20 space-y-8 animate-in slide-in-from-top-1 duration-300">
-                               <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                                 <div className="space-y-4">
-                                   <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><Layers className="h-4 w-4" /> Required Materials</Label>
-                                   <div className="grid gap-3">
-                                     {req.items.map((item, idx) => (
-                                       <div key={idx} className="p-3 bg-background border rounded-sm flex items-center justify-between shadow-sm">
-                                         <span className="text-sm font-bold">{item.itemName}</span>
-                                         <Badge className="font-mono bg-primary text-white border-none">{item.quantity} {item.unit}</Badge>
-                                       </div>
-                                     ))}
-                                   </div>
-                                   {req.remarks && (
-                                     <div className="p-4 bg-primary/5 border rounded-sm"><Label className="text-[9px] font-black uppercase text-primary/40 block mb-2">Requester Justification</Label><p className="text-sm italic font-medium leading-relaxed">"{req.remarks}"</p></div>
-                                   )}
-                                 </div>
-
-                                 <div className="space-y-6">
-                                   <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><History className="h-4 w-4" /> Workflow Audit Trail</Label>
-                                   <div className="relative border-l-2 border-muted pl-6 space-y-6">
-                                      {req.timeline?.map((t, tIdx) => (
-                                        <div key={tIdx} className="relative">
-                                           <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
-                                           <div className="flex flex-col gap-0.5">
-                                              <div className="flex justify-between items-center text-[10px] font-black uppercase"><span className="text-primary">{t.action}</span><span className="text-muted-foreground opacity-50">{format(new Date(t.timestamp), 'dd/MM HH:mm')}</span></div>
-                                              <p className="text-xs font-bold text-foreground">{t.userName}</p>
-                                              <p className="text-xs italic text-muted-foreground leading-relaxed mt-1">"{t.remarks}"</p>
-                                           </div>
-                                        </div>
-                                      ))}
-                                   </div>
-                                 </div>
+                    return (
+                      <React.Fragment key={req.id}>
+                        <TableRow className={cn("hover:bg-muted/5 transition-colors cursor-pointer group", expandedIds.has(req.id) && "bg-primary/[0.02]")} onClick={() => toggleExpand(req.id)}>
+                          <TableCell className="pl-4" onClick={e => e.stopPropagation()}>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm" onClick={() => toggleExpand(req.id)}>
+                              {expandedIds.has(req.id) ? <ChevronUp className="h-4 w-4 text-primary" /> : <ChevronDown className="h-4 w-4" />}
+                            </Button>
+                          </TableCell>
+                          <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground uppercase">
+                            {req.createdAt ? format(req.createdAt.toDate(), 'dd MMM yy') : '—'}
+                          </TableCell>
+                          <TableCell className="font-bold text-sm text-foreground truncate max-w-[150px]">
+                             {req.siteName}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant="outline" className={cn(
+                              "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
+                              req.urgency === 'High' ? "bg-red-50 text-red-700 border-red-200" :
+                              req.urgency === 'Medium' ? "bg-amber-50 text-amber-700 border-amber-200" :
+                              "bg-blue-50 text-blue-700 border-blue-200"
+                            )}>{req.urgency}</Badge>
+                          </TableCell>
+                          <TableCell><StatusBadge status={req.status} /></TableCell>
+                          <TableCell>
+                             {req.assignedToName ? (
+                               <div className="flex items-center gap-1.5 text-xs font-bold text-primary">
+                                 <User className="h-3 w-3" /> {req.assignedToName}
                                </div>
+                             ) : <span className="text-[10px] text-muted-foreground/30 italic uppercase font-bold">Unassigned</span>}
+                          </TableCell>
+                          <TableCell className="text-right px-6" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-end gap-1">
+                              {isMgrOfReq && (
+                                <div className="flex gap-1">
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'ManagerApproved', 'Approved by Manager.')}><CheckCircle2 className="h-4 w-4" /></Button>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Rejected by Manager.')}><XCircle className="h-4 w-4" /></Button>
+                                </div>
+                              )}
+                              {canAdminApprove && (
+                                <div className="flex gap-1">
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'Approved', 'Final Approved by Admin.')}><CheckCircle2 className="h-4 w-4" /></Button>
+                                  <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Final Rejected by Admin.')}><XCircle className="h-4 w-4" /></Button>
+                                </div>
+                              )}
+                              {canAssign && (
+                                <Button size="sm" variant="outline" className="h-8 px-3 rounded-sm font-black text-[9px] uppercase border-primary/20 text-primary" onClick={() => setAssignTarget(req)}><UserPlus className="h-3 w-3 mr-1" /> Assign</Button>
+                              )}
+                              {canUpdateFulfillment && (
+                                <Select defaultValue={req.status} onValueChange={(val: any) => handleUpdateStatus(req, val, `Status updated during fulfillment phase.`)}>
+                                  <SelectTrigger className="h-8 w-[130px] text-[10px] font-black uppercase"><SelectValue /></SelectTrigger>
+                                  <SelectContent>
+                                    {getFulfillmentOptions().map(opt => <SelectItem key={opt} value={opt} className="text-[10px] font-bold uppercase">{opt}</SelectItem>)}
+                                  </SelectContent>
+                                </Select>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => toggleExpand(req.id)}><Eye className="h-4 w-4" /></Button>
                             </div>
                           </TableCell>
                         </TableRow>
-                      )}
-                    </React.Fragment>
-                  )) : (
+                        {expandedIds.has(req.id) && (
+                          <TableRow className="bg-muted/10">
+                            <TableCell colSpan={7} className="p-0 border-b">
+                              <div className="p-8 px-20 space-y-8 animate-in slide-in-from-top-1 duration-300">
+                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                                   <div className="space-y-4">
+                                     <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><Layers className="h-4 w-4" /> Required Materials</Label>
+                                     <div className="grid gap-3">
+                                       {req.items.map((item, idx) => (
+                                         <div key={idx} className="p-3 bg-background border rounded-sm flex items-center justify-between shadow-sm">
+                                           <span className="text-sm font-bold">{item.itemName}</span>
+                                           <Badge className="font-mono bg-primary text-white border-none">{item.quantity} {item.unit}</Badge>
+                                         </div>
+                                       ))}
+                                     </div>
+                                     {req.remarks && (
+                                       <div className="p-4 bg-primary/5 border rounded-sm"><Label className="text-[9px] font-black uppercase text-primary/40 block mb-2">Requester Justification</Label><p className="text-sm italic font-medium leading-relaxed">"{req.remarks}"</p></div>
+                                     )}
+                                   </div>
+
+                                   <div className="space-y-6">
+                                     <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><History className="h-4 w-4" /> Workflow Audit Trail</Label>
+                                     <div className="relative border-l-2 border-muted pl-6 space-y-6">
+                                        {req.timeline?.map((t, tIdx) => (
+                                          <div key={tIdx} className="relative">
+                                             <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
+                                             <div className="flex flex-col gap-0.5">
+                                                <div className="flex justify-between items-center text-[10px] font-black uppercase"><span className="text-primary">{t.action}</span><span className="text-muted-foreground opacity-50">{format(new Date(t.timestamp), 'dd/MM HH:mm')}</span></div>
+                                                <p className="text-xs font-bold text-foreground">{t.userName}</p>
+                                                <p className="text-xs italic text-muted-foreground leading-relaxed mt-1">"{t.remarks}"</p>
+                                             </div>
+                                          </div>
+                                        ))}
+                                     </div>
+                                   </div>
+                                 </div>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                ) : (
                   <TableRow><TableCell colSpan={7} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No material requisitions discovered in registry</TableCell></TableRow>
                 )}
               </TableBody>
