@@ -1,3 +1,4 @@
+
 'use client';
 
 import React from 'react';
@@ -16,7 +17,8 @@ import {
   LayoutList,
   ShieldCheck,
   UserCircle2,
-  Fuel
+  Fuel,
+  ClipboardList
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -73,6 +75,13 @@ export function BottomNav({ canShow }: BottomNavProps) {
       href: '/vehicles/request',
       description: 'Allotment for site trip',
       key: 'trips' as PageKey
+    },
+    {
+      label: 'Material Requisition',
+      icon: <ClipboardList className="h-4 w-4 text-primary" />,
+      href: '/requisitions/submit',
+      description: 'Request master catalog items',
+      key: 'requisitions' as PageKey
     },
     {
       label: 'Request PtW',

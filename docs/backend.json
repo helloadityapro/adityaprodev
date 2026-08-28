@@ -625,6 +625,37 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["siteId", "poleConfiguration", "userId"]
+    },
+    "MaterialRequisition": {
+      "title": "Material Requisition",
+      "type": "object",
+      "description": "Formal request for materials from master inventory for a specific site.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "itemId": { "type": "string" },
+              "itemName": { "type": "string" },
+              "quantity": { "type": "number" },
+              "unit": { "type": "string" }
+            }
+          }
+        },
+        "status": { "type": "string", "enum": ["Pending", "Approved", "Rejected", "Fulfilled"] },
+        "urgency": { "type": "string", "enum": ["Low", "Medium", "High"] },
+        "neededBy": { "type": "string", "format": "date" },
+        "remarks": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "items", "status", "userId"]
     }
   },
   "auth": {
@@ -703,10 +734,6 @@
       "schema": { "$ref": "#/backend/entities/MaterialUtilisation" },
       "description": "Consumption logs for project sites."
     },
-    "/material_movements/{movementId}": {
-      "schema": { "$ref": "#/backend/entities/MaterialMovements" },
-      "description": "Inward and Outward material logs."
-    },
     "/master_inventory/{itemId}": {
       "schema": { "$ref": "#/backend/entities/MasterInventoryItem" },
       "description": "Global master list of all inventory item types."
@@ -754,6 +781,10 @@
     "/notifications/{notifId}": {
       "schema": { "$ref": "#/backend/entities/Notification" },
       "description": "System alerts and push notification logs."
+    },
+    "/material_requisitions/{reqId}": {
+      "schema": { "$ref": "#/backend/entities/MaterialRequisition" },
+      "description": "Formal request for materials from master inventory for a specific site."
     }
   }
 }

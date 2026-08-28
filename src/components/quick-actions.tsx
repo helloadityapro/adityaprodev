@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -20,7 +21,8 @@ import {
   CheckSquare,
   Plus,
   Navigation,
-  Fuel
+  Fuel,
+  ClipboardList
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion } from 'framer-motion';
@@ -47,6 +49,13 @@ export function QuickActions({ canShow }: QuickActionsProps) {
       href: '/vehicles/request',
       description: 'Allotment for site trip',
       key: 'trips' as PageKey
+    },
+    {
+      label: 'Material Requisition',
+      icon: <ClipboardList className="mr-2 h-4 w-4 text-primary" />,
+      href: '/requisitions/submit',
+      description: 'Formal request from catalog',
+      key: 'requisitions' as PageKey
     },
     {
       label: 'Request PtW',

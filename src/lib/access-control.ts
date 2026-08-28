@@ -1,4 +1,5 @@
 
+
 /**
  * @fileOverview Definition of all available sidebar pages and their keys.
  * This acts as the source of truth for the User Access Management system.
@@ -16,6 +17,7 @@ export type PageKey =
   | 'work-orders' 
   | 'payments' 
   | 'requirements'
+  | 'requisitions'
   | 'dpr' 
   | 'tasks' 
   | 'permits' 
@@ -80,6 +82,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'work-orders', label: 'Work Orders', category: 'Operations', path: '/work-orders/manage' },
   { id: 'payments', label: 'Payments', category: 'Operations', path: '/payments/record' },
   { id: 'requirements', label: 'Requirements', category: 'Operations', path: '/requirements/submit' },
+  { id: 'requisitions', label: 'Material Requisition', category: 'Operations', path: '/requisitions/list' },
   { id: 'dpr', label: 'Daily Progress Reports (DPR)', category: 'Operations', path: '/dpr/submit' },
   { id: 'tasks', label: 'Tasks', category: 'Operations', path: '/tasks/list' },
   { id: 'permits', label: 'Permits to Work (PtW)', category: 'Operations', path: '/ptw/list' },
@@ -151,6 +154,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/work-orders')) return 'work-orders';
   if (path.startsWith('/payments')) return 'payments';
   if (path.startsWith('/requirements')) return 'requirements';
+  if (path.startsWith('/requisitions')) return 'requisitions';
   if (path.startsWith('/site-visits')) {
     if (path.includes('/summary')) return 'visits-summary';
     return 'visits';

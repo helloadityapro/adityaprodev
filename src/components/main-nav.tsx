@@ -279,6 +279,41 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
             </Collapsible>
           )}
 
+          {/* Requisitions */}
+          {canShow('requisitions') && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/requisitions')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Requisitions" isActive={pathname.startsWith('/requisitions')} className="rounded-sm">
+                    <ClipboardList className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Requisitions</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/requisitions/submit'} onClick={handleMobileClose}>
+                        <Link href="/requisitions/submit">
+                          <Plus className="h-4 w-4" />
+                          <span>Submit Requisition</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/requisitions/list'} onClick={handleMobileClose}>
+                        <Link href="/requisitions/list">
+                          <List className="h-4 w-4" />
+                          <span>Track Requests</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
           {/* PO Sub-Section */}
           {canShow('purchase-orders') && (
             <Collapsible asChild defaultOpen={pathname.startsWith('/purchase-orders')} className="group/collapsible">
