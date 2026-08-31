@@ -2,8 +2,8 @@
 'use client';
 
 import * as React from 'react';
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from '@/firebase';
-import { collection, query, where, doc, limit } from 'firebase/firestore';
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
+import { collection, query, where, doc, limit, serverTimestamp } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,8 @@ import {
   startOfDay,
   addMonths,
   subMonths,
-  isSunday
+  isSunday,
+  parseISO
 } from 'date-fns';
 import { 
   ArrowLeft, 
@@ -37,7 +38,10 @@ import {
   Search,
   RefreshCw,
   FileDown,
-  LayoutGrid
+  LayoutGrid,
+  Clock,
+  Settings2,
+  ShieldCheck
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
@@ -49,8 +53,18 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose
+} from "@/components/ui/dialog";
 import * as XLSX from 'xlsx';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
 
 type UserProfile = {
   id: string;
@@ -70,26 +84,45 @@ type AttendanceRecord = {
   checkOutTime?: any;
 };
 
+type AttendanceSettings = {
+  lateMarkCutoff: string;
+};
+
 const EXCLUDED_PERSONNEL = ["Khalil Choudhary", "Imtiyaz Kazi", "Jayesh Bajaj", "Vipul Joisher"];
 
 export default function AttendanceMatrixPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
+  const { toast } = useToast();
   const router = useRouter();
 
   const [currentDate, setCurrentDate] = React.useState(new Date());
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [isPolicyDialogOpen, setIsPolicyDialogOpen] = React.useState(false);
+  const [newCutoff, setNewCutoff] = React.useState("10:30");
+  const [isSavingPolicy, setIsSavingPolicy] = React.useState(false);
 
   const currentUserProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: currentUserProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(currentUserProfileRef);
 
+  const settingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'attendance'), [firestore]);
+  const { data: settings, isLoading: isSettingsLoading } = useDoc<AttendanceSettings>(settingsRef);
+
   const isAdmin = isSuperAdmin(user?.email) || currentUserProfile?.role === 'Admin' || currentUserProfile?.role === 'Manager - Human Resources';
+
+  const lateCutoff = settings?.lateMarkCutoff || "10:30";
 
   React.useEffect(() => {
     if (!isUserLoading && !isProfileLoading && !isAdmin) {
       router.replace('/dashboard');
     }
   }, [isUserLoading, isProfileLoading, isAdmin, router]);
+
+  React.useEffect(() => {
+    if (settings?.lateMarkCutoff) {
+      setNewCutoff(settings.lateMarkCutoff);
+    }
+  }, [settings]);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -121,25 +154,53 @@ export default function AttendanceMatrixPage() {
   const handlePrevMonth = () => setCurrentDate(prev => subMonths(prev, 1));
   const handleNextMonth = () => setCurrentDate(prev => addMonths(prev, 1));
 
+  const checkIsLate = (checkInTime: any) => {
+    if (!checkInTime) return false;
+    const time = checkInTime.toDate ? checkInTime.toDate() : new Date(checkInTime);
+    const timeStr = format(time, 'HH:mm');
+    return timeStr > lateCutoff;
+  };
+
+  const handleUpdatePolicy = async () => {
+    setIsSavingPolicy(true);
+    try {
+      await setDocumentNonBlocking(settingsRef, {
+        lateMarkCutoff: newCutoff,
+        updatedAt: serverTimestamp(),
+        updatedBy: user?.uid
+      }, { merge: true });
+      toast({ title: 'Policy Updated', description: `Late Mark cutoff set to ${newCutoff}.` });
+      setIsPolicyDialogOpen(false);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Update Failed', description: e.message });
+    } finally {
+      setIsSavingPolicy(false);
+    }
+  };
+
   const handleExport = () => {
     if (!filteredUsers || !monthAttendance) return;
 
     const exportData = filteredUsers.map(u => {
       const row: any = { 'Employee': u.username, 'Role': u.role };
       let presentCount = 0;
+      let lateCount = 0;
       daysInMonth.forEach(day => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const record = monthAttendance.find(a => a.userId === u.id && a.date === dateStr);
         if (record) {
-          row[format(day, 'dd')] = '✔';
+          const isLate = checkIsLate(record.checkInTime);
+          row[format(day, 'dd')] = isLate ? 'L' : '✔';
           presentCount++;
+          if (isLate) lateCount++;
         } else if (isAfter(day, startOfDay(new Date()))) {
           row[format(day, 'dd')] = '-';
         } else {
           row[format(day, 'dd')] = '✖';
         }
       });
-      row['Total'] = `${presentCount} / ${daysInMonth.length}`;
+      row['Late Marks'] = lateCount;
+      row['Total Present'] = `${presentCount} / ${daysInMonth.length}`;
       return row;
     });
 
@@ -149,7 +210,7 @@ export default function AttendanceMatrixPage() {
     XLSX.writeFile(wb, `Attendance_Board_${format(currentDate, 'MMM_yyyy')}.xlsx`);
   };
 
-  if (isProfileLoading || isUsersLoading || isAttendanceLoading || isUserLoading) {
+  if (isProfileLoading || isUsersLoading || isAttendanceLoading || isUserLoading || isSettingsLoading) {
     return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
   }
 
@@ -170,6 +231,9 @@ export default function AttendanceMatrixPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" size="sm" onClick={() => setIsPolicyDialogOpen(true)} className="h-10 rounded-sm font-bold border-primary/20 text-muted-foreground hover:text-primary hover:border-primary/40 px-4">
+            <Settings2 className="h-4 w-4 mr-2" /> Policy
+          </Button>
           <div className="flex items-center bg-muted/50 rounded-sm border border-primary/10 p-1">
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm" onClick={handlePrevMonth}><ChevronLeft className="h-4 w-4" /></Button>
             <span className="px-4 text-xs font-black uppercase tracking-widest">{format(currentDate, 'MMMM yyyy')}</span>
@@ -218,6 +282,9 @@ export default function AttendanceMatrixPage() {
                       </th>
                     );
                   })}
+                  <th className="sticky right-[80px] z-40 bg-muted px-4 py-4 border-b border-l text-center font-black uppercase tracking-widest text-muted-foreground min-w-[80px]">
+                    Late
+                  </th>
                   <th className="sticky right-0 z-40 bg-muted px-6 py-4 border-b border-l text-center font-black uppercase tracking-widest text-muted-foreground">
                     Total
                   </th>
@@ -226,6 +293,7 @@ export default function AttendanceMatrixPage() {
               <tbody>
                 {filteredUsers.length > 0 ? filteredUsers.map((u) => {
                   let presentCount = 0;
+                  let lateCount = 0;
                   return (
                     <tr key={u.id} className="hover:bg-muted/5 transition-colors border-b last:border-0 group">
                       <td className="sticky left-0 z-20 bg-background group-hover:bg-muted/5 px-6 py-3 border-r flex items-center gap-3 transition-colors">
@@ -246,7 +314,12 @@ export default function AttendanceMatrixPage() {
                         const isFuture = isAfter(day, startOfDay(new Date()));
                         const isSun = isSunday(day);
                         
-                        if (record) presentCount++;
+                        let isLate = false;
+                        if (record) {
+                          presentCount++;
+                          isLate = checkIsLate(record.checkInTime);
+                          if (isLate) lateCount++;
+                        }
 
                         return (
                           <td 
@@ -262,7 +335,11 @@ export default function AttendanceMatrixPage() {
                                 <TooltipTrigger asChild>
                                   <div className="flex justify-center">
                                     {record ? (
-                                      <Check className="h-4 w-4 text-blue-600 animate-in zoom-in duration-300" />
+                                      isLate ? (
+                                        <Clock className="h-4 w-4 text-amber-600 animate-in zoom-in duration-300" />
+                                      ) : (
+                                        <Check className="h-4 w-4 text-blue-600 animate-in zoom-in duration-300" />
+                                      )
                                     ) : isFuture ? (
                                       <span className="text-muted-foreground/30 font-bold">—</span>
                                     ) : (
@@ -280,8 +357,13 @@ export default function AttendanceMatrixPage() {
                                       </div>
                                       <div className="flex items-center justify-between gap-4">
                                         <span className="text-[9px] font-bold text-white/60">In:</span>
-                                        <span className="text-[10px] font-mono font-bold">{record.checkInTime ? format(record.checkInTime.toDate(), 'HH:mm') : '—'}</span>
+                                        <span className={cn("text-[10px] font-mono font-bold", isLate && "text-amber-400")}>{record.checkInTime ? format(record.checkInTime.toDate(), 'HH:mm') : '—'}</span>
                                       </div>
+                                      {isLate && (
+                                        <div className="flex items-center gap-1 text-[8px] font-black uppercase text-amber-400">
+                                          <AlertCircle className="h-2 w-2" /> Late Mark
+                                        </div>
+                                      )}
                                       <div className="flex items-center justify-between gap-4">
                                         <span className="text-[9px] font-bold text-white/60">Out:</span>
                                         <span className="text-[10px] font-mono font-bold">{record.checkOutTime ? format(record.checkOutTime.toDate(), 'HH:mm') : (record.status === 'ongoing' ? 'Active' : '—')}</span>
@@ -294,6 +376,14 @@ export default function AttendanceMatrixPage() {
                           </td>
                         );
                       })}
+                      <td className="sticky right-[80px] z-20 bg-background group-hover:bg-muted/5 px-4 py-3 border-l text-center transition-colors">
+                        <Badge variant="outline" className={cn(
+                          "h-6 px-2 rounded-sm font-mono font-black text-[10px]",
+                          lateCount > 0 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-50 text-muted-foreground border-slate-200"
+                        )}>
+                          {lateCount}
+                        </Badge>
+                      </td>
                       <td className="sticky right-0 z-20 bg-background group-hover:bg-muted/5 px-6 py-3 border-l text-center transition-colors">
                         <Badge variant="outline" className="h-6 px-3 rounded-full font-mono font-black text-[10px] bg-primary/5 text-primary border-primary/20 shadow-sm">
                           {presentCount} / {daysInMonth.length}
@@ -303,7 +393,7 @@ export default function AttendanceMatrixPage() {
                   );
                 }) : (
                   <tr>
-                    <td colSpan={daysInMonth.length + 2} className="h-64 text-center text-muted-foreground italic text-sm">
+                    <td colSpan={daysInMonth.length + 3} className="h-64 text-center text-muted-foreground italic text-sm">
                       No personnel records discovered for this month.
                     </td>
                   </tr>
@@ -313,6 +403,46 @@ export default function AttendanceMatrixPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={isPolicyDialogOpen} onOpenChange={setIsPolicyDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-sm border-primary/20 shadow-2xl">
+          <DialogHeader className="text-left space-y-2">
+            <DialogTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-primary" />
+              Attendance Policy
+            </DialogTitle>
+            <DialogDescription className="text-xs font-medium leading-relaxed">
+              Define the global cutoff time for Late Marks. All historical and new logs will be audited against this value.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Late Mark Cutoff (24h Format)</Label>
+              <div className="relative">
+                <Clock className="absolute left-3 top-3 h-4 w-4 text-primary opacity-50" />
+                <Input 
+                  type="time" 
+                  value={newCutoff} 
+                  onChange={(e) => setNewCutoff(e.target.value)} 
+                  className="rounded-sm h-12 pl-10 font-mono font-bold text-lg"
+                />
+              </div>
+              <p className="text-[9px] text-muted-foreground italic pl-1">
+                Note: Check-ins recorded AFTER this time will be counted as a Late Mark.
+              </p>
+            </div>
+          </div>
+          <DialogFooter className="gap-2 flex flex-col sm:flex-row">
+            <DialogClose asChild>
+              <Button variant="ghost" className="rounded-sm font-bold uppercase text-[10px] flex-1">Cancel</Button>
+            </DialogClose>
+            <Button onClick={handleUpdatePolicy} disabled={isSavingPolicy} className="rounded-sm font-black uppercase text-[10px] flex-1 shadow-lg">
+              {isSavingPolicy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+              Save Policy
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

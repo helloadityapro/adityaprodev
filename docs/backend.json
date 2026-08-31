@@ -44,6 +44,14 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
+    "AttendanceSettings": {
+      "title": "Attendance Settings",
+      "type": "object",
+      "description": "Global configuration for attendance compliance.",
+      "properties": {
+        "lateMarkCutoff": { "type": "string", "description": "24h format HH:mm", "default": "10:30" }
+      }
+    },
     "TeamMappingOverride": {
       "title": "Team Mapping Override",
       "type": "object",
@@ -681,6 +689,10 @@
     "/system_settings/access/roles/{roleId}": {
       "schema": { "$ref": "#/backend/entities/AccessRule" },
       "description": "Role-based access permissions."
+    },
+    "/system_settings/attendance": {
+      "schema": { "$ref": "#/backend/entities/AttendanceSettings" },
+      "description": "Global attendance parameters."
     },
     "/quotes/{quoteId}": {
       "schema": { "$ref": "#/backend/entities/Quote" },
