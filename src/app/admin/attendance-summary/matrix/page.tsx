@@ -125,9 +125,9 @@ export default function AttendanceMatrixPage() {
     }
   }, [settings]);
 
-  const monthStart = startOfMonth(currentDate);
-  const monthEnd = endOfMonth(currentDate);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const monthStart = React.useMemo(() => startOfMonth(currentDate), [currentDate]);
+  const monthEnd = React.useMemo(() => endOfMonth(currentDate), [currentDate]);
+  const daysInMonth = React.useMemo(() => eachDayOfInterval({ start: monthStart, end: monthEnd }), [monthStart, monthEnd]);
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: isUsersLoading } = useCollection<UserProfile>(usersQuery);
@@ -138,8 +138,25 @@ export default function AttendanceMatrixPage() {
       where('date', '>=', format(monthStart, 'yyyy-MM-dd')),
       where('date', '<=', format(monthEnd, 'yyyy-MM-dd'))
     );
-  }, [firestore, currentDate]);
+  }, [firestore, monthStart, monthEnd]);
   const { data: monthAttendance, isLoading: isAttendanceLoading } = useCollection<AttendanceRecord>(attendanceQuery);
+
+  const checkIsLate = React.useCallback((checkInTime: any) => {
+    if (!checkInTime) return false;
+    const time = checkInTime.toDate ? checkInTime.toDate() : new Date(checkInTime);
+    const timeStr = format(time, 'HH:mm');
+    return timeStr > lateCutoff;
+  }, [lateCutoff]);
+
+  // OPTIMIZATION: Index attendance data for O(1) lookup in the grid
+  const indexedAttendance = React.useMemo(() => {
+    const map = new Map<string, AttendanceRecord>();
+    if (!monthAttendance) return map;
+    monthAttendance.forEach(record => {
+      map.set(`${record.userId}_${record.date}`, record);
+    });
+    return map;
+  }, [monthAttendance]);
 
   const filteredUsers = React.useMemo(() => {
     if (!allUsers) return [];
@@ -152,15 +169,29 @@ export default function AttendanceMatrixPage() {
       .sort((a, b) => a.username.localeCompare(b.username));
   }, [allUsers, searchTerm]);
 
+  // OPTIMIZATION: Pre-calculate totals for each user to avoid loops during render
+  const userAggregates = React.useMemo(() => {
+    const aggregates = new Map<string, { present: number, late: number }>();
+    if (!filteredUsers || !indexedAttendance) return aggregates;
+
+    filteredUsers.forEach(u => {
+      let presentCount = 0;
+      let lateCount = 0;
+      daysInMonth.forEach(day => {
+        const dateStr = format(day, 'yyyy-MM-dd');
+        const record = indexedAttendance.get(`${u.id}_${dateStr}`);
+        if (record) {
+          presentCount++;
+          if (checkIsLate(record.checkInTime)) lateCount++;
+        }
+      });
+      aggregates.set(u.id, { present: presentCount, late: lateCount });
+    });
+    return aggregates;
+  }, [filteredUsers, indexedAttendance, daysInMonth, checkIsLate]);
+
   const handlePrevMonth = () => setCurrentDate(prev => subMonths(prev, 1));
   const handleNextMonth = () => setCurrentDate(prev => addMonths(prev, 1));
-
-  const checkIsLate = (checkInTime: any) => {
-    if (!checkInTime) return false;
-    const time = checkInTime.toDate ? checkInTime.toDate() : new Date(checkInTime);
-    const timeStr = format(time, 'HH:mm');
-    return timeStr > lateCutoff;
-  };
 
   const handleUpdatePolicy = async () => {
     setIsSavingPolicy(true);
@@ -184,24 +215,22 @@ export default function AttendanceMatrixPage() {
 
     const exportData = filteredUsers.map(u => {
       const row: any = { 'Employee': u.username, 'Role': u.role };
-      let presentCount = 0;
-      let lateCount = 0;
+      const stats = userAggregates.get(u.id);
+      
       daysInMonth.forEach(day => {
         const dateStr = format(day, 'yyyy-MM-dd');
-        const record = monthAttendance.find(a => a.userId === u.id && a.date === dateStr);
+        const record = indexedAttendance.get(`${u.id}_${dateStr}`);
         if (record) {
           const isLate = checkIsLate(record.checkInTime);
           row[format(day, 'dd')] = isLate ? 'L' : '✔';
-          presentCount++;
-          if (isLate) lateCount++;
         } else if (isAfter(day, startOfDay(new Date()))) {
           row[format(day, 'dd')] = '-';
         } else {
           row[format(day, 'dd')] = '✖';
         }
       });
-      row['Late Marks'] = lateCount;
-      row['Total Present'] = `${presentCount} / ${daysInMonth.length}`;
+      row['Late Marks'] = stats?.late || 0;
+      row['Total Present'] = `${stats?.present || 0} / ${daysInMonth.length}`;
       return row;
     });
 
@@ -226,7 +255,7 @@ export default function AttendanceMatrixPage() {
           </Button>
           <div className="flex items-center gap-2">
             <LayoutGrid className="h-6 w-6 text-primary" />
-            <h1 className="text-2xl font-black tracking-tight">Monthly Attendance Board</h1>
+            <h1 className="text-2xl font-black tracking-tight text-foreground">Monthly Attendance Board</h1>
           </div>
           <p className="text-muted-foreground text-sm font-medium">Cross-personnel presence grid for {format(currentDate, 'MMMM yyyy')}.</p>
         </div>
@@ -244,7 +273,7 @@ export default function AttendanceMatrixPage() {
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Filter personnel..." 
-              className="pl-8 h-10 rounded-sm border-primary/20 text-xs" 
+              className="pl-8 h-10 rounded-sm border-primary/20 text-xs bg-background" 
               value={searchTerm} 
               onChange={(e) => setSearchTerm(e.target.value)} 
             />
@@ -258,80 +287,77 @@ export default function AttendanceMatrixPage() {
       <Card className="rounded-sm border-primary/10 shadow-xl overflow-hidden">
         <CardContent className="p-0">
           <div className="relative h-[75vh] overflow-auto custom-scrollbar">
-            <table className="w-full border-collapse border-spacing-0 text-[10px]">
-              <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur-md shadow-sm">
-                <tr>
-                  <th className="sticky left-0 z-40 bg-muted px-6 py-4 border-b border-r text-left min-w-[220px] font-black uppercase tracking-widest text-muted-foreground">
-                    Employee
-                  </th>
-                  {daysInMonth.map(day => {
-                    const isToday = isSameDay(day, new Date());
-                    const isSun = isSunday(day);
+            <TooltipProvider delayDuration={0}>
+              <table className="w-full border-collapse border-spacing-0 text-[10px]">
+                <thead className="sticky top-0 z-30 bg-muted/95 backdrop-blur-md shadow-sm">
+                  <tr>
+                    <th className="sticky left-0 z-40 bg-muted px-6 py-4 border-b border-r text-left min-w-[220px] font-black uppercase tracking-widest text-muted-foreground">
+                      Employee
+                    </th>
+                    {daysInMonth.map(day => {
+                      const isToday = isSameDay(day, new Date());
+                      const isSun = isSunday(day);
+                      return (
+                        <th 
+                          key={day.toString()} 
+                          className={cn(
+                            "px-2 py-3 border-b text-center min-w-[40px] transition-colors",
+                            isToday && "bg-primary/10 ring-1 ring-primary/20",
+                            isSun && "bg-red-50/50"
+                          )}
+                        >
+                          <div className="flex flex-col items-center">
+                            <span className={cn("font-mono text-xs font-black", isSun && "text-red-600")}>{format(day, 'dd')}</span>
+                            <span className={cn("text-[8px] font-bold uppercase", isSun ? "text-red-500" : "text-muted-foreground")}>{format(day, 'EEE')}</span>
+                          </div>
+                        </th>
+                      );
+                    })}
+                    <th className="sticky right-[80px] z-40 bg-muted px-4 py-4 border-b border-l text-center font-black uppercase tracking-widest text-muted-foreground min-w-[80px]">
+                      Late
+                    </th>
+                    <th className="sticky right-0 z-40 bg-muted px-6 py-4 border-b border-l text-center font-black uppercase tracking-widest text-muted-foreground">
+                      Total
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredUsers.length > 0 ? filteredUsers.map((u) => {
+                    const stats = userAggregates.get(u.id);
                     return (
-                      <th 
-                        key={day.toString()} 
-                        className={cn(
-                          "px-2 py-3 border-b text-center min-w-[40px] transition-colors",
-                          isToday && "bg-primary/10 ring-1 ring-primary/20",
-                          isSun && "bg-red-50/50"
-                        )}
-                      >
-                        <div className="flex flex-col items-center">
-                          <span className={cn("font-mono text-xs font-black", isSun && "text-red-600")}>{format(day, 'dd')}</span>
-                          <span className={cn("text-[8px] font-bold uppercase", isSun ? "text-red-500" : "text-muted-foreground")}>{format(day, 'EEE')}</span>
-                        </div>
-                      </th>
-                    );
-                  })}
-                  <th className="sticky right-[80px] z-40 bg-muted px-4 py-4 border-b border-l text-center font-black uppercase tracking-widest text-muted-foreground min-w-[80px]">
-                    Late
-                  </th>
-                  <th className="sticky right-0 z-40 bg-muted px-6 py-4 border-b border-l text-center font-black uppercase tracking-widest text-muted-foreground">
-                    Total
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredUsers.length > 0 ? filteredUsers.map((u) => {
-                  let presentCount = 0;
-                  let lateCount = 0;
-                  return (
-                    <tr key={u.id} className="hover:bg-muted/5 transition-colors border-b last:border-0 group">
-                      <td className="sticky left-0 z-20 bg-background group-hover:bg-muted/5 px-6 py-3 border-r flex items-center gap-3 transition-colors">
-                        <Avatar className="h-8 w-8 rounded-sm shadow-sm">
-                          <AvatarFallback className="text-[10px] font-black bg-primary/5 text-primary">
-                            {u.username?.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex flex-col min-w-0">
-                          <span className="font-bold text-sm text-foreground truncate">{u.username}</span>
-                          <span className="text-[9px] text-muted-foreground uppercase font-black truncate">{u.role}</span>
-                        </div>
-                      </td>
-                      {daysInMonth.map(day => {
-                        const dateStr = format(day, 'yyyy-MM-dd');
-                        const record = monthAttendance?.find(a => a.userId === u.id && a.date === dateStr);
-                        const isToday = isSameDay(day, new Date());
-                        const isFuture = isAfter(day, startOfDay(new Date()));
-                        const isSun = isSunday(day);
-                        
-                        let isLate = false;
-                        if (record) {
-                          presentCount++;
-                          isLate = checkIsLate(record.checkInTime);
-                          if (isLate) lateCount++;
-                        }
+                      <tr key={u.id} className="hover:bg-muted/5 transition-colors border-b last:border-0 group">
+                        <td className="sticky left-0 z-20 bg-background group-hover:bg-muted/5 px-6 py-3 border-r flex items-center gap-3 transition-colors">
+                          <Avatar className="h-8 w-8 rounded-sm shadow-sm">
+                            <AvatarFallback className="text-[10px] font-black bg-primary/5 text-primary">
+                              {u.username?.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-bold text-sm text-foreground truncate">{u.username}</span>
+                            <span className="text-[9px] text-muted-foreground uppercase font-black truncate">{u.role}</span>
+                          </div>
+                        </td>
+                        {daysInMonth.map(day => {
+                          const dateStr = format(day, 'yyyy-MM-dd');
+                          const record = indexedAttendance.get(`${u.id}_${dateStr}`);
+                          const isToday = isSameDay(day, new Date());
+                          const isFuture = isAfter(day, startOfDay(new Date()));
+                          const isSun = isSunday(day);
+                          
+                          let isLate = false;
+                          if (record) {
+                            isLate = checkIsLate(record.checkInTime);
+                          }
 
-                        return (
-                          <td 
-                            key={day.toString()} 
-                            className={cn(
-                              "px-1 py-3 text-center transition-colors",
-                              isToday && "bg-primary/[0.02]",
-                              isSun && "bg-red-50/20"
-                            )}
-                          >
-                            <TooltipProvider delayDuration={0}>
+                          return (
+                            <td 
+                              key={day.toString()} 
+                              className={cn(
+                                "px-1 py-3 text-center transition-colors",
+                                isToday && "bg-primary/[0.02]",
+                                isSun && "bg-red-50/20"
+                              )}
+                            >
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <div className="flex justify-center">
@@ -373,34 +399,34 @@ export default function AttendanceMatrixPage() {
                                   </TooltipContent>
                                 )}
                               </Tooltip>
-                            </TooltipProvider>
-                          </td>
-                        );
-                      })}
-                      <td className="sticky right-[80px] z-20 bg-background group-hover:bg-muted/5 px-4 py-3 border-l text-center transition-colors">
-                        <Badge variant="outline" className={cn(
-                          "h-6 px-2 rounded-sm font-mono font-black text-[10px]",
-                          lateCount > 0 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-50 text-muted-foreground border-slate-200"
-                        )}>
-                          {lateCount}
-                        </Badge>
-                      </td>
-                      <td className="sticky right-0 z-20 bg-background group-hover:bg-muted/5 px-6 py-3 border-l text-center transition-colors">
-                        <Badge variant="outline" className="h-6 px-3 rounded-full font-mono font-black text-[10px] bg-primary/5 text-primary border-primary/20 shadow-sm">
-                          {presentCount} / {daysInMonth.length}
-                        </Badge>
+                            </td>
+                          );
+                        })}
+                        <td className="sticky right-[80px] z-20 bg-background group-hover:bg-muted/5 px-4 py-3 border-l text-center transition-colors">
+                          <Badge variant="outline" className={cn(
+                            "h-6 px-2 rounded-sm font-mono font-black text-[10px]",
+                            (stats?.late || 0) > 0 ? "bg-amber-50 text-amber-700 border-amber-200" : "bg-slate-50 text-muted-foreground border-slate-200"
+                          )}>
+                            {stats?.late || 0}
+                          </Badge>
+                        </td>
+                        <td className="sticky right-0 z-20 bg-background group-hover:bg-muted/5 px-6 py-3 border-l text-center transition-colors">
+                          <Badge variant="outline" className="h-6 px-3 rounded-full font-mono font-black text-[10px] bg-primary/5 text-primary border-primary/20 shadow-sm">
+                            {stats?.present || 0} / {daysInMonth.length}
+                          </Badge>
+                        </td>
+                      </tr>
+                    );
+                  }) : (
+                    <tr>
+                      <td colSpan={daysInMonth.length + 3} className="h-64 text-center text-muted-foreground italic text-sm">
+                        No personnel records discovered for this month.
                       </td>
                     </tr>
-                  );
-                }) : (
-                  <tr>
-                    <td colSpan={daysInMonth.length + 3} className="h-64 text-center text-muted-foreground italic text-sm">
-                      No personnel records discovered for this month.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  )}
+                </tbody>
+              </table>
+            </TooltipProvider>
           </div>
         </CardContent>
       </Card>
@@ -435,7 +461,7 @@ export default function AttendanceMatrixPage() {
           </div>
           <DialogFooter className="gap-2 flex flex-col sm:flex-row">
             <DialogClose asChild>
-              <Button variant="ghost" className="rounded-sm font-bold uppercase text-[10px] flex-1">Cancel</Button>
+              <Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] flex-1">Cancel</Button>
             </DialogClose>
             <Button onClick={handleUpdatePolicy} disabled={isSavingPolicy} className="rounded-sm font-black uppercase text-[10px] flex-1 shadow-lg">
               {isSavingPolicy ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
