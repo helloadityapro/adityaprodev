@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -41,7 +40,9 @@ import {
   LayoutGrid,
   Clock,
   Settings2,
-  ShieldCheck
+  ShieldCheck,
+  Save,
+  Loader2
 } from 'lucide-react';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { useRouter } from 'next/navigation';
@@ -239,7 +240,7 @@ export default function AttendanceMatrixPage() {
             <span className="px-4 text-xs font-black uppercase tracking-widest">{format(currentDate, 'MMMM yyyy')}</span>
             <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm" onClick={handleNextMonth}><ChevronRight className="h-4 w-4" /></Button>
           </div>
-          <div className="relative w-48 sm:w-64">
+          <div className="relative w-48 sm:w-[260px]">
             <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Filter personnel..." 
