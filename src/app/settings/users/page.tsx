@@ -45,7 +45,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { useCollection, useFirestore, updateDocumentNonBlocking, useMemoFirebase, deleteDocumentNonBlocking, useUser, useDoc } from "@/firebase"
-import { collection, doc } from "firebase/firestore"
+import { collection, doc, query, where } from "firebase/firestore"
 import { AddUserDialog } from "@/components/add-user-dialog";
 import { EditUserDialog } from "@/components/edit-user-dialog";
 import { useToast } from "@/hooks/use-toast";
@@ -72,10 +72,10 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuCheckboxItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 
 type UserType = {
@@ -100,7 +100,7 @@ type UserType = {
 
 const getRoleIcon = (roleName: string) => {
     const name = roleName?.toLowerCase() || '';
-    if (name.includes('admin')) return < Shield className="h-4 w-4" />;
+    if (name.includes('admin')) return <Shield className="h-4 w-4" />;
     if (name.includes('manager')) return <UserCog className="h-4 w-4" />;
     if (name.includes('engineer')) return <HardHat className="h-4 w-4" />;
     if (name.includes('driver')) return <Truck className="h-4 w-4" />;
@@ -155,9 +155,6 @@ export default function UsersPage() {
         return collection(firestore, 'users');
     }, [firestore, isAdmin]);
     const { data: users, isLoading: isUsersLoading } = useCollection<UserType>(usersQuery);
-
-    const rolesQuery = useMemoFirebase(() => collection(firestore, 'user_roles'), [firestore]);
-    const { data: dbRoles } = useCollection<{ name: string }>(rolesQuery);
 
     const [filter, setFilter] = React.useState<string>('all');
     const [searchTerm, setSearchTerm] = React.useState('');
@@ -379,7 +376,7 @@ export default function UsersPage() {
                           <DropdownMenuSeparator />
                           <DropdownMenuItem onClick={() => setUpcomingFilter('none')} className="gap-2 cursor-pointer font-black text-[9px] uppercase text-destructive">
                             <FilterX className="h-3 w-3" /> Reset Specialized Filters
-                          </MenuItem>
+                          </DropdownMenuItem>
                         </>
                       )}
                     </DropdownMenuContent>
@@ -524,7 +521,7 @@ export default function UsersPage() {
             <ViewUserDialog user={userToView as any} open={!!userToView} onOpenChange={() => setUserToView(null)} />
             <UserDocumentsDialog userId={userIdForDocs} open={!!userIdForDocs} onOpenChange={() => setUserIdForDocs(null)} />
             
-            <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+            <AlertDialog open={!!userToDelete} onOpenChange={(o) => !o && setUserToDelete(null)}>
                 <AlertDialogContent className="rounded-sm max-md">
                     <AlertDialogHeader>
                     <AlertDialogTitle className="font-black uppercase tracking-tight flex items-center gap-2">
