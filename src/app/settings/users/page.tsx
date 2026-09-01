@@ -56,7 +56,6 @@ import {
     AlertDialogAction,
     AlertDialogCancel,
     AlertDialogContent,
-    AlertDialogDescription,
     AlertDialogFooter,
     AlertDialogHeader,
     AlertDialogTitle,
@@ -77,6 +76,8 @@ import {
   DropdownMenuTrigger,
   DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 type UserType = {
   id: string;
@@ -130,6 +131,21 @@ function StatusBadge({ user }: { user: UserType }) {
 
 type SortKey = 'username' | 'role' | 'registrationRequest' | 'createdAt' | 'department' | 'dob' | 'doj' | 'aadharNumber' | 'panNumber';
 
+const MONTHS = [
+  { value: "1", label: "January" },
+  { value: "2", label: "February" },
+  { value: "3", label: "March" },
+  { value: "4", label: "April" },
+  { value: "5", label: "May" },
+  { value: "6", label: "June" },
+  { value: "7", label: "July" },
+  { value: "8", label: "August" },
+  { value: "9", label: "September" },
+  { value: "10", label: "October" },
+  { value: "11", label: "November" },
+  { value: "12", label: "December" },
+];
+
 export default function UsersPage() {
     const firestore = useFirestore();
     const router = useRouter();
@@ -169,6 +185,7 @@ export default function UsersPage() {
     // New Advanced States
     const [showSuspended, setShowSuspended] = React.useState(true);
     const [upcomingFilter, setUpcomingFilter] = React.useState<'none' | 'birthday' | 'anniversary'>('none');
+    const [birthdayMonth, setBirthdayMonth] = React.useState<string>("none");
 
     const handleApproveRegistration = (userId: string) => {
         const userRef = doc(firestore, 'users', userId);
@@ -207,7 +224,7 @@ export default function UsersPage() {
 
     const SortIcon = ({ column }: { column: SortKey }) => {
         if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-        return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+        return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
     };
 
     const isUpcoming = (dateStr?: string) => {
@@ -262,6 +279,15 @@ export default function UsersPage() {
             // Suspension filter
             if (!showSuspended && u.suspended) return false;
 
+            // Month filter (Birthdays)
+            if (birthdayMonth !== 'none') {
+              if (!u.dob) return false;
+              try {
+                const dob = new Date(u.dob);
+                if ((dob.getMonth() + 1).toString() !== birthdayMonth) return false;
+              } catch (e) { return false; }
+            }
+
             // Upcoming filters
             if (upcomingFilter === 'birthday') {
                 if (!u.dob || !isUpcoming(u.dob)) return false;
@@ -288,7 +314,7 @@ export default function UsersPage() {
             if (valA > valB) return direction === 'asc' ? 1 : -1;
             return 0;
         });
-    }, [users, filter, sortConfig, searchTerm, showSuspended, upcomingFilter]);
+    }, [users, filter, sortConfig, searchTerm, showSuspended, upcomingFilter, birthdayMonth]);
 
     const handleExport = () => {
         if (!sortedAndFilteredUsers || sortedAndFilteredUsers.length === 0) return;
@@ -327,11 +353,18 @@ export default function UsersPage() {
                   <h1 className="text-2xl font-bold flex items-center gap-2">
                     <Users className="h-7 w-7 text-primary" /> Personnel Directory
                   </h1>
-                  {upcomingFilter !== 'none' && (
-                    <Badge variant="secondary" className="w-fit bg-primary/10 text-primary border-none animate-in fade-in zoom-in-95 font-bold uppercase text-[9px]">
-                      Filter Active: Upcoming {upcomingFilter}s
-                    </Badge>
-                  )}
+                  <div className="flex flex-wrap gap-2">
+                    {upcomingFilter !== 'none' && (
+                      <Badge variant="secondary" className="w-fit bg-primary/10 text-primary border-none animate-in fade-in zoom-in-95 font-bold uppercase text-[9px]">
+                        Filter Active: Upcoming {upcomingFilter}s
+                      </Badge>
+                    )}
+                    {birthdayMonth !== 'none' && (
+                      <Badge variant="secondary" className="w-fit bg-amber-500/10 text-amber-600 border-none animate-in fade-in zoom-in-95 font-bold uppercase text-[9px]">
+                        Birthdays in {MONTHS.find(m => m.value === birthdayMonth)?.label}
+                      </Badge>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <DropdownMenu>
@@ -340,26 +373,56 @@ export default function UsersPage() {
                         <MoreVertical className="h-5 w-5" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 rounded-sm shadow-xl">
+                    <DropdownMenuContent align="end" className="w-64 rounded-sm shadow-xl">
                       <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Advanced Options</DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       <DropdownMenuItem onClick={handleExport} className="gap-2 cursor-pointer font-bold text-xs uppercase">
                         <FileDown className="h-4 w-4 text-primary" /> Export User List
                       </DropdownMenuItem>
                       <DropdownMenuSeparator />
-                      <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Special Filters</DropdownMenuLabel>
+                      
+                      <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Milestones (30 Days)</DropdownMenuLabel>
                       <DropdownMenuItem 
-                        onClick={() => setUpcomingFilter(upcomingFilter === 'birthday' ? 'none' : 'birthday')} 
+                        onClick={() => {
+                          setUpcomingFilter(upcomingFilter === 'birthday' ? 'none' : 'birthday');
+                          setBirthdayMonth('none');
+                        }} 
                         className={cn("gap-2 cursor-pointer font-bold text-xs uppercase", upcomingFilter === 'birthday' && "bg-primary/10 text-primary")}
                       >
                         <Cake className="h-4 w-4" /> Upcoming Birthdays
                       </DropdownMenuItem>
                       <DropdownMenuItem 
-                        onClick={() => setUpcomingFilter(upcomingFilter === 'anniversary' ? 'none' : 'anniversary')} 
+                        onClick={() => {
+                          setUpcomingFilter(upcomingFilter === 'anniversary' ? 'none' : 'anniversary');
+                          setBirthdayMonth('none');
+                        }} 
                         className={cn("gap-2 cursor-pointer font-bold text-xs uppercase", upcomingFilter === 'anniversary' && "bg-primary/10 text-primary")}
                       >
                         <Award className="h-4 w-4" /> Upcoming Anniversaries
                       </DropdownMenuItem>
+                      
+                      <DropdownMenuSeparator />
+                      <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Filter by Birth Month</DropdownMenuLabel>
+                      <div className="px-2 py-1.5">
+                        <Select 
+                          value={birthdayMonth} 
+                          onValueChange={(val) => {
+                            setBirthdayMonth(val);
+                            setUpcomingFilter('none');
+                          }}
+                        >
+                          <SelectTrigger className="h-8 text-[10px] font-bold uppercase rounded-sm border-primary/10">
+                            <SelectValue placeholder="Select Month" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none" className="text-[10px] font-bold uppercase">All Months</SelectItem>
+                            {MONTHS.map(m => (
+                              <SelectItem key={m.value} value={m.value} className="text-[10px] font-bold uppercase">{m.label}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
                       <DropdownMenuSeparator />
                       <DropdownMenuCheckboxItem 
                         checked={showSuspended} 
@@ -371,11 +434,17 @@ export default function UsersPage() {
                           {showSuspended ? "Hide Suspended Users" : "Show Suspended Users"}
                         </div>
                       </DropdownMenuCheckboxItem>
-                      {upcomingFilter !== 'none' && (
+                      {(upcomingFilter !== 'none' || birthdayMonth !== 'none') && (
                         <>
                           <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => setUpcomingFilter('none')} className="gap-2 cursor-pointer font-black text-[9px] uppercase text-destructive">
-                            <FilterX className="h-3 w-3" /> Reset Specialized Filters
+                          <DropdownMenuItem 
+                            onClick={() => {
+                              setUpcomingFilter('none');
+                              setBirthdayMonth('none');
+                            }} 
+                            className="gap-2 cursor-pointer font-black text-[9px] uppercase text-destructive"
+                          >
+                            <FilterX className="h-3 w-3" /> Reset Filter(s)
                           </DropdownMenuItem>
                         </>
                       )}
