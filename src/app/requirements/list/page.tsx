@@ -142,8 +142,6 @@ export default function RequirementListPage() {
   const [statusFilter, setStatusFilter] = React.useState("all");
   const [siteFilter, setSiteFilter] = React.useState("all");
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
-  const [startDate, setStartDate] = React.useState("");
-  const [endDate, setEndDate] = React.useState("");
   
   const [editingReq, setEditingReq] = React.useState<Requirement | null>(null);
   const [deletingReq, setDeletingReq] = React.useState<Requirement | null>(null);
@@ -161,7 +159,7 @@ export default function RequirementListPage() {
   const { data: allSites } = useCollection<{ name: string, id: string }>(sitesQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+  const { data: allOverrides, isLoading: overridesLoading } = useCollection<MappingOverride>(overridesQuery);
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
@@ -218,6 +216,7 @@ export default function RequirementListPage() {
       case 'yesterday': return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
       case '7days': return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
       case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime': return { start: '1970-01-01', end: '2099-12-31' };
       default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
     }
   }, [dateFilter]);
@@ -353,7 +352,7 @@ export default function RequirementListPage() {
           <div className="md:col-span-2 space-y-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Search Personnel or Material</Label>
             <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-3 h-3.5 w-3.5 text-muted-foreground" />
               <Input placeholder="Search..." className="pl-10 h-11 rounded-sm bg-background border-primary/10 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
@@ -366,6 +365,7 @@ export default function RequirementListPage() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
                 <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
                 <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
                 <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
@@ -425,8 +425,17 @@ export default function RequirementListPage() {
                 <div className="flex items-center justify-between"><div className="flex items-center gap-1.5 text-[10px] font-black text-muted-foreground uppercase tracking-tight truncate max-w-[150px]"><Building2 className="h-3.5 w-3.5 text-primary/60" /><span>{req.siteName}</span></div><StatusBadge status={req.status} /></div>
                 <div className="flex items-center justify-between py-2 border-y border-primary/5"><div className="flex flex-col"><span className="text-[8px] font-black text-muted-foreground uppercase">Target Date</span><span className="text-xs font-bold">{req.expectedDate}</span></div><span className="text-sm font-black text-primary">{req.quantity} {req.unit}</span></div>
                 <div className="flex items-center justify-between pt-2">
-                  <div className="flex gap-1">{(canManagerAct || canAdminAct) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })}><CircleCheck className="h-5 w-5" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><CircleX className="h-5 w-5" /></Button></>)}</div>
-                  <div className="flex gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)}><MessageCircle className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setHistoryReq(req)}><History className="h-4 w-4" /></Button>{isOwner && req.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingReq(req)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingReq(req)}><Trash2 className="h-4 w-4" /></Button></>)}</div>
+                  <div className="flex gap-1">{(canManagerAct || canAdminAct) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })}><CircleCheck className="h-5 w-5" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><CircleX className="h-5 w-5" /></Button></>)}</div>
+                  <div className="flex gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)}><MessageCircle className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground rounded-sm" onClick={() => setHistoryReq(req)}><History className="h-4 w-4" /></Button>
+                    {isOwner && req.status === 'Pending' && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingReq(req)}><Pencil className="h-4 w-4" /></Button>
+                    )}
+                    {(isAdmin || (isOwner && req.status === 'Pending')) && (
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingReq(req)}><Trash2 className="h-4 w-4" /></Button>
+                    )}
+                  </div>
                 </div>
               </CardContent>
             </Card>
@@ -469,10 +478,15 @@ export default function RequirementListPage() {
                         <TableCell><div className="flex flex-col gap-1.5"><StatusBadge status={req.status} />{canLogisticsAct && (<Select defaultValue={req.status} onValueChange={(val) => setActionState({ req, targetStatus: val })}><SelectTrigger className="w-[120px] h-7 text-[10px] font-bold rounded-sm border-primary/20"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="Approved" className="text-[10px] font-bold">Approved</SelectItem>{LOGISTICS_STATUSES.map(opt => (<SelectItem key={opt} value={opt} className="text-[10px] font-medium">{opt}</SelectItem>))}</SelectContent></Select>)}</div></TableCell>
                         <TableCell className="text-right px-6">
                             <div className="flex justify-end items-center gap-1">
-                                {(canManagerAct || canAdminAct) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })}><CircleCheck className="h-5 w-5" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><CircleX className="h-5 w-5" /></Button></>)}
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)}><MessageCircle className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted rounded-sm" onClick={() => setHistoryReq(req)}><History className="h-4 w-4" /></Button>
-                                {isOwner && req.status === 'Pending' && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingReq(req)}><Pencil className="h-4 w-4" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingReq(req)}><Trash2 className="h-4 w-4" /></Button></>)}
+                                {(canManagerAct || canAdminAct) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: canManagerAct ? 'ManagerApproved' : 'Approved' })} title="Approve"><CircleCheck className="h-5 w-5" /></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })} title="Reject"><CircleX className="h-5 w-5" /></Button></>)}
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 rounded-sm" onClick={() => handleWhatsAppShare(req)} title="WhatsApp"><MessageCircle className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted rounded-sm" onClick={() => setHistoryReq(req)} title="History"><History className="h-4 w-4" /></Button>
+                                {isOwner && req.status === 'Pending' && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setEditingReq(req)} title="Edit"><Pencil className="h-4 w-4" /></Button>
+                                )}
+                                {(isAdmin || (isOwner && req.status === 'Pending')) && (
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingReq(req)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
+                                )}
                             </div>
                         </TableCell>
                       </TableRow>
@@ -486,12 +500,27 @@ export default function RequirementListPage() {
       </div>
 
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
-        <DialogContent className="rounded-sm max-w-md"><DialogHeader><DialogTitle className="uppercase tracking-tight font-black">Process Authorization</DialogTitle><DialogDescription>Setting final lifecycle status to: <strong>{actionState?.targetStatus}</strong>.</DialogDescription></DialogHeader><div className="py-6 space-y-3"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Feedback / Remarks</Label><Textarea id="action-remarks-input" placeholder="Enter remarks..." className="min-h-[120px] rounded-sm" /></div><DialogFooter className="gap-2"><DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose><Button className={cn("rounded-sm font-black uppercase text-[10px]", actionState?.targetStatus === 'Rejected' ? "bg-red-600" : "bg-green-600")} onClick={() => handleAction((document.getElementById('action-remarks-input') as HTMLTextAreaElement)?.value || "")}>Confirm Status</Button></DialogFooter></DialogContent>
+        <DialogContent className="rounded-sm max-md"><DialogHeader><DialogTitle className="uppercase tracking-tight font-black">Process Authorization</DialogTitle><DialogDescription>Setting final lifecycle status to: <strong>{actionState?.targetStatus}</strong>.</DialogDescription></DialogHeader><div className="py-6 space-y-3"><Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Feedback / Remarks</Label><Textarea id="action-remarks-input" placeholder="Enter remarks..." className="min-h-[120px] rounded-sm" /></div><DialogFooter className="gap-2"><DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose><Button className={cn("rounded-sm font-black uppercase text-[10px]", actionState?.targetStatus === 'Rejected' ? "bg-red-600" : "bg-green-600")} onClick={() => handleAction((document.getElementById('action-remarks-input') as HTMLTextAreaElement)?.value || "")}>Confirm Status</Button></DialogFooter></DialogContent>
       </Dialog>
 
       <Dialog open={!!historyReq} onOpenChange={(o) => !o && setHistoryReq(null)}>
         <DialogContent className="rounded-sm max-lg p-0 overflow-hidden flex flex-col h-[70vh] shadow-2xl border-none"><DialogHeader className="p-6 bg-primary/5 border-b"><DialogTitle className="text-xl font-black uppercase tracking-tight">Lifecycle Audit</DialogTitle></DialogHeader><ScrollArea className="flex-1"><div className="p-8 space-y-8 relative border-l-2 border-muted ml-8 my-4">{historyReq?.timeline?.map((entry, idx) => (<div key={idx} className="relative"><div className="absolute -left-[39px] top-1 h-3 w-3 rounded-full bg-primary ring-4 ring-background" /><div className="flex flex-col gap-1.5 text-left"><span className="text-[11px] font-black text-primary uppercase tracking-tight">{entry.action} — {entry.userName}</span><p className="text-[9px] text-muted-foreground font-mono font-bold uppercase">{formatTimestamp(entry.timestamp)}</p><p className="text-xs font-medium italic text-foreground/80">"{entry.remarks}"</p><StatusBadge status={entry.status} className="w-fit mt-1 h-4 px-1.5" /></div></div>))}</div></ScrollArea><DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 w-full">Close Audit</Button></DialogClose></DialogFooter></DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!deletingReq} onOpenChange={(o) => !o && setDeletingReq(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive font-black uppercase tracking-tight flex items-center gap-2"><Trash2 className="h-5 w-5" /> Remove Requirement?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              Are you sure you want to permanently delete the requirement for <strong>{deletingReq?.itemName}</strong>? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-10">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] h-10 shadow-lg">Confirm Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
