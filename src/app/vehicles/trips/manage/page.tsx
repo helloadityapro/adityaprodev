@@ -1,8 +1,10 @@
+
 'use client';
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -86,6 +88,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from '@/components/ui/separator';
 import {
@@ -110,8 +113,6 @@ import {
   FormMessage 
 } from '@/components/ui/form';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { Textarea } from '@/components/ui/textarea';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { sendNotification } from '@/lib/notifications';
 import { getPageKeyByPath, type PageKey, slugifyRole } from "@/lib/access-control";
 import {
@@ -361,6 +362,7 @@ export default function ManageAllTripsPage() {
     
     const exportData = filteredAssignments.map(trip => {
         const distance = (trip.endReading && trip.startReading) ? (trip.endReading - trip.startReading).toFixed(1) : '—';
+        const stopsStr = trip.intermediateStops?.map(s => s.location).join(', ') || 'None';
         
         return {
             'Trip Date': trip.tripDate,
@@ -370,6 +372,7 @@ export default function ManageAllTripsPage() {
             'Ownership': trip.vehicleOwnership || '—',
             'Driver': trip.driverName || '—',
             'Pickup': trip.pickupLocation,
+            'Intermediate Stops': stopsStr,
             'Drop': trip.dropLocation || '—',
             'Purpose': trip.purpose,
             'Distance (KM)': distance,
@@ -383,18 +386,6 @@ export default function ManageAllTripsPage() {
     XLSX.utils.book_append_sheet(wb, ws, "Trips Registry");
     XLSX.writeFile(wb, `AdityaPro_Trips_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
-
-  const availableVehiclesForAllotment = React.useMemo(() => {
-    if (!vehicles) return [];
-    const base = vehicles.filter(v => v.status === 'Available');
-    if (approvalTarget?.assignment?.vehicleId) {
-      const currentV = vehicles.find(v => v.id === approvalTarget.assignment.vehicleId);
-      if (currentV && !base.find(v => v.id === currentV.id)) {
-        base.push(currentV);
-      }
-    }
-    return base;
-  }, [vehicles, approvalTarget]);
 
   const handleGlobalWhatsAppShare = (trip: Assignment) => {
     let header = "";
@@ -618,7 +609,7 @@ export default function ManageAllTripsPage() {
   return (
     <div className="space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-2">
               <MapPinned className="h-6 w-6 text-primary" />
@@ -1861,3 +1852,4 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
+
