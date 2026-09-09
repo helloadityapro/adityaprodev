@@ -26,11 +26,13 @@ import {
   ArrowDown,
   MessageCircle,
   Activity,
-  Plus
+  Plus,
+  Check
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
@@ -99,8 +101,8 @@ export default function MeetingsListPage() {
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const filteredMeetings = React.useMemo(() => {
@@ -246,7 +248,7 @@ export default function MeetingsListPage() {
 
       {/* Meeting Detail Dialog */}
       <Dialog open={!!viewingMeeting} onOpenChange={(o) => !o && setViewingMeeting(null)}>
-        <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
+        <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Mic className="h-5 w-5 text-primary" /></div>
