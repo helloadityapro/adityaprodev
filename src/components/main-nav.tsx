@@ -1,4 +1,5 @@
 
+
 "use client"
 
 import Link from "next/link"
@@ -60,7 +61,8 @@ import {
   AreaChart,
   Bell,
   Cpu,
-  GlassWater
+  GlassWater,
+  Mic
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -273,6 +275,41 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                         </SidebarMenuSubItem>
                       </>
                     )}
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {/* Meetings Section */}
+          {canShow('meetings') && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/meetings')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Meetings" isActive={pathname.startsWith('/meetings')} className="rounded-sm">
+                    <Mic className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Meetings</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/meetings/start'} onClick={handleMobileClose}>
+                        <Link href="/meetings/start">
+                          <Plus className="h-4 w-4" />
+                          <span>Start Meeting</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/meetings/list'} onClick={handleMobileClose}>
+                        <Link href="/meetings/list">
+                          <List className="h-4 w-4" />
+                          <span>Meetings Data</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>

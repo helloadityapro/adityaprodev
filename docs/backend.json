@@ -52,6 +52,50 @@
         "lateMarkCutoff": { "type": "string", "description": "24h format HH:mm", "default": "10:30" }
       }
     },
+    "Meeting": {
+      "title": "Review Meeting",
+      "type": "object",
+      "description": "Structured site review meeting with voice recording.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "recordingUrl": { "type": "string" },
+        "observations": {
+          "type": "object",
+          "properties": {
+            "mms": { "type": "string" },
+            "mcr": { "type": "string" },
+            "earthing": { "type": "string" },
+            "acCable": { "type": "string" },
+            "dcCable": { "type": "string" },
+            "stringInverter": { "type": "string" },
+            "ltPanel": { "type": "string" },
+            "transformer": { "type": "string" },
+            "rmuVcb": { "type": "string" },
+            "poleStructure": { "type": "string" },
+            "modules": { "type": "string" },
+            "htLine": { "type": "string" }
+          }
+        },
+        "customPoints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string" },
+              "value": { "type": "string" }
+            }
+          }
+        },
+        "criticalPoints": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteName", "date", "userId"]
+    },
     "TeamMappingOverride": {
       "title": "Team Mapping Override",
       "type": "object",
@@ -126,7 +170,7 @@
         "description": { "type": "string" },
         "link": { "type": "string" },
         "read": { "type": "boolean", "default": false },
-        "push": { "type": "boolean", "default": false, "description": "Whether to send as a system push notification" },
+        "push": { "push": { "type": "boolean", "default": false, "description": "Whether to send as a system push notification" } },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userId", "title", "description"]
@@ -797,6 +841,10 @@
     "/material_requisitions/{reqId}": {
       "schema": { "$ref": "#/backend/entities/MaterialRequisition" },
       "description": "Formal request for materials from master inventory for a specific site."
+    },
+    "/meetings/{meetingId}": {
+      "schema": { "$ref": "#/backend/entities/Meeting" },
+      "description": "Structured site review meetings with voice recording."
     }
   }
 }

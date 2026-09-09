@@ -2,13 +2,13 @@
 'use client';
 
 import * as React from 'react';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking, writeBatch, useFirebaseApp } from '@/firebase';
+import { collection, doc, query, orderBy, where, or, and, getDocs, writeBatch as firestoreWriteBatch, serverTimestamp, arrayUnion, getDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Separator } from '@/components/ui/separator';
 import { 
   CarFront, 
   Search, 
@@ -90,7 +90,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
-import { Separator } from '@/components/ui/separator';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -252,7 +251,7 @@ export default function ManageAllTripsPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const roleConfigsQuery = useMemoFirebase(() => user ? collection(firestore, 'system_settings', 'access', 'roles') : null, [firestore, user]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
   
   const isSuper = isSuperAdmin(user?.email);
@@ -291,6 +290,11 @@ export default function ManageAllTripsPage() {
   const { data: sites } = useCollection<Site>(sitesQuery);
 
   const driversList = React.useMemo(() => allUsers?.filter(u => u.role === 'Driver') || [], [allUsers]);
+
+  const availableVehiclesForAllotment = React.useMemo(() => {
+    if (!vehicles) return [];
+    return vehicles.filter(v => v.status === 'Available' || v.id === approvalTarget?.assignment.vehicleId);
+  }, [vehicles, approvalTarget]);
 
   const queryDateRange = React.useMemo(() => {
     const today = new Date();
@@ -595,7 +599,7 @@ export default function ManageAllTripsPage() {
     const urls = [trip.startReadingPhoto, trip.endReadingPhoto].filter(Boolean) as string[];
     const index = urls.indexOf(url);
     setViewUrls(urls);
-    setCurrentUrlIndex(index >= 0 ? index : 0);
+    setCurrentFileIndex(index >= 0 ? index : 0);
     setViewUrl(url);
     setZoom(1);
   };
@@ -984,7 +988,7 @@ export default function ManageAllTripsPage() {
                         {detailsAssignment.coPassengers && detailsAssignment.coPassengers.length > 0 ? (
                           detailsAssignment.coPassengers.map((p, pIdx) => (
                             <Badge key={pIdx} variant="secondary" className="rounded-sm font-bold text-[10px] bg-background border border-primary/5">
-                              <User className="h-2.5 w-2.5 mr-1 text-primary/60" /> {p.name}
+                              <UserIcon className="h-2.5 w-2.5 mr-1 text-primary/60" /> {p.name}
                             </Badge>
                           ))
                         ) : (
@@ -1081,7 +1085,7 @@ export default function ManageAllTripsPage() {
               disabled={isProcessing} 
               className="bg-red-600 text-white hover:bg-red-700 rounded-sm font-black uppercase text-[10px] h-11 shadow-lg"
             >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : "Confirm Termination"}
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : "Confirm Termination"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1135,7 +1139,7 @@ function TripTableRow({ trip, user, isAdmin, isHR, isManager, allUsers, onDetail
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <span className="text-xs font-bold">{trip.vehicleDetails}</span>
-                <Badge variant="secondary" className="h-3.5 px-1 text-[7px] font-black uppercase rounded-sm border-none bg-muted text-muted-foreground">{trip.vehicleOwnership || 'Owned'}</Badge>
+                <Badge variant="outline" className="text-[8px] h-3.5 px-1 font-black uppercase rounded-sm border-primary/10 bg-primary/5 text-primary">{trip.vehicleOwnership || 'Owned'}</Badge>
               </div>
               <span className="text-[10px] text-muted-foreground font-black uppercase">{trip.driverName}</span>
             </div>
@@ -1308,7 +1312,7 @@ function TripItinerary({ trip }: { trip: Assignment }) {
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+function SummaryCard({ title, value, icon: Icon, color, description, isLoading }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber', description?: string, isLoading?: boolean }) {
   const colors = {
     primary: "bg-primary/5 border-primary/10 text-primary",
     emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",

@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React from 'react';
@@ -18,7 +19,8 @@ import {
   ShieldCheck,
   UserCircle2,
   Fuel,
-  ClipboardList
+  ClipboardList,
+  Mic
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -63,8 +65,15 @@ export function BottomNav({ canShow }: BottomNavProps) {
 
   const quickActions = [
     {
+      label: 'Start Review Meeting',
+      icon: <Mic className="h-4 w-4 text-indigo-500" />,
+      href: '/meetings/start',
+      description: 'Record on-site discussion',
+      key: 'meetings' as PageKey
+    },
+    {
       label: 'Start Site Visit',
-      icon: <Navigation className="h-4 w-4 text-indigo-500" />,
+      icon: <Navigation className="h-4 w-4 text-blue-500" />,
       href: '/site-visits/start',
       description: 'Check-in to a project site',
       key: 'visits' as PageKey
