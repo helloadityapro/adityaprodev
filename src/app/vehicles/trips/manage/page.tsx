@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -120,6 +119,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
@@ -1856,4 +1857,3 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
-
