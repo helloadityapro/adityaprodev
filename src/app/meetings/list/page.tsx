@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -26,7 +25,8 @@ import {
   ArrowUp,
   ArrowDown,
   MessageCircle,
-  Activity
+  Activity,
+  Plus
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -352,4 +352,3 @@ export default function MeetingsListPage() {
     </div>
   );
 }
-
