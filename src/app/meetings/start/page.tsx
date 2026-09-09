@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -32,13 +31,15 @@ import {
   ArrowLeft,
   Search,
   ChevronsUpDown,
-  Check
+  Check,
+  ListChecks
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { motion } from 'framer-motion';
 
 const REVIEW_POINTS = [
   { id: 'mms', label: 'Module Mounting Structure' },
