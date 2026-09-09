@@ -1,5 +1,4 @@
 
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -59,6 +58,11 @@ service cloud.firestore {
 
     match /system_settings/access/roles/{roleId} {
       allow read, write: if isAdmin();
+    }
+
+    match /system_settings/attendance {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
 
     match /quotes/{quoteId} {
@@ -312,6 +316,13 @@ service cloud.firestore {
         resource.data.siteManagerId == request.auth.uid ||
         resource.data.assignedToId == request.auth.uid
       );
+      allow delete: if isAdmin();
+    }
+
+    match /meetings/{meetingId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
       allow delete: if isAdmin();
     }
   }
