@@ -89,6 +89,16 @@
             }
           }
         },
+        "attendees": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" }
+            }
+          }
+        },
         "criticalPoints": { "type": "string" },
         "userId": { "type": "string" },
         "userName": { "type": "string" },
@@ -217,6 +227,7 @@
               "name": { "type": "string" },
               "url": { "type": "string" },
               "type": { "type": "string" },
+              "size": { "type": "number" },
               "storagePath": { "type": "string" },
               "uploadedAt": { "type": "string", "format": "date-time" }
             }

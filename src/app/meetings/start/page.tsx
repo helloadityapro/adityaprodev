@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -21,13 +22,18 @@ import {
   ChevronsUpDown,
   Check,
   ListChecks,
-  Trash2
+  Trash2,
+  Users,
+  User,
+  X
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 
 const REVIEW_POINTS = [
   { id: 'mms', label: 'Module Mounting Structure' },
@@ -55,6 +61,9 @@ export default function StartMeetingPage() {
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
 
+  const [attendees, setAttendees] = React.useState<{ id: string, name: string }[]>([]);
+  const [attendeeSearch, setAttendeeSearch] = React.useState("");
+
   const [observations, setObservations] = React.useState<Record<string, string>>({});
   const [customPoints, setCustomPoints] = React.useState<{ id: string, label: string, value: string }[]>([]);
   const [criticalPoints, setCriticalPoints] = React.useState("");
@@ -67,6 +76,9 @@ export default function StartMeetingPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<any>(sitesQuery);
+
+  const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: allUsers } = useCollection<any>(usersQuery);
 
   const addCustomPoint = () => {
     const id = `custom_${Date.now()}`;
@@ -96,7 +108,8 @@ export default function StartMeetingPage() {
         observations,
         customPoints,
         criticalPoints,
-        recordingUrl: "", // Removed recording functionality
+        attendees,
+        recordingUrl: "", 
         userId: user.uid,
         userName: userProfile.username || user.email,
         createdAt: serverTimestamp()
@@ -163,7 +176,7 @@ export default function StartMeetingPage() {
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Select Project Site</Label>
               <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between h-12 rounded-sm font-bold border-primary/20">
+                  <Button variant="outline" className="w-full justify-between h-12 rounded-sm font-bold border-primary/20 text-left">
                     <span className="truncate">{siteName || "Choose site..."}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -180,8 +193,8 @@ export default function StartMeetingPage() {
                   </div>
                   <ScrollArea className="h-[200px]">
                     <div className="p-1">
-                      {allSites?.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map(s => (
-                        <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase" onClick={() => { setSiteId(s.id); setSiteName(s.name); setIsSitePopoverOpen(false); }}>
+                      {allSites?.filter((s: any) => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map((s: any) => (
+                        <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase text-left" onClick={() => { setSiteId(s.id); setSiteName(s.name); setIsSitePopoverOpen(false); }}>
                           <Check className={cn("mr-2 h-4 w-4 text-primary", siteId === s.id ? "opacity-100" : "opacity-0")} />
                           {s.name}
                         </Button>
@@ -191,6 +204,82 @@ export default function StartMeetingPage() {
                 </PopoverContent>
               </Popover>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Attendees Selection */}
+        <Card className="rounded-sm shadow-md border-primary/10">
+          <CardHeader className="py-4 border-b bg-muted/5">
+            <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Attendees / Participants
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">Select Personnel Available in Meeting</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-between h-12 rounded-sm font-bold border-primary/20 text-left">
+                    <span className="truncate">
+                      {attendees.length === 0 ? "Select Attendees..." : `${attendees.length} Personnel Selected`}
+                    </span>
+                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-2xl">
+                  <div className="flex items-center border-b px-3 bg-muted/20">
+                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                    <Input 
+                      placeholder="Search personnel..." 
+                      className="h-10 border-none text-sm bg-transparent focus-visible:ring-0" 
+                      value={attendeeSearch} 
+                      onChange={e => setAttendeeSearch(e.target.value)} 
+                    />
+                  </div>
+                  <ScrollArea className="h-[250px]">
+                    <div className="p-1">
+                      {allUsers?.filter((u: any) => u.username?.toLowerCase().includes(attendeeSearch.toLowerCase())).map((u: any) => {
+                        const isSelected = attendees.some(a => a.id === u.id);
+                        return (
+                          <div 
+                            key={u.id} 
+                            className={cn(
+                              "flex items-center space-x-3 p-3 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer group",
+                              isSelected && "bg-primary/5"
+                            )}
+                            onClick={() => {
+                              if (isSelected) {
+                                setAttendees(prev => prev.filter(a => a.id !== u.id));
+                              } else {
+                                setAttendees(prev => [...prev, { id: u.id, name: u.username }]);
+                              }
+                            }}
+                          >
+                            <Checkbox checked={isSelected} className="rounded-[4px]" />
+                            <div className="flex flex-col min-w-0">
+                              <span className={cn("text-xs font-bold truncate transition-colors", isSelected ? "text-primary" : "text-foreground")}>{u.username}</span>
+                              <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter opacity-60">{u.role}</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </ScrollArea>
+                </PopoverContent>
+              </Popover>
+            </div>
+            
+            {attendees.length > 0 && (
+              <div className="flex flex-wrap gap-2 pt-2">
+                {attendees.map(a => (
+                  <Badge key={a.id} variant="secondary" className="pl-2 pr-1 h-7 rounded-sm gap-1.5 flex items-center font-bold text-[10px] bg-primary/5 text-primary border border-primary/10">
+                    <User className="h-3 w-3" />
+                    <span className="truncate max-w-[120px]">{a.name}</span>
+                    <X className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" onClick={(e) => { e.stopPropagation(); setAttendees(prev => prev.filter(x => x.id !== a.id)); }} />
+                  </Badge>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -27,7 +28,8 @@ import {
   MessageCircle,
   Activity,
   Plus,
-  Check
+  Check,
+  Users
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -47,7 +49,8 @@ type Meeting = {
   date: string;
   recordingUrl?: string;
   observations: Record<string, string>;
-  customPoints?: { label: string, value: string }[];
+  customPoints?: { id: string, label: string, value: string }[];
+  attendees?: { id: string, name: string }[];
   criticalPoints: string;
   userId: string;
   userName: string;
@@ -289,6 +292,23 @@ export default function MeetingsListPage() {
                       <audio src={viewingMeeting.recordingUrl} controls className="w-full h-10 accent-primary" />
                     ) : (
                       <p className="text-[10px] italic text-white/30 uppercase font-black text-center py-2 tracking-widest">No audio captured during this session</p>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
+                    <Users className="h-4 w-4 text-primary" />
+                    <h3 className="text-xs font-black uppercase tracking-widest text-primary">Meeting Attendees</h3>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    {viewingMeeting.attendees && viewingMeeting.attendees.length > 0 ? viewingMeeting.attendees.map((a: any) => (
+                      <Badge key={a.id} variant="outline" className="rounded-sm font-bold text-[10px] bg-background border-primary/10 py-1.5 px-3 flex items-center gap-2">
+                        <User className="h-3 w-3 text-primary/40" />
+                        {a.name}
+                      </Badge>
+                    )) : (
+                      <p className="text-[10px] italic text-muted-foreground/40 uppercase font-black tracking-widest">No additional attendees recorded.</p>
                     )}
                   </div>
                 </div>
