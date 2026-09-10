@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -42,6 +43,7 @@ const movementSchema = z.object({
   movementDate: z.string().min(1, "Date is required"),
   invoiceNumber: z.string().optional(),
   invoiceDate: z.string().optional(),
+  remarks: z.string().optional(),
   items: z.array(itemSchema).min(1, "Add at least one item"),
 });
 
@@ -176,6 +178,7 @@ export default function RecordMovementPage() {
       movementDate: format(new Date(), 'yyyy-MM-dd'),
       invoiceNumber: "",
       invoiceDate: format(new Date(), 'yyyy-MM-dd'),
+      remarks: "",
       items: [{ itemName: "", quantity: 0, unit: "Numbers" }]
     },
   });
@@ -326,7 +329,7 @@ export default function RecordMovementPage() {
           } else {
             const inv = projectInventory?.find(i => i.itemName === item.itemName);
             list.push({
-              id: inv?.id || `new-${bom.id}`,
+              id: inv?.id || `new-${item.id}`,
               itemName: item.itemName,
               unit: item.unit,
               stockLevel: 999999
@@ -580,7 +583,7 @@ export default function RecordMovementPage() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredSuppliers.map(s => (
-                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}>
+                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); setSupplierSearchQuery(""); }}>
                               <Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />
                               {s.name}
                             </Button>
@@ -605,7 +608,7 @@ export default function RecordMovementPage() {
                         </div>
                         <ScrollArea className="h-[200px]">
                           {allSites?.filter(s => s.name !== watchSiteName && s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())).map(s => (
-                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}>
+                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); setSupplierSearchQuery(""); }}>
                               <Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />
                               {s.name}
                             </Button>
@@ -647,6 +650,16 @@ export default function RecordMovementPage() {
                     </FormItem>
                   )} />
                 </div>
+
+                <FormField control={form.control} name="remarks" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Remarks / Notes</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Enter any additional details about this movement..." {...field} className="rounded-sm min-h-[80px]" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
 
                 <div className="space-y-3">
                   <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
