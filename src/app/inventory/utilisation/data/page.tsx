@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -129,7 +130,7 @@ export default function UtilisationDataPage() {
   const { data: allSites } = useCollection<{ name: string, id: string }>(sitesQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+  const { data: allOverrides, isLoading: overridesLoading } = useCollection<MappingOverride>(overridesQuery);
 
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === 'Admin';
@@ -293,7 +294,7 @@ export default function UtilisationDataPage() {
     setIsProcessing(true);
 
     try {
-      // 1. Revert stock adjustment
+      // 1. Revert stock adjustment (restore available stock, reduce utilised count)
       const invQ = query(
         collection(firestore, 'project_inventory'), 
         where('siteId', '==', deletingUtil.siteId), 

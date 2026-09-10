@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -10,7 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection, updateDocumentNonBlocking, addDocumentNonBlocking } from "@/firebase";
 import { collection, doc, serverTimestamp, increment, query, where, getDocs, and, setDoc } from "firebase/firestore";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
@@ -114,7 +113,7 @@ export default function RecordUtilisationPage() {
     const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
     const isOwnDataOnly = userProfile.ownDataOnly !== undefined 
       ? userProfile.ownDataOnly 
-      : roleConfigs?.find(c => c.id === roleId)?.ownDataOnly ?? false;
+      : roleConfigs?.find((c: any) => c.id === roleId)?.ownDataOnly ?? false;
 
     if (!isOwnDataOnly) return Array.from(new Map(allSites.map(s => [s.name, s])).values()).sort((a, b) => a.name.localeCompare(b.name));
 
@@ -206,8 +205,16 @@ export default function RecordUtilisationPage() {
   const onSubmit = async (values: z.infer<typeof utilisationSchema>) => {
     if (!user || !userProfile || !selectedItem) return;
     
-    if (values.quantity > selectedItem.stockLevel) {
-      toast({ variant: 'destructive', title: 'Insufficient Stock', description: `Only ${selectedItem.stockLevel} ${selectedItem.unit} available at this site.` });
+    const invQ = query(
+      collection(firestore, 'project_inventory'), 
+      where('siteId', '==', values.siteId), 
+      where('itemName', '==', values.itemName)
+    );
+    const invSnap = await getDocs(invQ);
+    const liveStock = invSnap.empty ? 0 : invSnap.docs[0].data().stockLevel;
+
+    if (values.quantity > liveStock) {
+      toast({ variant: 'destructive', title: 'Insufficient Stock', description: `Only ${liveStock} ${selectedItem.unit} remains in available site stock.` });
       return;
     }
 
@@ -228,10 +235,21 @@ export default function RecordUtilisationPage() {
 
       await addDocumentNonBlocking(collection(firestore, 'material_utilisations'), utilisationData);
 
-      if (!selectedItem.id.startsWith('new-')) {
-        updateDocumentNonBlocking(doc(firestore, 'project_inventory', selectedItem.id), {
+      if (!invSnap.empty) {
+        updateDocumentNonBlocking(doc(firestore, 'project_inventory', invSnap.docs[0].id), {
           stockLevel: increment(-values.quantity),
           utilisedQuantity: increment(values.quantity),
+          lastUpdated: serverTimestamp()
+        });
+      } else {
+        const newInvRef = doc(collection(firestore, 'project_inventory'));
+        await setDoc(newInvRef, {
+          siteId: values.siteId,
+          siteName: values.siteName,
+          itemName: values.itemName,
+          stockLevel: 0,
+          utilisedQuantity: values.quantity,
+          unit: selectedItem.unit,
           lastUpdated: serverTimestamp()
         });
       }
@@ -250,7 +268,7 @@ export default function RecordUtilisationPage() {
 
   if (isSuccess) {
     return (
-      <div className="flex items-center justify-center min-h-[60vh] px-4 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex items-center justify-center min-h-[70vh] px-4 animate-in fade-in zoom-in-95 duration-500">
         <Card className="max-w-md w-full rounded-sm shadow-2xl border-emerald-500/20">
           <CardHeader className="text-center pt-8">
             <div className="flex justify-center mb-6">
@@ -411,7 +429,11 @@ export default function RecordUtilisationPage() {
               )}
 
               <Button type="submit" className="w-full h-14 text-base font-black uppercase tracking-widest shadow-xl shadow-primary/20 transition-all active:scale-[0.98]" disabled={isSubmitting || !selectedItem || isOverStock}>
-                {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <><Save className="mr-2 h-5 w-5" /> PUBLISH UTILISATION</>}
+                {isSubmitting ? (
+                  <><Loader2 className="mr-2 h-5 w-5 animate-spin" /> PUBLISHING...</>
+                ) : (
+                  <>PUBLISH UTILISATION</>
+                )}
               </Button>
             </form>
           </Form>

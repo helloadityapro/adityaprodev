@@ -1,12 +1,13 @@
+
 "use client";
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, orderBy, doc, where } from "firebase/firestore";
+import { collection, query, orderBy, doc, where, getDocs, writeBatch, serverTimestamp } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart, FileDown } from "lucide-react";
+import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart, FileDown, RefreshCw, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,6 +16,7 @@ import { cn } from "@/lib/utils";
 import * as XLSX from 'xlsx';
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { slugifyRole } from "@/lib/access-control";
+import { useToast } from "@/hooks/use-toast";
 
 type InventoryItem = {
   id: string;
@@ -48,7 +50,9 @@ const formatTimestamp = (ts: any) => {
 export default function GlobalInventoryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [isReconciling, setIsReconciling] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -125,6 +129,94 @@ export default function GlobalInventoryPage() {
     );
   }, [inventory, searchTerm, isAdmin, accessibleSiteIds]);
 
+  /**
+   * RECONCILIATION ENGINE
+   * Reconstructs the project_inventory collection by re-processing all raw movement and utilization logs.
+   */
+  const handleReconcileAllStock = async () => {
+    if (!isAdmin) return;
+    setIsReconciling(true);
+    try {
+      // 1. Fetch raw data
+      const [movementsSnap, utilisationsSnap] = await Promise.all([
+        getDocs(collection(firestore, 'material_movements')),
+        getDocs(collection(firestore, 'material_utilisations'))
+      ]);
+
+      // 2. Aggregate per (siteId + itemName)
+      const auditMap = new Map<string, { 
+        siteId: string, 
+        siteName: string, 
+        itemName: string, 
+        unit: string, 
+        inward: number, 
+        outward: number, 
+        utilised: number 
+      }>();
+
+      movementsSnap.docs.forEach(d => {
+        const m = d.data();
+        if (m.status === 'Rejected' || m.status === 'Pending') return;
+        
+        const key = `${m.siteId}_${m.itemName}`;
+        if (!auditMap.has(key)) {
+          auditMap.set(key, { siteId: m.siteId, siteName: m.siteName, itemName: m.itemName, unit: m.unit, inward: 0, outward: 0, utilised: 0 });
+        }
+        
+        const entry = auditMap.get(key)!;
+        if (m.movementType === 'Inward') entry.inward += (Number(m.quantity) || 0);
+        else entry.outward += (Number(m.quantity) || 0);
+      });
+
+      utilisationsSnap.docs.forEach(d => {
+        const u = d.data();
+        const key = `${u.siteId}_${u.itemName}`;
+        if (!auditMap.has(key)) {
+          auditMap.set(key, { siteId: u.siteId, siteName: u.siteName, itemName: u.itemName, unit: u.unit, inward: 0, outward: 0, utilised: 0 });
+        }
+        const entry = auditMap.get(key)!;
+        entry.utilised += (Number(u.quantity) || 0);
+      });
+
+      // 3. Batch write results to project_inventory
+      const currentInvSnap = await getDocs(collection(firestore, 'project_inventory'));
+      const batch = writeBatch(firestore);
+      
+      // Map current docs to identify existing vs new
+      const currentDocsMap = new Map();
+      currentInvSnap.docs.forEach(d => {
+        const data = d.data();
+        currentDocsMap.set(`${data.siteId}_${data.itemName}`, d.id);
+      });
+
+      auditMap.forEach((data, key) => {
+        const stockLevel = data.inward - data.outward - data.utilised;
+        const invPayload = {
+          siteId: data.siteId,
+          siteName: data.siteName,
+          itemName: data.itemName,
+          unit: data.unit,
+          stockLevel: Math.max(0, stockLevel),
+          utilisedQuantity: data.utilised,
+          lastUpdated: serverTimestamp()
+        };
+
+        if (currentDocsMap.has(key)) {
+          batch.set(doc(firestore, 'project_inventory', currentDocsMap.get(key)), invPayload, { merge: true });
+        } else {
+          batch.set(doc(collection(firestore, 'project_inventory')), invPayload);
+        }
+      });
+
+      await batch.commit();
+      toast({ title: 'Reconciliation Complete', description: `Audited ${auditMap.size} material threads. Stock balances are now synchronized.` });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Audit Failed', description: e.message });
+    } finally {
+      setIsReconciling(false);
+    }
+  };
+
   const handleExport = () => {
     if (filteredInventory.length === 0) return;
     
@@ -154,10 +246,18 @@ export default function GlobalInventoryPage() {
           </h1>
           <p className="text-muted-foreground font-medium">Real-time component-level stock availability and utilisation across project sites.</p>
         </div>
-        <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
-          <FileDown className="h-4 w-4 mr-2" />
-          Export to Excel
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && (
+            <Button onClick={handleReconcileAllStock} disabled={isReconciling} variant="outline" className="h-10 rounded-sm font-bold border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm">
+              {isReconciling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+              Reconcile All Stock
+            </Button>
+          )}
+          <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+            <FileDown className="h-4 w-4 mr-2" />
+            Export to Excel
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
