@@ -158,9 +158,20 @@ export default function GlobalInventoryPage() {
         const m = d.data();
         if (m.status === 'Rejected' || m.status === 'Pending') return;
         
+        // CRITICAL FIX: Skip records with undefined or missing siteId/itemName to prevent WriteBatch.set error
+        if (!m.siteId || !m.itemName) return;
+
         const key = `${m.siteId}_${m.itemName}`;
         if (!auditMap.has(key)) {
-          auditMap.set(key, { siteId: m.siteId, siteName: m.siteName, itemName: m.itemName, unit: m.unit, inward: 0, outward: 0, utilised: 0 });
+          auditMap.set(key, { 
+            siteId: String(m.siteId), 
+            siteName: String(m.siteName || "Unknown Site"), 
+            itemName: String(m.itemName), 
+            unit: String(m.unit || "Units"), 
+            inward: 0, 
+            outward: 0, 
+            utilised: 0 
+          });
         }
         
         const entry = auditMap.get(key)!;
@@ -170,9 +181,21 @@ export default function GlobalInventoryPage() {
 
       utilisationsSnap.docs.forEach(d => {
         const u = d.data();
+        
+        // CRITICAL FIX: Skip records with undefined or missing siteId/itemName
+        if (!u.siteId || !u.itemName) return;
+
         const key = `${u.siteId}_${u.itemName}`;
         if (!auditMap.has(key)) {
-          auditMap.set(key, { siteId: u.siteId, siteName: u.siteName, itemName: u.itemName, unit: u.unit, inward: 0, outward: 0, utilised: 0 });
+          auditMap.set(key, { 
+            siteId: String(u.siteId), 
+            siteName: String(u.siteName || "Unknown Site"), 
+            itemName: String(u.itemName), 
+            unit: String(u.unit || "Units"), 
+            inward: 0, 
+            outward: 0, 
+            utilised: 0 
+          });
         }
         const entry = auditMap.get(key)!;
         entry.utilised += (Number(u.quantity) || 0);
@@ -186,7 +209,9 @@ export default function GlobalInventoryPage() {
       const currentDocsMap = new Map();
       currentInvSnap.docs.forEach(d => {
         const data = d.data();
-        currentDocsMap.set(`${data.siteId}_${data.itemName}`, d.id);
+        if (data.siteId && data.itemName) {
+          currentDocsMap.set(`${data.siteId}_${data.itemName}`, d.id);
+        }
       });
 
       auditMap.forEach((data, key) => {
@@ -211,6 +236,7 @@ export default function GlobalInventoryPage() {
       await batch.commit();
       toast({ title: 'Reconciliation Complete', description: `Audited ${auditMap.size} material threads. Stock balances are now synchronized.` });
     } catch (e: any) {
+      console.error("Reconciliation Error:", e);
       toast({ variant: 'destructive', title: 'Audit Failed', description: e.message });
     } finally {
       setIsReconciling(false);
@@ -349,5 +375,26 @@ export default function GlobalInventoryPage() {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3.5 sm:h-4 sm:w-4" />
+      </CardHeader>
+      <CardContent className="p-3 sm:p-4 pt-0">
+        <div className="text-xl sm:text-2xl font-black">{value}</div>
+      </CardContent>
+    </Card>
   );
 }
