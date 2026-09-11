@@ -31,7 +31,10 @@ import {
   XCircle,
   ChevronsUpDown,
   ShieldAlert,
-  Info
+  Info,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -48,6 +51,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 const REVIEW_POINTS = [
   { id: 'mms', label: 'Module Mounting Structure' },
@@ -136,6 +140,18 @@ export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteI
     XLSX.writeFile(wb, `Meetings_Matrix_${selectedSiteId}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary shrink-0" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
+  };
+
   if (isProfileLoading || sitesLoading || meetingsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
 
   return (
@@ -176,7 +192,7 @@ export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteI
                 <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                 <Input placeholder="Search sites..." className="h-10 border-none focus-visible:ring-0 text-xs bg-transparent" value={siteSearch} onChange={e => setSiteSearch(e.target.value)} />
               </div>
-              <ScrollArea className="h-[300px]">
+              <ScrollArea className="h-[200px]">
                 <div className="p-1">
                   <Button variant="ghost" className="w-full justify-start h-9 text-xs font-bold uppercase" onClick={() => { setSelectedSiteId('all'); setIsSitePopoverOpen(false); }}>
                     Global View (Latest)
