@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -15,26 +14,30 @@ import {
   FileDown, 
   Check, 
   X, 
+  AlertTriangle,
+  Zap,
+  ImageIcon,
+  Maximize2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  ChevronLeft,
+  ChevronRight,
+  RotateCw,
   Search,
   Building2,
   Calendar,
-  Filter,
   CheckCircle2,
   XCircle,
-  AlertTriangle,
-  ChevronLeft,
-  ChevronRight,
-  FilterX,
-  Mic,
   ChevronsUpDown,
-  History,
+  ShieldAlert,
   Info
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import * as XLSX from 'xlsx';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import {
   Tooltip,
   TooltipContent,
@@ -78,7 +81,7 @@ type Site = {
   projectCompany: string;
 };
 
-export default function MeetingsMatrixPage() {
+export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteId: string }> }) {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
