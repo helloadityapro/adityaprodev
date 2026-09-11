@@ -34,7 +34,9 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
-  Plus
+  Plus,
+  Globe,
+  FilterX
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -164,7 +166,7 @@ export default function MeetingsMatrixPage() {
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     XLSX.utils.book_append_sheet(workbook, ws, "Meetings Matrix");
-    XLSX.writeFile(wb, `Meetings_Matrix_${selectedSiteId}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+    XLSX.writeFile(workbook, `Meetings_Matrix_${selectedSiteId}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
   if (isProfileLoading || sitesLoading || meetingsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
@@ -178,8 +180,8 @@ export default function MeetingsMatrixPage() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <div className="bg-primary/10 p-2.5 rounded-sm shrink-0"><LayoutGrid className="h-7 w-7 text-primary" /></div>
-            <div className="min-w-0">
-              <h1 className="text-2xl md:text-4xl font-black uppercase tracking-tight text-primary leading-tight truncate">
+            <div className="min-w-0 text-left">
+              <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-primary leading-tight truncate">
                 {selectedSiteId === 'all' ? "Global Matrix" : allSites?.find(s => s.id === selectedSiteId)?.name}
               </h1>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1">Cross-session technical audit</p>
@@ -231,7 +233,7 @@ export default function MeetingsMatrixPage() {
                         )} 
                         onClick={() => { setSelectedSiteId(s.id); setIsSitePopoverOpen(false); }}
                     >
-                      <div className="flex flex-col items-start min-w-0">
+                      <div className="flex flex-col items-start min-w-0 text-left">
                         <span className={cn("font-bold truncate w-full uppercase tracking-tight", selectedSiteId === s.id ? "text-primary" : "text-foreground")}>{s.name}</span>
                         <span className="text-[9px] text-muted-foreground uppercase opacity-60 font-medium">{s.projectCompany}</span>
                       </div>
