@@ -78,7 +78,7 @@ export default function StartMeetingPage() {
   const { data: userProfile } = useDoc<any>(userProfileRef);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
-  const { data: allSites } = useCollection<any>(sitesQuery);
+  const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<any>(usersQuery);
@@ -86,13 +86,29 @@ export default function StartMeetingPage() {
   // Fetch historical meetings for the selected site to provide context
   const historicalMeetingsQuery = useMemoFirebase(() => {
     if (!siteId) return null;
+    // Removed orderBy to prevent missing index errors in production
+    // Client-side sorting is used for robustness
     return query(
       collection(firestore, 'meetings'),
-      where('siteId', '==', siteId),
-      orderBy('createdAt', 'desc')
+      where('siteId', '==', siteId)
     );
   }, [firestore, siteId]);
-  const { data: previousMeetings, isLoading: isHistoryLoading } = useCollection<any>(historicalMeetingsQuery);
+
+  const { data: rawPreviousMeetings, isLoading: isHistoryLoading } = useCollection<any>(historicalMeetingsQuery);
+
+  // Client-side sorting for robustness and to avoid complex index requirements
+  const previousMeetings = React.useMemo(() => {
+    if (!rawPreviousMeetings) return [];
+    return [...rawPreviousMeetings].sort((a, b) => {
+      const getT = (item: any) => {
+        if (item.createdAt?.toDate) return item.createdAt.toDate().getTime();
+        if (item.createdAt instanceof Date) return item.createdAt.getTime();
+        if (typeof item.date === 'string') return new Date(item.date).getTime();
+        return 0;
+      };
+      return getT(b) - getT(a); // Descending (Newest First)
+    });
+  }, [rawPreviousMeetings]);
 
   const handleSaveMeeting = async () => {
     if (!user || !userProfile || !siteId) {
@@ -177,7 +193,7 @@ export default function StartMeetingPage() {
               <Label className="text-[10px] font-black uppercase text-muted-foreground">Select Project Site</Label>
               <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="w-full justify-between h-12 rounded-sm font-bold border-primary/20 text-left">
+                  <Button variant="outline" role="combobox" className={cn("w-full justify-between h-12 rounded-sm font-bold border-primary/20 text-left", !siteId && "text-muted-foreground")}>
                     <span className="truncate">{siteName || "Choose site..."}</span>
                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                   </Button>
@@ -315,7 +331,7 @@ export default function StartMeetingPage() {
                       </div>
                     </div>
 
-                    {/* HISTORY SECTION - FULL WIDTH BELOW (AS INDICATED IN SCREENSHOT) */}
+                    {/* HISTORY SECTION - FULL WIDTH BELOW */}
                     {siteId && (
                       <div className="space-y-3 animate-in fade-in duration-500 pt-2">
                          <div className="flex items-center justify-between border-t border-dashed pt-4">
