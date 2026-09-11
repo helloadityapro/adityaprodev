@@ -7,7 +7,7 @@ import { collection, query, orderBy, doc, where, getDocs, writeBatch, serverTime
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart, FileDown, RefreshCw, Loader2 } from "lucide-react";
+import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart, FileDown, RefreshCw, Loader2, ListFilter } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,13 @@ import * as XLSX from 'xlsx';
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { slugifyRole } from "@/lib/access-control";
 import { useToast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 type InventoryItem = {
   id: string;
@@ -52,6 +59,7 @@ export default function GlobalInventoryPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
+  const [siteFilter, setSiteFilter] = React.useState("all");
   const [isReconciling, setIsReconciling] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -103,7 +111,7 @@ export default function GlobalInventoryPage() {
         });
       });
     } else {
-      (userProfile.assignedProjectIds || []).forEach(id => ids.add(id));
+      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
     }
     return ids;
   }, [allSites, userProfile, roleConfigs, isAdmin, isManager, teamMembers, allOverrides]);
@@ -123,11 +131,13 @@ export default function GlobalInventoryPage() {
       list = list.filter(item => accessibleSiteIds.has(item.siteId));
     }
 
-    return list.filter(item => 
-      item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.siteName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [inventory, searchTerm, isAdmin, accessibleSiteIds]);
+    return list.filter(item => {
+      const matchesSearch = item.itemName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        item.siteName.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchesSite = siteFilter === "all" || item.siteId === siteFilter;
+      return matchesSearch && matchesSite;
+    });
+  }, [inventory, searchTerm, isAdmin, accessibleSiteIds, siteFilter]);
 
   /**
    * RECONCILIATION ENGINE
@@ -297,10 +307,24 @@ export default function GlobalInventoryPage() {
           />
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-8 border-primary/20 text-primary">
+          <div className="flex-1 md:flex-none">
+            <Select value={siteFilter} onValueChange={setSiteFilter}>
+              <SelectTrigger className="w-full md:w-[200px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background">
+                <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
+                <SelectValue placeholder="All Sites" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs font-bold uppercase">All Sites</SelectItem>
+                {allSites?.filter(s => isAdmin || accessibleSiteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name)).map(site => (
+                  <SelectItem key={site.id} value={site.id} className="text-xs font-bold uppercase">{site.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary">
             {filteredInventory.length} Stock Records
           </Badge>
-          <Button variant="ghost" size="icon" onClick={() => setSearchTerm("")} className="h-10 w-10 text-muted-foreground rounded-sm">
+          <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setSiteFilter("all"); }} className="h-10 w-10 text-muted-foreground rounded-sm">
             <FilterX className="h-4 w-4" />
           </Button>
         </div>
