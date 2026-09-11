@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -37,6 +36,7 @@ type InventoryItem = {
 
 type AccessConfig = {
   id: string;
+  allowedPageKeys: string[];
   ownDataOnly?: boolean;
 };
 
@@ -145,7 +145,7 @@ export default function GlobalInventoryPage() {
     return allSites
       .filter(s => isAdmin || accessibleSiteIds.has(s.id))
       .filter(s => s.name.toLowerCase().includes(siteSearchInput.toLowerCase()))
-      .sort((a, b) => a.name.compare(b.name));
+      .sort((a, b) => a.name.localeCompare(b.name));
   }, [allSites, isAdmin, accessibleSiteIds, siteSearchInput]);
 
   /**
@@ -287,24 +287,26 @@ export default function GlobalInventoryPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
-            <PackageCheck className="h-8 w-8" /> Global Inventory
-          </h1>
-          <p className="text-muted-foreground font-medium">Real-time component-level stock availability and utilisation across project sites.</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {isAdmin && (
-            <Button onClick={handleReconcileAllStock} disabled={isReconciling} variant="outline" className="h-10 rounded-sm font-bold border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm">
-              {isReconciling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
-              Reconcile All Stock
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="text-3xl font-black tracking-tight text-primary flex items-center gap-2 uppercase">
+              <PackageCheck className="h-8 w-8" /> Global Inventory
+            </h1>
+            <p className="text-muted-foreground font-medium">Real-time component-level stock availability and utilisation across project sites.</p>
+          </div>
+          <div className="flex items-center gap-2">
+            {isAdmin && (
+              <Button onClick={handleReconcileAllStock} disabled={isReconciling} variant="outline" className="h-10 rounded-sm font-bold border-amber-200 text-amber-700 hover:bg-amber-50 shadow-sm">
+                {isReconciling ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <RefreshCw className="h-4 w-4 mr-2" />}
+                Reconcile All Stock
+              </Button>
+            )}
+            <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
+              <FileDown className="h-4 w-4 mr-2" />
+              Export to Excel
             </Button>
-          )}
-          <Button onClick={handleExport} variant="outline" className="h-10 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 shadow-sm px-6">
-            <FileDown className="h-4 w-4 mr-2" />
-            Export to Excel
-          </Button>
+          </div>
         </div>
       </div>
 
