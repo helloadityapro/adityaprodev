@@ -7,7 +7,7 @@ import { collection, query, orderBy, doc, limit, where } from 'firebase/firestor
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { Button } from '@/components/ui/button';
 import { 
   ArrowLeft, 
   LayoutGrid, 
@@ -17,6 +17,7 @@ import {
   Zap,
   ImageIcon,
   Maximize2,
+  Minimize2,
   ZoomIn,
   ZoomOut,
   RotateCcw,
@@ -40,9 +41,11 @@ import {
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
+import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import * as XLSX from 'xlsx';
-import { format } from 'date-fns';
+import { format, subDays, subMonths, subYears, startOfDay, endOfDay } from 'date-fns';
+import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
   TooltipContent,
@@ -51,9 +54,14 @@ import {
 } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const REVIEW_POINTS = [
   { id: 'mms', label: 'Module Mounting Structure' },
@@ -99,6 +107,9 @@ export default function MeetingsMatrixPage() {
   const [selectedSiteId, setSelectedSiteId] = React.useState<string>("all");
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
+  
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [expandedCells, setExpandedCells] = React.useState<Set<string>>(new Set());
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -114,25 +125,36 @@ export default function MeetingsMatrixPage() {
 
   const { data: meetings, isLoading: meetingsLoading } = useCollection<Meeting>(meetingsQuery);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    switch (dateFilter) {
+      case '7days': return { start: startOfDay(subDays(today, 7)), end: endOfDay(today) };
+      case 'lastMonth': return { start: startOfDay(subMonths(today, 1)), end: endOfDay(today) };
+      case 'lastYear': return { start: startOfDay(subYears(today, 1)), end: endOfDay(today) };
+      case 'allTime': return { start: new Date(0), end: new Date(2100, 0, 1) };
+      default: return { start: startOfDay(subDays(today, 7)), end: endOfDay(today) };
+    }
+  }, [dateFilter]);
+
   const sortedMeetings = React.useMemo(() => {
     if (!meetings) return [];
-    return [...meetings].sort((a, b) => {
+    const { start, end } = queryDateRange;
+    return [...meetings].filter(m => {
+        const d = m.createdAt?.toDate?.() || new Date(m.date);
+        return d >= start && d <= end;
+    }).sort((a, b) => {
         const da = a.createdAt?.toDate?.()?.getTime() || new Date(a.date).getTime();
         const db = b.createdAt?.toDate?.()?.getTime() || new Date(b.date).getTime();
         return da - db; // Ascending order for matrix columns
     });
-  }, [meetings]);
+  }, [meetings, queryDateRange]);
 
-  // Extract unique custom point labels from all visible meetings (for legacy data)
-  const allCustomPointLabels = React.useMemo(() => {
-    const labels = new Set<string>();
-    sortedMeetings.forEach(m => {
-      m.customPoints?.forEach(cp => {
-        if (cp.label) labels.add(cp.label);
-      });
-    });
-    return Array.from(labels).sort();
-  }, [sortedMeetings]);
+  const toggleCell = (cellId: string) => {
+    const next = new Set(expandedCells);
+    if (next.has(cellId)) next.delete(cellId);
+    else next.add(cellId);
+    setExpandedCells(next);
+  };
 
   const handleExport = () => {
     if (sortedMeetings.length === 0) return;
@@ -147,17 +169,6 @@ export default function MeetingsMatrixPage() {
       });
       return row;
     });
-
-    if (allCustomPointLabels.length > 0) {
-      allCustomPointLabels.forEach(label => {
-        const row: any = { 'Observation Point': `Custom Archive: ${label}` };
-        sortedMeetings.forEach(m => {
-          const cp = m.customPoints?.find(p => p.label === label);
-          row[m.date] = cp ? cp.value : '-';
-        });
-        exportData.push(row);
-      });
-    }
 
     const criticalRow: any = { 'Observation Point': 'CRITICAL POINTS' };
     sortedMeetings.forEach(m => {
@@ -188,9 +199,22 @@ export default function MeetingsMatrixPage() {
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1">Cross-session technical audit</p>
             </div>
           </div>
-          <Button onClick={handleExport} disabled={sortedMeetings.length === 0} variant="outline" className="h-11 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 px-8 shadow-sm">
-            <FileDown className="h-4 w-4 mr-2" /> Export Matrix
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Select value={dateFilter} onValueChange={setDateFilter}>
+              <SelectTrigger className="h-11 w-[160px] rounded-sm font-black uppercase text-[10px] tracking-widest bg-secondary border-none">
+                <Calendar className="mr-2 h-3.5 w-3.5" /><SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="7days" className="text-[10px] font-black uppercase">Last 7 Days</SelectItem>
+                <SelectItem value="lastMonth" className="text-[10px] font-black uppercase">Last Month</SelectItem>
+                <SelectItem value="lastYear" className="text-[10px] font-black uppercase">Last Year</SelectItem>
+                <SelectItem value="allTime" className="text-[10px] font-black uppercase">All Time</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button onClick={handleExport} disabled={sortedMeetings.length === 0} variant="outline" className="h-11 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 px-8 shadow-sm">
+              <FileDown className="h-4 w-4 mr-2" /> Export Matrix
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -279,16 +303,34 @@ export default function MeetingsMatrixPage() {
                       </TableCell>
                       {sortedMeetings.map((m) => {
                         const observation = m.observations[point.id];
+                        const cellId = `${m.id}-${point.id}`;
+                        const isExpanded = expandedCells.has(cellId);
+                        
                         return (
-                          <TableCell key={`${m.id}-${point.id}`} className="text-center border-r border-b p-0 group">
+                          <TableCell key={cellId} className="text-center border-r border-b p-0 group align-top">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="w-full h-full flex justify-center items-center py-5 px-3 cursor-default hover:bg-muted/10 transition-colors font-medium text-center">
+                                <div className="w-full h-full flex flex-col p-4 cursor-default hover:bg-muted/10 transition-colors font-medium text-left relative min-h-[60px]">
                                   {observation ? (
-                                    <span className="truncate text-[10px] text-foreground block max-w-full font-bold" title={observation}>
-                                      {observation}
-                                    </span>
-                                  ) : <span className="text-muted-foreground/20 font-black">-</span>}
+                                    <div className="space-y-2">
+                                      <p className={cn(
+                                        "text-[10px] text-foreground leading-relaxed font-bold break-words",
+                                        !isExpanded && "line-clamp-2"
+                                      )}>
+                                        {observation}
+                                      </p>
+                                      {observation.length > 30 && (
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                          onClick={(e) => { e.stopPropagation(); toggleCell(cellId); }}
+                                        >
+                                          {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                                        </Button>
+                                      )}
+                                    </div>
+                                  ) : <span className="text-muted-foreground/20 font-black text-center w-full block">-</span>}
                                 </div>
                               </TooltipTrigger>
                               {observation && (
@@ -309,51 +351,6 @@ export default function MeetingsMatrixPage() {
                       })}
                     </TableRow>
                   ))}
-
-                  {/* CUSTOM POINTS SECTION - LEGACY ARCHIVE */}
-                  {allCustomPointLabels.length > 0 && (
-                    <>
-                      <TableRow className="bg-muted/10">
-                        <TableCell colSpan={sortedMeetings.length + 1} className="px-4 py-2 font-black uppercase text-[9px] tracking-[0.25em] text-muted-foreground border-b">
-                           Historical Custom Observations
-                        </TableCell>
-                      </TableRow>
-                      {allCustomPointLabels.map((label) => (
-                        <TableRow key={label} className="hover:bg-primary/[0.02] transition-colors group">
-                          <TableCell className="px-4 py-4 font-black text-[11px] border-r border-b bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] uppercase tracking-tight text-primary/70">
-                            {label}
-                          </TableCell>
-                          {sortedMeetings.map((m) => {
-                            const cp = m.customPoints?.find(p => p.label === label);
-                            const val = cp?.value;
-                            return (
-                              <TableCell key={`${m.id}-${label}`} className="text-center border-r border-b p-0 group">
-                                <Tooltip>
-                                  <TooltipTrigger asChild>
-                                    <div className="w-full h-full flex justify-center items-center py-5 px-3 cursor-default hover:bg-muted/10 transition-colors font-medium text-center">
-                                      {val ? (
-                                        <span className="truncate text-[10px] text-foreground block max-w-full font-bold" title={val}>
-                                          {val}
-                                        </span>
-                                      ) : <span className="text-muted-foreground/20 font-black">-</span>}
-                                    </div>
-                                  </TooltipTrigger>
-                                  {val && (
-                                    <TooltipContent side="top" className="p-4 border-none shadow-2xl bg-slate-900 text-white rounded-sm max-w-[280px]">
-                                       <div className="space-y-2">
-                                          <p className="text-[9px] font-black uppercase text-amber-400 tracking-widest border-b border-white/10 pb-1.5">{label}</p>
-                                          <p className="text-xs leading-relaxed italic font-medium">"{val}"</p>
-                                       </div>
-                                    </TooltipContent>
-                                  )}
-                                </Tooltip>
-                              </TableCell>
-                            );
-                          })}
-                        </TableRow>
-                      ))}
-                    </>
-                  )}
                   
                   {/* CRITICAL POINTS ROW */}
                   <TableRow className="bg-red-50/50">
@@ -363,32 +360,52 @@ export default function MeetingsMatrixPage() {
                          Critical Points
                       </div>
                     </TableCell>
-                    {sortedMeetings.map((m) => (
-                      <TableCell key={`critical-${m.id}`} className="p-0 border-r border-b">
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <div className="w-full h-full p-4 hover:bg-red-100/50 transition-colors cursor-default text-center flex items-center justify-center">
-                               {m.criticalPoints ? (
-                                 <p className="text-[10px] font-black text-red-950 line-clamp-3 leading-tight uppercase tracking-tighter">
-                                   {m.criticalPoints}
-                                 </p>
-                               ) : <span className="text-red-900/10 font-black flex justify-center">-</span>}
-                            </div>
-                          </TooltipTrigger>
-                          {m.criticalPoints && (
-                            <TooltipContent side="top" className="p-5 bg-red-900 text-white border-none shadow-2xl max-w-[320px]">
-                               <div className="space-y-3">
-                                  <div className="flex items-center gap-2 border-b border-white/20 pb-2">
-                                     <ShieldAlert className="h-4 w-4" />
-                                     <Label className="text-[10px] font-black uppercase tracking-widest text-red-100 leading-none">Critical Blockers Identified</Label>
-                                  </div>
-                                  <p className="text-sm font-medium leading-relaxed italic">"{m.criticalPoints}"</p>
-                               </div>
-                            </TooltipContent>
-                          )}
-                        </Tooltip>
-                      </TableCell>
-                    ))}
+                    {sortedMeetings.map((m) => {
+                      const cellId = `critical-${m.id}`;
+                      const isExpanded = expandedCells.has(cellId);
+                      
+                      return (
+                        <TableCell key={cellId} className="p-0 border-r border-b align-top">
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className="w-full h-full p-4 hover:bg-red-100/50 transition-colors cursor-default text-left flex flex-col justify-start relative min-h-[80px]">
+                                 {m.criticalPoints ? (
+                                   <div className="space-y-2">
+                                      <p className={cn(
+                                        "text-[10px] font-black text-red-950 leading-tight uppercase tracking-tighter break-words",
+                                        !isExpanded && "line-clamp-3"
+                                      )}>
+                                        {m.criticalPoints}
+                                      </p>
+                                      {m.criticalPoints.length > 30 && (
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-700"
+                                          onClick={(e) => { e.stopPropagation(); toggleCell(cellId); }}
+                                        >
+                                          {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                                        </Button>
+                                      )}
+                                   </div>
+                                 ) : <span className="text-red-900/10 font-black text-center w-full block">-</span>}
+                              </div>
+                            </TooltipTrigger>
+                            {m.criticalPoints && (
+                              <TooltipContent side="top" className="p-5 bg-red-900 text-white border-none shadow-2xl max-w-[320px]">
+                                 <div className="space-y-3">
+                                    <div className="flex items-center gap-2 border-b border-white/20 pb-2">
+                                       <ShieldAlert className="h-4 w-4" />
+                                       <Label className="text-[10px] font-black uppercase tracking-widest text-red-100 leading-none">Critical Blockers Identified</Label>
+                                    </div>
+                                    <p className="text-sm font-medium leading-relaxed italic">"{m.criticalPoints}"</p>
+                                 </div>
+                              </TooltipContent>
+                            )}
+                          </Tooltip>
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 </TableBody>
               </Table>
