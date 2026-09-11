@@ -26,7 +26,8 @@ import {
   History,
   ChevronDown,
   ChevronUp,
-  Plus
+  Plus,
+  UserPlus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -78,7 +79,7 @@ export default function StartMeetingPage() {
   const { data: userProfile } = useDoc<any>(userProfileRef);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
-  const { data: allSites } = useCollection<Site>(sitesQuery);
+  const { data: allSites } = useCollection<any>(sitesQuery);
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<any>(usersQuery);
@@ -86,8 +87,6 @@ export default function StartMeetingPage() {
   // Fetch historical meetings for the selected site to provide context
   const historicalMeetingsQuery = useMemoFirebase(() => {
     if (!siteId) return null;
-    // Removed orderBy to prevent missing index errors in production
-    // Client-side sorting is used for robustness
     return query(
       collection(firestore, 'meetings'),
       where('siteId', '==', siteId)
@@ -96,7 +95,6 @@ export default function StartMeetingPage() {
 
   const { data: rawPreviousMeetings, isLoading: isHistoryLoading } = useCollection<any>(historicalMeetingsQuery);
 
-  // Client-side sorting for robustness and to avoid complex index requirements
   const previousMeetings = React.useMemo(() => {
     if (!rawPreviousMeetings) return [];
     return [...rawPreviousMeetings].sort((a, b) => {
@@ -123,7 +121,7 @@ export default function StartMeetingPage() {
         siteName,
         date: format(new Date(), 'yyyy-MM-dd HH:mm'),
         observations,
-        customPoints: [], // Maintained for legacy compatibility
+        customPoints: [], 
         criticalPoints,
         attendees,
         recordingUrl: "", 
@@ -139,6 +137,14 @@ export default function StartMeetingPage() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const addExternalAttendee = () => {
+    const name = attendeeSearch.trim();
+    if (!name) return;
+    const newId = `ext_${Date.now()}`;
+    setAttendees(prev => [...prev, { id: newId, name: `${name} (Ext)` }]);
+    setAttendeeSearch("");
   };
 
   if (isSuccess) {
@@ -181,7 +187,6 @@ export default function StartMeetingPage() {
       </div>
 
       <div className="space-y-8">
-        {/* Site Selection */}
         <Card className="rounded-sm shadow-md border-primary/10">
           <CardHeader className="py-4 border-b bg-muted/5">
             <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
@@ -224,7 +229,6 @@ export default function StartMeetingPage() {
           </CardContent>
         </Card>
 
-        {/* Attendees Selection */}
         <Card className="rounded-sm shadow-md border-primary/10">
           <CardHeader className="py-4 border-b bg-muted/5">
             <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
@@ -233,7 +237,7 @@ export default function StartMeetingPage() {
           </CardHeader>
           <CardContent className="pt-6 space-y-4">
             <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground">Select Personnel Available in Meeting</Label>
+              <Label className="text-[10px] font-black uppercase text-muted-foreground">Select or Add Participants</Label>
               <Popover>
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-between h-12 rounded-sm font-bold border-primary/20 text-left">
@@ -247,7 +251,7 @@ export default function StartMeetingPage() {
                   <div className="flex items-center border-b px-3 bg-muted/20">
                     <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
                     <Input 
-                      placeholder="Search personnel..." 
+                      placeholder="Search or type new name..." 
                       className="h-10 border-none text-sm bg-transparent focus-visible:ring-0" 
                       value={attendeeSearch} 
                       onChange={e => setAttendeeSearch(e.target.value)} 
@@ -255,6 +259,16 @@ export default function StartMeetingPage() {
                   </div>
                   <ScrollArea className="h-[250px]">
                     <div className="p-1">
+                      {attendeeSearch.trim() !== "" && (
+                        <Button 
+                          variant="ghost" 
+                          className="w-full justify-start h-11 mb-1 bg-primary/5 text-primary rounded-sm border-b" 
+                          onClick={addExternalAttendee}
+                        >
+                          <UserPlus className="mr-2 h-4 w-4" />
+                          <span className="text-xs font-black uppercase truncate">Add "{attendeeSearch}" (External)</span>
+                        </Button>
+                      )}
                       {allUsers?.filter((u: any) => u.username?.toLowerCase().includes(attendeeSearch.toLowerCase())).map((u: any) => {
                         const isSelected = attendees.some(a => a.id === u.id);
                         return (
@@ -300,7 +314,6 @@ export default function StartMeetingPage() {
           </CardContent>
         </Card>
 
-        {/* Review Points */}
         <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
           <CardHeader className="bg-primary/5 border-b py-4">
             <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
@@ -331,7 +344,6 @@ export default function StartMeetingPage() {
                       </div>
                     </div>
 
-                    {/* HISTORY SECTION - FULL WIDTH BELOW */}
                     {siteId && (
                       <div className="space-y-3 animate-in fade-in duration-500 pt-2">
                          <div className="flex items-center justify-between border-t border-dashed pt-4">
@@ -397,7 +409,6 @@ export default function StartMeetingPage() {
           </CardContent>
         </Card>
 
-        {/* Critical Points */}
         <Card className="rounded-sm shadow-md border-primary/10">
           <CardHeader className="bg-red-500/5 border-b py-4">
             <CardTitle className="text-xs font-bold uppercase tracking-widest text-red-700 flex items-center gap-2">
@@ -415,7 +426,6 @@ export default function StartMeetingPage() {
           </CardContent>
         </Card>
 
-        {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-4 pt-4">
           <Button 
             variant="outline" 
