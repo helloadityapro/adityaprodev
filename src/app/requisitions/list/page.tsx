@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, orderBy, limit, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, doc, query, where, or, orderBy, limit, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
