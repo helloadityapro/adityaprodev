@@ -3,11 +3,11 @@
 
 import * as React from "react";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useCollection } from "@/firebase";
-import { collection, query, orderBy, doc, where, getDocs, writeBatch, serverTimestamp } from "firebase/firestore";
+import { collection, query, orderBy, doc, where, getDocs, writeBatch, serverTimestamp, increment } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart, FileDown, RefreshCw, Loader2, ListFilter } from "lucide-react";
+import { PackageCheck, Search, FilterX, Building2, Layers, Boxes, Clock, PieChart, FileDown, RefreshCw, Loader2, ListFilter, Check, ChevronsUpDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,11 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { slugifyRole } from "@/lib/access-control";
 import { useToast } from "@/hooks/use-toast";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 type InventoryItem = {
   id: string;
@@ -60,6 +59,8 @@ export default function GlobalInventoryPage() {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = React.useState("");
   const [siteFilter, setSiteFilter] = React.useState("all");
+  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
+  const [siteSearchInput, setSiteSearchInput] = React.useState("");
   const [isReconciling, setIsReconciling] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -69,7 +70,7 @@ export default function GlobalInventoryPage() {
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
-  const { data: allSites } = useCollection<{ name: string, id: string }>(sitesQuery);
+  const { data: allSites } = useCollection<{ name: string, id: string, projectCompany: string }>(sitesQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
   const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
@@ -111,7 +112,7 @@ export default function GlobalInventoryPage() {
         });
       });
     } else {
-      (userProfile.assignedProjectIds || []).forEach(id => siteIds.add(id));
+      (userProfile.assignedProjectIds || []).forEach(id => ids.add(id));
     }
     return ids;
   }, [allSites, userProfile, roleConfigs, isAdmin, isManager, teamMembers, allOverrides]);
@@ -138,6 +139,14 @@ export default function GlobalInventoryPage() {
       return matchesSearch && matchesSite;
     });
   }, [inventory, searchTerm, isAdmin, accessibleSiteIds, siteFilter]);
+
+  const filteredSitesForDropdown = React.useMemo(() => {
+    if (!allSites) return [];
+    return allSites
+      .filter(s => isAdmin || accessibleSiteIds.has(s.id))
+      .filter(s => s.name.toLowerCase().includes(siteSearchInput.toLowerCase()))
+      .sort((a, b) => a.name.compare(b.name));
+  }, [allSites, isAdmin, accessibleSiteIds, siteSearchInput]);
 
   /**
    * RECONCILIATION ENGINE
@@ -168,7 +177,6 @@ export default function GlobalInventoryPage() {
         const m = d.data();
         if (m.status === 'Rejected' || m.status === 'Pending') return;
         
-        // CRITICAL FIX: Skip records with undefined or missing siteId/itemName to prevent WriteBatch.set error
         if (!m.siteId || !m.itemName) return;
 
         const key = `${m.siteId}_${m.itemName}`;
@@ -192,7 +200,6 @@ export default function GlobalInventoryPage() {
       utilisationsSnap.docs.forEach(d => {
         const u = d.data();
         
-        // CRITICAL FIX: Skip records with undefined or missing siteId/itemName
         if (!u.siteId || !u.itemName) return;
 
         const key = `${u.siteId}_${u.itemName}`;
@@ -215,7 +222,6 @@ export default function GlobalInventoryPage() {
       const currentInvSnap = await getDocs(collection(firestore, 'project_inventory'));
       const batch = writeBatch(firestore);
       
-      // Map current docs to identify existing vs new
       const currentDocsMap = new Map();
       currentInvSnap.docs.forEach(d => {
         const data = d.data();
@@ -271,6 +277,12 @@ export default function GlobalInventoryPage() {
     XLSX.writeFile(wb, `Global_Inventory_Status_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
+  const clearFilters = () => {
+    setSearchTerm("");
+    setSiteFilter("all");
+    setSiteSearchInput("");
+  };
+
   if (isLoading || isProfileLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
@@ -308,23 +320,59 @@ export default function GlobalInventoryPage() {
         </div>
         <div className="flex items-center gap-2">
           <div className="flex-1 md:flex-none">
-            <Select value={siteFilter} onValueChange={setSiteFilter}>
-              <SelectTrigger className="w-full md:w-[200px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background">
-                <ListFilter className="h-3.5 w-3.5 mr-2 text-muted-foreground" />
-                <SelectValue placeholder="All Sites" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all" className="text-xs font-bold uppercase">All Sites</SelectItem>
-                {allSites?.filter(s => isAdmin || accessibleSiteIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name)).map(site => (
-                  <SelectItem key={site.id} value={site.id} className="text-xs font-bold uppercase">{site.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" role="combobox" className="w-full md:w-[200px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20 bg-background justify-between">
+                  <div className="flex items-center gap-2 truncate">
+                    <ListFilter className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span className="truncate">{siteFilter === "all" ? "All Sites" : allSites?.find(s => s.id === siteFilter)?.name}</span>
+                  </div>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" align="end">
+                <div className="flex items-center border-b px-3 py-2">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Input 
+                    placeholder="Filter sites..." 
+                    className="h-8 border-none focus-visible:ring-0 px-0 text-sm"
+                    value={siteSearchInput}
+                    onChange={(e) => setSiteSearchInput(e.target.value)}
+                  />
+                </div>
+                <ScrollArea className="h-[250px]">
+                  <div className="p-1">
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-start h-10 text-xs rounded-sm px-3 mb-0.5"
+                      onClick={() => { setSiteFilter("all"); setIsSitePopoverOpen(false); }}
+                    >
+                      <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === "all" ? "opacity-100" : "opacity-0")} />
+                      All Sites
+                    </Button>
+                    {filteredSitesForDropdown.map((s) => (
+                      <Button
+                        key={s.id}
+                        variant="ghost"
+                        className="w-full justify-start h-10 text-xs rounded-sm px-3 mb-0.5"
+                        onClick={() => { setSiteFilter(s.id); setIsSitePopoverOpen(false); }}
+                      >
+                        <Check className={cn("mr-2 h-4 w-4 text-primary", siteFilter === s.id ? "opacity-100" : "opacity-0")} />
+                        <div className="flex flex-col items-start overflow-hidden text-left">
+                          <span className="font-bold truncate w-full">{s.name}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase">{s.projectCompany}</span>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
           </div>
           <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary">
             {filteredInventory.length} Stock Records
           </Badge>
-          <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setSiteFilter("all"); }} className="h-10 w-10 text-muted-foreground rounded-sm">
+          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground rounded-sm">
             <FilterX className="h-4 w-4" />
           </Button>
         </div>
