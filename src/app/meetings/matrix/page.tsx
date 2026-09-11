@@ -14,7 +14,6 @@ import {
   FileDown, 
   Check, 
   X, 
-  AlertTriangle,
   Zap,
   ImageIcon,
   Maximize2,
@@ -85,7 +84,9 @@ type Site = {
   projectCompany: string;
 };
 
-export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteId: string }> }) {
+type SortKey = 'company' | 'name' | 'total' | string;
+
+export default function MeetingsMatrixPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
@@ -108,6 +109,8 @@ export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteI
 
   const { data: meetings, isLoading: meetingsLoading } = useCollection<Meeting>(meetingsQuery);
 
+  const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'total', direction: 'desc' });
+
   const sortedMeetings = React.useMemo(() => {
     if (!meetings) return [];
     return [...meetings].sort((a, b) => {
@@ -123,14 +126,14 @@ export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteI
     const exportData = REVIEW_POINTS.map(point => {
       const row: any = { 'Review Point': point.label };
       sortedMeetings.forEach(m => {
-        row[m.date] = m.observations[point.id] || '—';
+        row[m.date] = m.observations[point.id] || '-';
       });
       return row;
     });
 
     const criticalRow: any = { 'Review Point': 'CRITICAL POINTS' };
     sortedMeetings.forEach(m => {
-      criticalRow[m.date] = m.criticalPoints || '—';
+      criticalRow[m.date] = m.criticalPoints || '-';
     });
     exportData.push(criticalRow);
 
@@ -239,22 +242,17 @@ export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteI
                       </TableCell>
                       {sortedMeetings.map((m) => {
                         const observation = m.observations[point.id];
-                        const isOk = observation?.toLowerCase() === 'ok' || observation?.toLowerCase() === 'yes' || observation?.toLowerCase() === 'done';
-                        const isNotOk = observation?.toLowerCase() === 'not ok' || observation?.toLowerCase() === 'no' || observation?.toLowerCase() === 'pending';
                         
                         return (
                           <TableCell key={`${m.id}-${point.id}`} className="text-center border-r border-b p-0 group">
                             <Tooltip>
                               <TooltipTrigger asChild>
-                                <div className="w-full h-full flex justify-center items-center py-4 cursor-default hover:bg-muted/10 transition-colors font-medium">
+                                <div className="w-full h-full flex justify-center items-center py-4 px-2 cursor-default hover:bg-muted/10 transition-colors font-medium text-center">
                                   {observation ? (
-                                    isOk ? <CheckCircle2 className="h-4 w-4 text-emerald-600" /> :
-                                    isNotOk ? <XCircle className="h-4 w-4 text-red-600" /> :
-                                    <div className="flex items-center gap-1 text-[10px] text-primary truncate px-2">
-                                        <Info className="h-3 w-3 shrink-0" />
-                                        <span className="truncate">{observation}</span>
-                                    </div>
-                                  ) : <span className="text-muted-foreground/30 font-black">—</span>}
+                                    <span className="truncate text-[10px] text-foreground block max-w-full" title={observation}>
+                                      {observation}
+                                    </span>
+                                  ) : <span className="text-muted-foreground/30 font-black">-</span>}
                                 </div>
                               </TooltipTrigger>
                               {observation && (
@@ -288,12 +286,12 @@ export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteI
                       <TableCell key={`critical-${m.id}`} className="p-0 border-r border-b">
                         <Tooltip>
                           <TooltipTrigger asChild>
-                            <div className="w-full h-full p-4 hover:bg-red-100/50 transition-colors cursor-default">
+                            <div className="w-full h-full p-4 hover:bg-red-100/50 transition-colors cursor-default text-center">
                                {m.criticalPoints ? (
                                  <p className="text-[9px] font-bold text-red-900 line-clamp-2 leading-tight">
                                    {m.criticalPoints}
                                  </p>
-                               ) : <span className="text-muted-foreground/20 font-black flex justify-center">—</span>}
+                               ) : <span className="text-muted-foreground/20 font-black flex justify-center">-</span>}
                             </div>
                           </TooltipTrigger>
                           {m.criticalPoints && (
