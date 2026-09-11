@@ -29,7 +29,8 @@ import {
   Activity,
   Plus,
   Check,
-  Users
+  Users,
+  LayoutGrid
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -146,9 +147,14 @@ export default function MeetingsListPage() {
           </h1>
           <p className="text-muted-foreground font-medium">Archived on-site review meetings and technical discussions.</p>
         </div>
-        <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-8">
-          <Link href="/meetings/start"><Plus className="mr-2 h-4 w-4" /> Start New Meeting</Link>
-        </Button>
+        <div className="flex gap-2">
+          <Button asChild variant="outline" className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
+            <Link href="/meetings/matrix"><LayoutGrid className="mr-2 h-4 w-4" /> Matrix View</Link>
+          </Button>
+          <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-8">
+            <Link href="/meetings/start"><Plus className="mr-2 h-4 w-4" /> Start New Meeting</Link>
+          </Button>
+        </div>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
@@ -194,7 +200,7 @@ export default function MeetingsListPage() {
               <div className="pt-2 border-t border-primary/5 flex justify-end gap-1">
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm"><Eye className="h-4 w-4" /></Button>
                 {(isAdmin || m.userId === user?.uid) && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}><Trash2 className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}><Trash2 className="h-4 w-4" /> </Button>
                 )}
               </div>
             </CardContent>
