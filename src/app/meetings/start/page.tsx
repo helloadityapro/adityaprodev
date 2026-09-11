@@ -25,7 +25,8 @@ import {
   X,
   History,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Plus
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -34,6 +35,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 
 const REVIEW_POINTS = [
   { id: 'mms', label: 'Module Mounting Structure' },
@@ -90,7 +92,7 @@ export default function StartMeetingPage() {
       orderBy('createdAt', 'desc')
     );
   }, [firestore, siteId]);
-  const { data: previousMeetings } = useCollection<any>(historicalMeetingsQuery);
+  const { data: previousMeetings, isLoading: isHistoryLoading } = useCollection<any>(historicalMeetingsQuery);
 
   const handleSaveMeeting = async () => {
     if (!user || !userProfile || !siteId) {
@@ -291,25 +293,36 @@ export default function StartMeetingPage() {
           </CardHeader>
           <CardContent className="p-0">
             <div className="divide-y">
-              {REVIEW_POINTS.map((point) => (
-                <div key={point.id} className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-start hover:bg-muted/[0.01] transition-colors">
-                  <div className="md:col-span-4 space-y-4">
-                    <Label className="text-xs font-black uppercase text-foreground pt-3 tracking-tight">{point.label}</Label>
-                    
-                    {/* Historical Context Section */}
-                    {(() => {
-                      if (!siteId) return null;
-                      
-                      const pointHistory = previousMeetings?.filter(m => m.observations && m.observations[point.id]) || [];
-                      const latest = pointHistory[0];
-                      const isExpanded = expandedHistory[point.id];
+              {REVIEW_POINTS.map((point) => {
+                const pointHistory = previousMeetings?.filter((m: any) => m.observations && m.observations[point.id]) || [];
+                const latest = pointHistory[0];
+                const isExpanded = expandedHistory[point.id];
 
-                      return (
-                        <div className="space-y-2 animate-in fade-in duration-500">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-[9px] font-black uppercase text-primary/40 tracking-widest flex items-center gap-1.5">
-                              <History className="h-3 w-3" /> Historical Context
-                            </Label>
+                return (
+                  <div key={point.id} className="p-4 sm:p-6 space-y-6 hover:bg-muted/[0.01] transition-colors group">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                      <div className="md:col-span-4 pt-3 text-left">
+                        <Label className="text-xs font-black uppercase text-foreground tracking-tight">{point.label}</Label>
+                      </div>
+                      
+                      <div className="md:col-span-8">
+                        <Textarea 
+                          placeholder="Enter status / observation..." 
+                          value={observations[point.id] || ""}
+                          onChange={(e) => setObservations({ ...observations, [point.id]: e.target.value })}
+                          className="rounded-sm bg-background border-primary/10 min-h-[100px] text-sm font-medium shadow-sm focus-visible:ring-primary/20"
+                        />
+                      </div>
+                    </div>
+
+                    {/* HISTORY SECTION - FULL WIDTH BELOW (AS INDICATED IN SCREENSHOT) */}
+                    {siteId && (
+                      <div className="space-y-3 animate-in fade-in duration-500 pt-2">
+                         <div className="flex items-center justify-between border-t border-dashed pt-4">
+                            <div className="flex items-center gap-2">
+                              <History className="h-3.5 w-3.5 text-primary opacity-40" />
+                              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Historical Context</Label>
+                            </div>
                             {pointHistory.length > 1 && (
                               <Button 
                                 type="button" 
@@ -318,61 +331,52 @@ export default function StartMeetingPage() {
                                 className="h-auto p-0 text-[10px] font-bold uppercase tracking-tight text-primary/60 hover:text-primary"
                                 onClick={() => setExpandedHistory(prev => ({...prev, [point.id]: !isExpanded}))}
                               >
-                                {isExpanded ? "Show Less" : `View All (${pointHistory.length})`}
+                                {isExpanded ? "Collapse History" : `Expand Audit Trail (${pointHistory.length})`}
                               </Button>
                             )}
-                          </div>
+                         </div>
 
-                          <div className="space-y-2">
-                            {pointHistory.length > 0 ? (
-                              <>
-                                {/* Show Latest or Full List */}
-                                {!isExpanded ? (
-                                  <div className="p-3 rounded-sm bg-muted/20 border border-border/50 text-[11px] italic text-muted-foreground shadow-inner">
-                                    <div className="flex justify-between items-center mb-1">
-                                      <span className="font-bold text-[8px] uppercase not-italic text-foreground/40">{latest.userName}</span>
-                                      <span className="font-mono text-[8px] not-italic opacity-50">{latest.date}</span>
-                                    </div>
-                                    "{latest.observations[point.id]}"
-                                  </div>
-                                ) : (
-                                  <div className="space-y-2 animate-in slide-in-from-top-1 duration-300">
-                                    {pointHistory.map((h, hIdx) => (
-                                      <div key={h.id} className={cn(
-                                        "p-3 rounded-sm border text-[11px] italic",
-                                        hIdx === 0 ? "bg-primary/5 border-primary/10 text-primary/80" : "bg-muted/10 border-border/40 text-muted-foreground"
-                                      )}>
-                                        <div className="flex justify-between items-center mb-1">
-                                          <span className="font-bold text-[8px] uppercase not-italic text-foreground/40">{h.userName}</span>
-                                          <span className="font-mono text-[8px] not-italic opacity-50">{h.date}</span>
-                                        </div>
-                                        "{h.observations[point.id]}"
+                         <div className="space-y-2">
+                            {isHistoryLoading ? (
+                               <Skeleton className="h-14 w-full bg-muted/20 rounded-sm" />
+                            ) : pointHistory.length > 0 ? (
+                               <>
+                                 {!isExpanded ? (
+                                   <div className="p-4 rounded-sm bg-muted/20 border border-border/50 text-[11px] italic text-muted-foreground shadow-inner text-left">
+                                      <div className="flex justify-between items-center mb-1.5">
+                                        <span className="font-black text-[9px] uppercase not-italic text-foreground/40">{latest.userName}</span>
+                                        <span className="font-mono text-[9px] not-italic opacity-50">{latest.date}</span>
                                       </div>
-                                    ))}
-                                  </div>
-                                )}
-                              </>
+                                      <p className="leading-relaxed whitespace-pre-wrap">"{latest.observations[point.id]}"</p>
+                                   </div>
+                                 ) : (
+                                   <div className="space-y-2 animate-in slide-in-from-top-1 duration-300">
+                                      {pointHistory.map((h, hIdx) => (
+                                        <div key={h.id} className={cn(
+                                          "p-4 rounded-sm border text-[11px] italic text-left",
+                                          hIdx === 0 ? "bg-primary/5 border-primary/10 text-primary/80" : "bg-muted/10 border-border/40 text-muted-foreground"
+                                        )}>
+                                          <div className="flex justify-between items-center mb-1.5">
+                                            <span className="font-black text-[9px] uppercase not-italic text-foreground/40">{h.userName}</span>
+                                            <span className="font-mono text-[9px] not-italic opacity-50">{h.date}</span>
+                                          </div>
+                                          <p className="leading-relaxed whitespace-pre-wrap">"{h.observations[point.id]}"</p>
+                                        </div>
+                                      ))}
+                                   </div>
+                                 )}
+                               </>
                             ) : (
-                              <div className="p-3 rounded-sm bg-muted/5 border border-dashed text-[10px] text-muted-foreground/30 italic text-center uppercase font-bold tracking-tighter">
-                                No previous history
-                              </div>
+                               <div className="p-4 rounded-sm bg-muted/5 border border-dashed text-[10px] text-muted-foreground/30 italic text-center uppercase font-bold tracking-tighter">
+                                  No previous history discovered for this point.
+                               </div>
                             )}
-                          </div>
-                        </div>
-                      );
-                    })()}
+                         </div>
+                      </div>
+                    )}
                   </div>
-                  
-                  <div className="md:col-span-8">
-                    <Textarea 
-                      placeholder="Enter status / observation..." 
-                      value={observations[point.id] || ""}
-                      onChange={(e) => setObservations({ ...observations, [point.id]: e.target.value })}
-                      className="rounded-sm bg-background border-primary/10 min-h-[100px] text-sm font-medium shadow-sm focus-visible:ring-primary/20"
-                    />
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </CardContent>
         </Card>
