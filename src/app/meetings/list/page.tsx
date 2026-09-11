@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -73,6 +72,7 @@ const REVIEW_POINTS = [
   { id: 'poleStructure', label: 'Four Pole/Two Pole Structure' },
   { id: 'modules', label: 'Modules' },
   { id: 'htLine', label: 'HT Line' },
+  { id: 'others', label: 'Others' },
 ];
 
 export default function MeetingsListPage() {
@@ -140,20 +140,22 @@ export default function MeetingsListPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="flex items-center gap-2 text-primary font-black uppercase tracking-tight">
-            <Mic className="h-8 w-8" /> Meetings Registry
-          </h1>
-          <p className="text-muted-foreground font-medium">Archived on-site review meetings and technical discussions.</p>
-        </div>
-        <div className="flex gap-2">
-          <Button asChild variant="outline" className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
-            <Link href="/meetings/matrix"><LayoutGrid className="mr-2 h-4 w-4" /> Matrix View</Link>
-          </Button>
-          <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-8">
-            <Link href="/meetings/start"><Plus className="mr-2 h-4 w-4" /> Start New Meeting</Link>
-          </Button>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div className="flex flex-col gap-1">
+            <h1 className="flex items-center gap-2 text-primary font-black uppercase tracking-tight">
+              <Mic className="h-8 w-8" /> Meetings Registry
+            </h1>
+            <p className="text-muted-foreground font-medium">Archived on-site review meetings and technical discussions.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button asChild variant="outline" className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-6">
+              <Link href="/meetings/matrix"><LayoutGrid className="mr-2 h-4 w-4" /> Matrix View</Link>
+            </Button>
+            <Button asChild className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-md px-8">
+              <Link href="/meetings/start"><Plus className="mr-2 h-4 w-4" /> Start New Meeting</Link>
+            </Button>
+          </div>
         </div>
       </div>
 

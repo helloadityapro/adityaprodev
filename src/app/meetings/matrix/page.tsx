@@ -68,6 +68,7 @@ const REVIEW_POINTS = [
   { id: 'poleStructure', label: 'Four Pole/Two Pole Structure' },
   { id: 'modules', label: 'Modules' },
   { id: 'htLine', label: 'HT Line' },
+  { id: 'others', label: 'Others' },
 ];
 
 type Meeting = {
@@ -122,7 +123,7 @@ export default function MeetingsMatrixPage() {
     });
   }, [meetings]);
 
-  // Extract unique custom point labels from all visible meetings
+  // Extract unique custom point labels from all visible meetings (for legacy data)
   const allCustomPointLabels = React.useMemo(() => {
     const labels = new Set<string>();
     sortedMeetings.forEach(m => {
@@ -149,7 +150,7 @@ export default function MeetingsMatrixPage() {
 
     if (allCustomPointLabels.length > 0) {
       allCustomPointLabels.forEach(label => {
-        const row: any = { 'Observation Point': `Custom: ${label}` };
+        const row: any = { 'Observation Point': `Custom Archive: ${label}` };
         sortedMeetings.forEach(m => {
           const cp = m.customPoints?.find(p => p.label === label);
           row[m.date] = cp ? cp.value : '-';
@@ -251,7 +252,7 @@ export default function MeetingsMatrixPage() {
           <div className="min-w-full">
             <TooltipProvider delayDuration={0}>
               <Table className="border-separate border-spacing-0 table-fixed w-full text-[10px]">
-                <TableHeader className="sticky top-0 z-20 shadow-sm">
+                <TableHeader className="sticky top-0 z-40">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[220px] font-black uppercase tracking-widest bg-primary text-white sticky left-0 top-0 z-30 px-4 py-4 border-r border-white/10">Observation Point</TableHead>
                     {sortedMeetings.map((m) => (
@@ -309,12 +310,12 @@ export default function MeetingsMatrixPage() {
                     </TableRow>
                   ))}
 
-                  {/* CUSTOM POINTS SECTION */}
+                  {/* CUSTOM POINTS SECTION - LEGACY ARCHIVE */}
                   {allCustomPointLabels.length > 0 && (
                     <>
                       <TableRow className="bg-muted/10">
                         <TableCell colSpan={sortedMeetings.length + 1} className="px-4 py-2 font-black uppercase text-[9px] tracking-[0.25em] text-muted-foreground border-b">
-                           Supplementary Site Observations
+                           Historical Custom Observations
                         </TableCell>
                       </TableRow>
                       {allCustomPointLabels.map((label) => (
@@ -358,7 +359,7 @@ export default function MeetingsMatrixPage() {
                   <TableRow className="bg-red-50/50">
                     <TableCell className="sticky left-0 z-10 px-4 py-8 font-black text-xs text-red-700 uppercase border-r border-b bg-red-50/90 shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                       <div className="flex items-center gap-2">
-                         <ShieldAlert className="h-4 w-4" />
+                         <ShieldAlert className="h-3.5 w-3.5" />
                          Critical Points
                       </div>
                     </TableCell>
@@ -401,17 +402,13 @@ export default function MeetingsMatrixPage() {
               <span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">Standard Indicators</span>
            </div>
            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-amber-400" />
-              <span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">Custom Points</span>
-           </div>
-           <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-red-600" />
               <span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">Critical Findings</span>
            </div>
            <Separator orientation="vertical" className="h-4 hidden sm:block" />
            <div className="flex items-center gap-2">
               <Info className="h-3.5 w-3.5 text-primary opacity-50" />
-              <span className="text-[10px] font-bold text-muted-foreground italic leading-none">Hover cell to expand observation narrative</span>
+              <span className="text-[10px] font-bold text-muted-foreground italic leading-none">Hover cell to view detailed notes</span>
            </div>
         </div>
       </Card>

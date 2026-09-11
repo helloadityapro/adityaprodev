@@ -1,10 +1,9 @@
-
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from '@/firebase';
-import { collection, doc, serverTimestamp, query } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +11,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
   Save, 
-  Plus, 
   Building2, 
   CheckCircle2, 
   Loader2, 
@@ -22,7 +20,6 @@ import {
   ChevronsUpDown,
   Check,
   ListChecks,
-  Trash2,
   Users,
   User,
   X
@@ -48,6 +45,7 @@ const REVIEW_POINTS = [
   { id: 'poleStructure', label: 'Four Pole/Two Pole Structure' },
   { id: 'modules', label: 'Modules' },
   { id: 'htLine', label: 'HT Line' },
+  { id: 'others', label: 'Others' },
 ];
 
 export default function StartMeetingPage() {
@@ -65,7 +63,6 @@ export default function StartMeetingPage() {
   const [attendeeSearch, setAttendeeSearch] = React.useState("");
 
   const [observations, setObservations] = React.useState<Record<string, string>>({});
-  const [customPoints, setCustomPoints] = React.useState<{ id: string, label: string, value: string }[]>([]);
   const [criticalPoints, setCriticalPoints] = React.useState("");
   
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -80,19 +77,6 @@ export default function StartMeetingPage() {
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<any>(usersQuery);
 
-  const addCustomPoint = () => {
-    const id = `custom_${Date.now()}`;
-    setCustomPoints([...customPoints, { id, label: '', value: '' }]);
-  };
-
-  const updateCustomPoint = (id: string, field: 'label' | 'value', val: string) => {
-    setCustomPoints(customPoints.map(p => p.id === id ? { ...p, [field]: val } : p));
-  };
-
-  const removeCustomPoint = (id: string) => {
-    setCustomPoints(customPoints.filter(p => p.id !== id));
-  };
-
   const handleSaveMeeting = async () => {
     if (!user || !userProfile || !siteId) {
       toast({ variant: 'destructive', title: 'Site Required', description: 'Please select a project site.' });
@@ -106,7 +90,7 @@ export default function StartMeetingPage() {
         siteName,
         date: format(new Date(), 'yyyy-MM-dd HH:mm'),
         observations,
-        customPoints,
+        customPoints: [], // Maintained for legacy compatibility
         criticalPoints,
         attendees,
         recordingUrl: "", 
@@ -258,7 +242,7 @@ export default function StartMeetingPage() {
                             <Checkbox checked={isSelected} className="rounded-[4px]" />
                             <div className="flex flex-col min-w-0">
                               <span className={cn("text-xs font-bold truncate transition-colors", isSelected ? "text-primary" : "text-foreground")}>{u.username}</span>
-                              <span className="text-[9px] text-muted-foreground uppercase font-black tracking-tighter opacity-60">{u.role}</span>
+                              <span className="text-[8px] text-muted-foreground uppercase font-black tracking-tighter opacity-60">{u.role}</span>
                             </div>
                           </div>
                         );
@@ -305,38 +289,6 @@ export default function StartMeetingPage() {
                   </div>
                 </div>
               ))}
-
-              {/* Custom Points */}
-              {customPoints.map((point) => (
-                <div key={point.id} className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-start bg-primary/[0.01] animate-in slide-in-from-top-2">
-                  <div className="md:col-span-4 space-y-2">
-                    <div className="flex items-center gap-2">
-                      <Input 
-                        placeholder="Point Label..." 
-                        value={point.label}
-                        onChange={(e) => updateCustomPoint(point.id, 'label', e.target.value)}
-                        className="h-8 text-[10px] font-black uppercase tracking-widest border-primary/20 rounded-sm"
-                      />
-                      <Button variant="ghost" size="icon" className="h-6 w-6 text-destructive shrink-0" onClick={() => removeCustomPoint(point.id)}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </div>
-                  <div className="md:col-span-8">
-                    <Textarea 
-                      placeholder="Details..." 
-                      value={point.value}
-                      onChange={(e) => updateCustomPoint(point.id, 'value', e.target.value)}
-                      className="rounded-sm bg-background border-primary/10 min-h-[60px] text-xs"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="p-6 bg-muted/5 border-t">
-              <Button variant="outline" onClick={addCustomPoint} className="w-full border-dashed rounded-sm font-bold text-primary border-primary/30 h-11">
-                <Plus className="h-4 w-4 mr-2" /> Add Custom Review Point
-              </Button>
             </div>
           </CardContent>
         </Card>
