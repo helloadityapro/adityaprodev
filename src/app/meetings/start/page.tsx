@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, useCollection } from '@/firebase';
-import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
+import { collection, doc, serverTimestamp, query, where, getDocs, orderBy } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,7 +22,10 @@ import {
   ListChecks,
   Users,
   User,
-  X
+  X,
+  History,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -67,6 +70,7 @@ export default function StartMeetingPage() {
   
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
+  const [expandedHistory, setExpandedHistory] = React.useState<Record<string, boolean>>({});
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -76,6 +80,17 @@ export default function StartMeetingPage() {
 
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<any>(usersQuery);
+
+  // Fetch historical meetings for the selected site to provide context
+  const historicalMeetingsQuery = useMemoFirebase(() => {
+    if (!siteId) return null;
+    return query(
+      collection(firestore, 'meetings'),
+      where('siteId', '==', siteId),
+      orderBy('createdAt', 'desc')
+    );
+  }, [firestore, siteId]);
+  const { data: previousMeetings } = useCollection<any>(historicalMeetingsQuery);
 
   const handleSaveMeeting = async () => {
     if (!user || !userProfile || !siteId) {
@@ -257,7 +272,7 @@ export default function StartMeetingPage() {
               <div className="flex flex-wrap gap-2 pt-2">
                 {attendees.map(a => (
                   <Badge key={a.id} variant="secondary" className="pl-2 pr-1 h-7 rounded-sm gap-1.5 flex items-center font-bold text-[10px] bg-primary/5 text-primary border border-primary/10">
-                    <User className="h-3 w-3" />
+                    <User className="h-3 w-3 text-primary/40" />
                     <span className="truncate max-w-[120px]">{a.name}</span>
                     <X className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" onClick={(e) => { e.stopPropagation(); setAttendees(prev => prev.filter(x => x.id !== a.id)); }} />
                   </Badge>
@@ -278,13 +293,82 @@ export default function StartMeetingPage() {
             <div className="divide-y">
               {REVIEW_POINTS.map((point) => (
                 <div key={point.id} className="p-4 sm:p-6 grid grid-cols-1 md:grid-cols-12 gap-4 items-start hover:bg-muted/[0.01] transition-colors">
-                  <Label className="md:col-span-4 text-xs font-black uppercase text-foreground pt-3 tracking-tight">{point.label}</Label>
+                  <div className="md:col-span-4 space-y-4">
+                    <Label className="text-xs font-black uppercase text-foreground pt-3 tracking-tight">{point.label}</Label>
+                    
+                    {/* Historical Context Section */}
+                    {(() => {
+                      if (!siteId) return null;
+                      
+                      const pointHistory = previousMeetings?.filter(m => m.observations && m.observations[point.id]) || [];
+                      const latest = pointHistory[0];
+                      const isExpanded = expandedHistory[point.id];
+
+                      return (
+                        <div className="space-y-2 animate-in fade-in duration-500">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-[9px] font-black uppercase text-primary/40 tracking-widest flex items-center gap-1.5">
+                              <History className="h-3 w-3" /> Historical Context
+                            </Label>
+                            {pointHistory.length > 1 && (
+                              <Button 
+                                type="button" 
+                                variant="link" 
+                                size="sm" 
+                                className="h-auto p-0 text-[10px] font-bold uppercase tracking-tight text-primary/60 hover:text-primary"
+                                onClick={() => setExpandedHistory(prev => ({...prev, [point.id]: !isExpanded}))}
+                              >
+                                {isExpanded ? "Show Less" : `View All (${pointHistory.length})`}
+                              </Button>
+                            )}
+                          </div>
+
+                          <div className="space-y-2">
+                            {pointHistory.length > 0 ? (
+                              <>
+                                {/* Show Latest or Full List */}
+                                {!isExpanded ? (
+                                  <div className="p-3 rounded-sm bg-muted/20 border border-border/50 text-[11px] italic text-muted-foreground shadow-inner">
+                                    <div className="flex justify-between items-center mb-1">
+                                      <span className="font-bold text-[8px] uppercase not-italic text-foreground/40">{latest.userName}</span>
+                                      <span className="font-mono text-[8px] not-italic opacity-50">{latest.date}</span>
+                                    </div>
+                                    "{latest.observations[point.id]}"
+                                  </div>
+                                ) : (
+                                  <div className="space-y-2 animate-in slide-in-from-top-1 duration-300">
+                                    {pointHistory.map((h, hIdx) => (
+                                      <div key={h.id} className={cn(
+                                        "p-3 rounded-sm border text-[11px] italic",
+                                        hIdx === 0 ? "bg-primary/5 border-primary/10 text-primary/80" : "bg-muted/10 border-border/40 text-muted-foreground"
+                                      )}>
+                                        <div className="flex justify-between items-center mb-1">
+                                          <span className="font-bold text-[8px] uppercase not-italic text-foreground/40">{h.userName}</span>
+                                          <span className="font-mono text-[8px] not-italic opacity-50">{h.date}</span>
+                                        </div>
+                                        "{h.observations[point.id]}"
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <div className="p-3 rounded-sm bg-muted/5 border border-dashed text-[10px] text-muted-foreground/30 italic text-center uppercase font-bold tracking-tighter">
+                                No previous history
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  
                   <div className="md:col-span-8">
                     <Textarea 
-                      placeholder="Status / Observation..." 
+                      placeholder="Enter status / observation..." 
                       value={observations[point.id] || ""}
                       onChange={(e) => setObservations({ ...observations, [point.id]: e.target.value })}
-                      className="rounded-sm bg-muted/5 border-primary/5 min-h-[60px] text-xs font-medium"
+                      className="rounded-sm bg-background border-primary/10 min-h-[100px] text-sm font-medium shadow-sm focus-visible:ring-primary/20"
                     />
                   </div>
                 </div>
