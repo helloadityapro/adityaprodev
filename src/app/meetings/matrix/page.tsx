@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy, doc, limit, where } from 'firebase/firestore';
+import { collection, query, doc, limit, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -12,32 +12,23 @@ import {
   ArrowLeft, 
   LayoutGrid, 
   FileDown, 
-  Check, 
-  X, 
-  Zap,
-  ImageIcon,
-  Maximize2,
-  Minimize2,
-  ZoomIn,
-  ZoomOut,
-  RotateCcw,
-  ChevronLeft,
-  ChevronRight,
-  RotateCw,
-  Search,
-  Building2,
-  Calendar,
-  CheckCircle2,
-  XCircle,
-  ChevronsUpDown,
-  ShieldAlert,
-  Info,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  Plus,
-  Globe,
-  FilterX
+  Maximize2, 
+  Minimize2, 
+  ChevronLeft, 
+  ChevronRight, 
+  Search, 
+  Building2, 
+  Calendar, 
+  ChevronsUpDown, 
+  ShieldAlert, 
+  ArrowUp, 
+  ArrowDown, 
+  ArrowUpDown, 
+  Globe, 
+  FilterX,
+  History,
+  Check,
+  Info
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -64,19 +55,23 @@ import {
 } from "@/components/ui/select";
 
 const REVIEW_POINTS = [
-  { id: 'mms', label: 'Module Mounting Structure' },
-  { id: 'mcr', label: 'Main Control Room' },
-  { id: 'earthing', label: 'Earthing' },
-  { id: 'acCable', label: 'AC Cable' },
-  { id: 'dcCable', label: 'DC Cable' },
-  { id: 'stringInverter', label: 'String Inverter' },
-  { id: 'ltPanel', label: 'LT Panel' },
-  { id: 'transformer', label: 'Transformer' },
-  { id: 'rmuVcb', label: 'RMU/VCB' },
-  { id: 'poleStructure', label: 'Four Pole/Two Pole Structure' },
-  { id: 'modules', label: 'Modules' },
-  { id: 'htLine', label: 'HT Line' },
-  { id: 'others', label: 'Others' },
+  { id: 'mms_civil', label: 'MMS Civil-work', category: 'MMS & MODULES' },
+  { id: 'mms_install', label: 'MMS Installation', category: 'MMS & MODULES' },
+  { id: 'module_install', label: 'Modules Installation', category: 'MMS & MODULES' },
+  { id: 'earthing_laying', label: 'Laying & Termination', category: 'EARTHING' },
+  { id: 'dc_block_laying', label: 'Trenches, Laying & Termination', category: 'DC BLOCK' },
+  { id: 'ac_block_laying', label: 'Trenches, Laying & Termination', category: 'AC BLOCK' },
+  { id: 'inverter_install', label: 'Frame erection, Installation and Termination', category: 'INVERTERS' },
+  { id: 'others', label: 'Others', category: 'OTHERS' },
+];
+
+const CATEGORIES = [
+  "MMS & MODULES",
+  "EARTHING",
+  "DC BLOCK",
+  "AC BLOCK",
+  "INVERTERS",
+  "OTHERS"
 ];
 
 type Meeting = {
@@ -145,7 +140,7 @@ export default function MeetingsMatrixPage() {
     }).sort((a, b) => {
         const da = a.createdAt?.toDate?.()?.getTime() || new Date(a.date).getTime();
         const db = b.createdAt?.toDate?.()?.getTime() || new Date(b.date).getTime();
-        return da - db; // Ascending order for matrix columns
+        return da - db;
     });
   }, [meetings, queryDateRange]);
 
@@ -160,17 +155,15 @@ export default function MeetingsMatrixPage() {
     if (sortedMeetings.length === 0) return;
 
     const workbook = XLSX.utils.book_new();
-    
-    // Row mapping logic for export
     const exportData = REVIEW_POINTS.map(point => {
-      const row: any = { 'Observation Point': point.label };
+      const row: any = { 'Category': point.category, 'Observation Point': point.label };
       sortedMeetings.forEach(m => {
         row[m.date] = m.observations[point.id] || '-';
       });
       return row;
     });
 
-    const criticalRow: any = { 'Observation Point': 'CRITICAL POINTS' };
+    const criticalRow: any = { 'Category': 'GENERAL', 'Observation Point': 'CRITICAL POINTS' };
     sortedMeetings.forEach(m => {
       criticalRow[m.date] = m.criticalPoints || '-';
     });
@@ -179,6 +172,18 @@ export default function MeetingsMatrixPage() {
     const ws = XLSX.utils.json_to_sheet(exportData);
     XLSX.utils.book_append_sheet(workbook, ws, "Meetings Matrix");
     XLSX.writeFile(workbook, `Meetings_Matrix_${selectedSiteId}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
+  };
+
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary shrink-0" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
   };
 
   if (isProfileLoading || sitesLoading || meetingsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
@@ -284,72 +289,75 @@ export default function MeetingsMatrixPage() {
                         <div className="flex flex-col items-center gap-1">
                           <span className="text-[10px] font-mono">{m.date.split(' ')[0]}</span>
                           <span className="text-[8px] opacity-80">{m.date.split(' ')[1] || ''}</span>
-                          {selectedSiteId === 'all' && (
-                            <div className="mt-1 px-2 py-0.5 bg-white/20 rounded-sm w-full">
-                               <span className="text-[7px] block truncate uppercase tracking-tighter" title={m.siteName}>{m.siteName}</span>
-                            </div>
-                          )}
                         </div>
                       </TableHead>
                     ))}
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {/* STANDARD POINTS */}
-                  {REVIEW_POINTS.map((point) => (
-                    <TableRow key={point.id} className="hover:bg-primary/[0.02] transition-colors group">
-                      <TableCell className="px-4 py-4 font-black text-[11px] border-r border-b bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] uppercase tracking-tight">
-                        {point.label}
-                      </TableCell>
-                      {sortedMeetings.map((m) => {
-                        const observation = m.observations[point.id];
-                        const cellId = `${m.id}-${point.id}`;
-                        const isExpanded = expandedCells.has(cellId);
-                        
-                        return (
-                          <TableCell key={cellId} className="text-center border-r border-b p-0 group align-top">
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <div className="w-full h-full flex flex-col p-4 cursor-default hover:bg-muted/10 transition-colors font-medium text-left relative min-h-[60px]">
-                                  {observation ? (
-                                    <div className="space-y-2">
-                                      <p className={cn(
-                                        "text-[10px] text-foreground leading-relaxed font-bold break-words",
-                                        !isExpanded && "line-clamp-2"
-                                      )}>
-                                        {observation}
-                                      </p>
-                                      {observation.length > 30 && (
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                          onClick={(e) => { e.stopPropagation(); toggleCell(cellId); }}
-                                        >
-                                          {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-                                        </Button>
-                                      )}
-                                    </div>
-                                  ) : <span className="text-muted-foreground/20 font-black text-center w-full block">-</span>}
-                                </div>
-                              </TooltipTrigger>
-                              {observation && (
-                                <TooltipContent side="top" className="p-4 border-none shadow-2xl bg-slate-900 text-white rounded-sm max-w-[280px]">
-                                   <div className="space-y-2">
-                                      <p className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-white/10 pb-1.5">{point.label}</p>
-                                      <p className="text-xs leading-relaxed italic font-medium">"{observation}"</p>
-                                      <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[8px] font-bold text-white/40 uppercase">
-                                         <span>Log By: {m.userName}</span>
-                                         <span className="font-mono">{m.date}</span>
-                                      </div>
-                                   </div>
-                                </TooltipContent>
-                              )}
-                            </Tooltip>
+                  {CATEGORIES.map(category => (
+                    <React.Fragment key={category}>
+                      <TableRow className="bg-muted/50">
+                        <TableCell colSpan={sortedMeetings.length + 1} className="px-4 py-2 font-black text-[9px] uppercase tracking-[0.2em] text-primary border-b border-r">
+                           {category}
+                        </TableCell>
+                      </TableRow>
+                      {REVIEW_POINTS.filter(p => p.category === category).map((point) => (
+                        <TableRow key={point.id} className="hover:bg-primary/[0.02] transition-colors group">
+                          <TableCell className="px-6 py-4 font-bold text-[11px] border-r border-b bg-background sticky left-0 z-10 shadow-[2px_0_5px_rgba(0,0,0,0.02)] uppercase tracking-tight">
+                            {point.label}
                           </TableCell>
-                        );
-                      })}
-                    </TableRow>
+                          {sortedMeetings.map((m) => {
+                            const observation = m.observations[point.id];
+                            const cellId = `${m.id}-${point.id}`;
+                            const isExpanded = expandedCells.has(cellId);
+                            
+                            return (
+                              <TableCell key={cellId} className="text-center border-r border-b p-0 group align-top">
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <div className="w-full h-full flex flex-col p-4 cursor-default hover:bg-muted/10 transition-colors font-medium text-left relative min-h-[60px]">
+                                      {observation ? (
+                                        <div className="space-y-2">
+                                          <p className={cn(
+                                            "text-[10px] text-foreground leading-relaxed font-bold break-words",
+                                            !isExpanded && "line-clamp-2"
+                                          )}>
+                                            {observation}
+                                          </p>
+                                          {observation.length > 30 && (
+                                            <Button 
+                                              variant="ghost" 
+                                              size="icon" 
+                                              className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                                              onClick={(e) => { e.stopPropagation(); toggleCell(cellId); }}
+                                            >
+                                              {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
+                                            </Button>
+                                          )}
+                                        </div>
+                                      ) : <span className="text-muted-foreground/20 font-black text-center w-full block">-</span>}
+                                    </div>
+                                  </TooltipTrigger>
+                                  {observation && (
+                                    <TooltipContent side="top" className="p-4 border-none shadow-2xl bg-slate-900 text-white rounded-sm max-w-[280px]">
+                                       <div className="space-y-2">
+                                          <p className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-white/10 pb-1.5">{point.label}</p>
+                                          <p className="text-xs leading-relaxed italic font-medium">"{observation}"</p>
+                                          <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[8px] font-bold text-white/40 uppercase">
+                                             <span>Log By: {m.userName}</span>
+                                             <span className="font-mono">{m.date}</span>
+                                          </div>
+                                       </div>
+                                    </TooltipContent>
+                                  )}
+                                </Tooltip>
+                              </TableCell>
+                            );
+                          })}
+                        </TableRow>
+                      ))}
+                    </React.Fragment>
                   ))}
                   
                   {/* CRITICAL POINTS ROW */}

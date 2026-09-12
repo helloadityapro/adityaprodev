@@ -60,19 +60,23 @@ type Meeting = {
 type SortKey = 'date' | 'site' | 'personnel';
 
 const REVIEW_POINTS = [
-  { id: 'mms', label: 'Module Mounting Structure' },
-  { id: 'mcr', label: 'Main Control Room' },
-  { id: 'earthing', label: 'Earthing' },
-  { id: 'acCable', label: 'AC Cable' },
-  { id: 'dcCable', label: 'DC Cable' },
-  { id: 'stringInverter', label: 'String Inverter' },
-  { id: 'ltPanel', label: 'LT Panel' },
-  { id: 'transformer', label: 'Transformer' },
-  { id: 'rmuVcb', label: 'RMU/VCB' },
-  { id: 'poleStructure', label: 'Four Pole/Two Pole Structure' },
-  { id: 'modules', label: 'Modules' },
-  { id: 'htLine', label: 'HT Line' },
-  { id: 'others', label: 'Others' },
+  { id: 'mms_civil', label: 'MMS Civil-work', category: 'MMS & MODULES' },
+  { id: 'mms_install', label: 'MMS Installation', category: 'MMS & MODULES' },
+  { id: 'module_install', label: 'Modules Installation', category: 'MMS & MODULES' },
+  { id: 'earthing_laying', label: 'Laying & Termination', category: 'EARTHING' },
+  { id: 'dc_block_laying', label: 'Trenches, Laying & Termination', category: 'DC BLOCK' },
+  { id: 'ac_block_laying', label: 'Trenches, Laying & Termination', category: 'AC BLOCK' },
+  { id: 'inverter_install', label: 'Frame erection, Installation and Termination', category: 'INVERTERS' },
+  { id: 'others', label: 'Others', category: 'OTHERS' },
+];
+
+const CATEGORIES = [
+  "MMS & MODULES",
+  "EARTHING",
+  "DC BLOCK",
+  "AC BLOCK",
+  "INVERTERS",
+  "OTHERS"
 ];
 
 export default function MeetingsListPage() {
@@ -159,7 +163,7 @@ export default function MeetingsListPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -187,7 +191,7 @@ export default function MeetingsListPage() {
               <div className="flex justify-between items-start">
                 <div className="flex flex-col gap-1">
                   <span className="text-[10px] font-mono font-black text-primary uppercase">{m.date}</span>
-                  <h3 className="font-bold text-sm text-foreground leading-tight">{m.siteName}</h3>
+                  <h3 className="font-bold text-sm leading-tight text-foreground">{m.siteName}</h3>
                 </div>
                 {m.recordingUrl && <Badge variant="secondary" className="h-5 px-1.5 bg-primary/10 text-primary border-none"><Volume2 className="h-3 w-3" /></Badge>}
               </div>
@@ -324,39 +328,29 @@ export default function MeetingsListPage() {
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                     <History className="h-4 w-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-widest text-primary">Standard Review Protocol</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-primary">Technical Review Protocol</h3>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {REVIEW_POINTS.map(p => (
-                      <div key={p.id} className="p-4 border rounded-sm bg-muted/5 space-y-2 group hover:bg-primary/[0.01] transition-all">
-                        <div className="flex items-center gap-2 text-[9px] font-black uppercase text-muted-foreground/60">
-                           <Check className="h-3 w-3 text-primary opacity-30 group-hover:opacity-100" />
-                           {p.label}
+                  <div className="space-y-8">
+                    {CATEGORIES.map(category => (
+                      <div key={category} className="space-y-4">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-primary/60">{category}</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          {REVIEW_POINTS.filter(p => p.category === category).map(p => (
+                            <div key={p.id} className="p-4 border rounded-sm bg-muted/5 space-y-2 group hover:bg-primary/[0.01] transition-all">
+                              <div className="flex items-center gap-2 text-[9px] font-black uppercase text-muted-foreground/60">
+                                 <Check className="h-3 w-3 text-primary opacity-30 group-hover:opacity-100" />
+                                 {p.label}
+                              </div>
+                              <p className="text-xs font-medium leading-relaxed italic text-foreground/80">
+                                {viewingMeeting.observations[p.id] ? `"${viewingMeeting.observations[p.id]}"` : "No specific observations logged."}
+                              </p>
+                            </div>
+                          ))}
                         </div>
-                        <p className="text-xs font-medium leading-relaxed italic text-foreground/80">
-                          {viewingMeeting.observations[p.id] ? `"${viewingMeeting.observations[p.id]}"` : "No specific observations logged."}
-                        </p>
                       </div>
                     ))}
                   </div>
                 </div>
-
-                {viewingMeeting.customPoints && viewingMeeting.customPoints.length > 0 && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
-                      <Plus className="h-4 w-4 text-primary" />
-                      <h3 className="text-xs font-black uppercase tracking-widest text-primary">Custom Agenda Points</h3>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {viewingMeeting.customPoints.map((p, idx) => (
-                        <div key={idx} className="p-4 border rounded-sm bg-muted/5 space-y-2">
-                          <Label className="text-[9px] font-black uppercase text-primary/70">{p.label || `Point ${idx + 1}`}</Label>
-                          <p className="text-xs font-medium italic leading-relaxed">"{p.value}"</p>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
 
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 border-b-2 border-red-500/20 pb-2">
