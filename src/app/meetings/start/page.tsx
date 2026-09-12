@@ -19,7 +19,7 @@ import {
   Search,
   ChevronsUpDown,
   Check,
-  ListChecks,
+  NotebookPen,
   Users,
   User,
   X,
@@ -165,7 +165,7 @@ export default function StartMeetingPage() {
               View Meetings Data
             </Button>
             <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase text-muted-foreground" onClick={() => router.push("/dashboard")}>
-              Return to Dashboard
+              Go to Dashboard
             </Button>
           </CardFooter>
         </Card>
@@ -180,7 +180,7 @@ export default function StartMeetingPage() {
           <ArrowLeft className="h-4 w-4" /> Back
         </button>
         <h1 className="flex items-center gap-3 text-2xl md:text-3xl font-black uppercase tracking-tight">
-          <div className="bg-primary/10 p-2 rounded-sm"><ListChecks className="h-6 w-6 text-primary" /></div>
+          <div className="bg-primary/10 p-2 rounded-sm"><NotebookPen className="h-6 w-6 text-primary" /></div>
           Start Review Meeting
         </h1>
         <p className="text-muted-foreground text-sm font-medium">Document site progress and record collaborative discussions.</p>
@@ -303,7 +303,7 @@ export default function StartMeetingPage() {
             {attendees.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-2">
                 {attendees.map(a => (
-                  <Badge key={a.id} variant="secondary" className="pl-2 pr-1 h-7 rounded-sm gap-1.5 flex items-center font-bold text-[10px] bg-primary/5 text-primary border border-primary/10">
+                  <Badge key={a.id} variant="secondary" className="pl-2.5 pr-1 h-7 rounded-sm gap-1.5 flex items-center font-bold text-[10px] bg-primary/5 text-primary border border-primary/10">
                     <User className="h-3 w-3 text-primary/40" />
                     <span className="truncate max-w-[120px]">{a.name}</span>
                     <X className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" onClick={(e) => { e.stopPropagation(); setAttendees(prev => prev.filter(x => x.id !== a.id)); }} />
@@ -317,7 +317,7 @@ export default function StartMeetingPage() {
         <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
           <CardHeader className="bg-primary/5 border-b py-4">
             <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-              <ListChecks className="h-4 w-4 text-primary" /> Technical Review Points
+              <NotebookPen className="h-4 w-4 text-primary" /> Technical Review Points
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">

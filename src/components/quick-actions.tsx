@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import * as React from 'react';
@@ -24,7 +22,7 @@ import {
   Navigation,
   Fuel,
   ClipboardList,
-  Mic
+  NotebookPen
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion } from 'framer-motion';
@@ -40,7 +38,7 @@ export function QuickActions({ canShow }: QuickActionsProps) {
   const actions = [
     {
       label: 'Start Review Meeting',
-      icon: <Mic className="mr-2 h-4 w-4 text-indigo-500" />,
+      icon: <NotebookPen className="mr-2 h-4 w-4 text-indigo-500" />,
       href: '/meetings/start',
       description: 'Record on-site discussion',
       key: 'meetings' as PageKey

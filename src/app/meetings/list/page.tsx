@@ -8,7 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
-  Mic, 
+  NotebookPen, 
   Search, 
   FilterX, 
   Building2, 
@@ -144,7 +144,7 @@ export default function MeetingsListPage() {
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="flex flex-col gap-1">
             <h1 className="flex items-center gap-2 text-primary font-black uppercase tracking-tight">
-              <Mic className="h-8 w-8" /> Meetings Registry
+              <NotebookPen className="h-8 w-8" /> Meetings Registry
             </h1>
             <p className="text-muted-foreground font-medium">Archived on-site review meetings and technical discussions.</p>
           </div>
@@ -262,7 +262,7 @@ export default function MeetingsListPage() {
         <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
-              <div className="bg-primary/10 p-2 rounded-sm"><Mic className="h-5 w-5 text-primary" /></div>
+              <div className="bg-primary/10 p-2 rounded-sm"><NotebookPen className="h-5 w-5 text-primary" /></div>
               <div>
                 <DialogTitle className="text-xl font-black uppercase tracking-tight">Review Meeting Audit</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{viewingMeeting?.date} • {viewingMeeting?.siteName}</DialogDescription>

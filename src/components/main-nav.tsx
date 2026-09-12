@@ -1,5 +1,3 @@
-
-
 "use client"
 
 import Link from "next/link"
@@ -62,7 +60,7 @@ import {
   Bell,
   Cpu,
   GlassWater,
-  Mic
+  NotebookPen
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -287,7 +285,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
               <SidebarMenuItem>
                 <CollapsibleTrigger asChild>
                   <SidebarMenuButton tooltip="Meetings" isActive={pathname.startsWith('/meetings')} className="rounded-sm">
-                    <Mic className="h-4 w-4 text-primary" />
+                    <NotebookPen className="h-4 w-4 text-primary" />
                     <span className="font-medium">Meetings</span>
                     <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
                   </SidebarMenuButton>
