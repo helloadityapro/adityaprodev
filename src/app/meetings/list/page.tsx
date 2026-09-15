@@ -60,22 +60,51 @@ type Meeting = {
 type SortKey = 'date' | 'site' | 'personnel';
 
 const REVIEW_POINTS = [
-  { id: 'mms_civil', label: 'MMS Civil-work', category: 'MMS & MODULES' },
-  { id: 'mms_install', label: 'MMS Installation', category: 'MMS & MODULES' },
-  { id: 'module_install', label: 'Modules Installation', category: 'MMS & MODULES' },
+  { id: 'mms_civil', label: 'MMS Civil-work', category: 'MMS & MODULES INSTALLATION' },
+  { id: 'mms_install', label: 'MMS Installation', category: 'MMS & MODULES INSTALLATION' },
+  { id: 'module_install', label: 'Modules Installation', category: 'MMS & MODULES INSTALLATION' },
   { id: 'earthing_laying', label: 'Laying & Termination', category: 'EARTHING' },
   { id: 'dc_block_laying', label: 'Trenches, Laying & Termination', category: 'DC BLOCK' },
   { id: 'ac_block_laying', label: 'Trenches, Laying & Termination', category: 'AC BLOCK' },
   { id: 'inverter_install', label: 'Frame erection, Installation and Termination', category: 'INVERTERS' },
+  
+  // CIVIL WORKS
+  { id: 'control_room_civil', label: 'Control Room', category: 'CIVIL WORKS' },
+  { id: 'lt_foundation_civil', label: 'LT Panel Foundation', category: 'CIVIL WORKS' },
+  { id: 'idt_foundation_civil', label: 'IDT Foundation', category: 'CIVIL WORKS' },
+  { id: 'ht_four_pole_civil', label: 'HT Panel Four-Pole Erection', category: 'CIVIL WORKS' },
+  { id: 'switchyard_civil', label: 'Switch-yard Civil Work', category: 'CIVIL WORKS' },
+
+  // EQUIPMENT INSTALLATION
+  { id: 'lt_panel_install', label: 'LT Panel', category: 'EQUIPMENT INSTALLATION' },
+  { id: 'ht_panel_install', label: 'HT Panel', category: 'EQUIPMENT INSTALLATION' },
+  { id: 'idt_install', label: 'IDT', category: 'EQUIPMENT INSTALLATION' },
+  { id: 'rtcc_install', label: 'RTCC', category: 'EQUIPMENT INSTALLATION' },
+  { id: 'scada_install', label: 'SCADA', category: 'EQUIPMENT INSTALLATION' },
+  { id: 'rms_wms_install', label: 'RMS/WMS', category: 'EQUIPMENT INSTALLATION' },
+
+  // TRANSMISSION LINE WORKS
+  { id: 'poles_erection_tl', label: 'Poles Erection', category: 'Transmission Line Works' },
+  { id: 'cable_stringing_tl', label: 'Cable Stringing', category: 'Transmission Line Works' },
+
+  // SUB-STATION WORKS
+  { id: 'equip_foundation_ss', label: 'Equipment Foundation', category: 'Sub-Station Works' },
+  { id: 'bay_erection_ss', label: 'Bay Erection', category: 'Sub-Station Works' },
+  { id: 'ht_panel_install_ss', label: 'HT Panel Installation', category: 'Sub-Station Works' },
+
   { id: 'others', label: 'Others', category: 'OTHERS' },
 ];
 
 const CATEGORIES = [
-  "MMS & MODULES",
+  "MMS & MODULES INSTALLATION",
   "EARTHING",
   "DC BLOCK",
   "AC BLOCK",
   "INVERTERS",
+  "CIVIL WORKS",
+  "EQUIPMENT INSTALLATION",
+  "Transmission Line Works",
+  "Sub-Station Works",
   "OTHERS"
 ];
 

@@ -27,7 +27,9 @@ import {
   ChevronDown,
   ChevronUp,
   Plus,
-  UserPlus
+  UserPlus,
+  Navigation,
+  Globe
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -46,6 +48,31 @@ const REVIEW_POINTS = [
   { id: 'dc_block_laying', label: 'Trenches, Laying & Termination' },
   { id: 'ac_block_laying', label: 'Trenches, Laying & Termination' },
   { id: 'inverter_install', label: 'Frame erection, Installation and Termination' },
+  
+  // CIVIL WORKS
+  { id: 'control_room_civil', label: 'Control Room' },
+  { id: 'lt_foundation_civil', label: 'LT Panel Foundation' },
+  { id: 'idt_foundation_civil', label: 'IDT Foundation' },
+  { id: 'ht_four_pole_civil', label: 'HT Panel Four-Pole Erection' },
+  { id: 'switchyard_civil', label: 'Switch-yard Civil Work' },
+
+  // EQUIPMENT INSTALLATION
+  { id: 'lt_panel_install', label: 'LT Panel' },
+  { id: 'ht_panel_install', label: 'HT Panel' },
+  { id: 'idt_install', label: 'IDT' },
+  { id: 'rtcc_install', label: 'RTCC' },
+  { id: 'scada_install', label: 'SCADA' },
+  { id: 'rms_wms_install', label: 'RMS/WMS' },
+
+  // TRANSMISSION LINE WORKS
+  { id: 'poles_erection_tl', label: 'Poles Erection' },
+  { id: 'cable_stringing_tl', label: 'Cable Stringing' },
+
+  // SUB-STATION WORKS
+  { id: 'equip_foundation_ss', label: 'Equipment Foundation' },
+  { id: 'bay_erection_ss', label: 'Bay Erection' },
+  { id: 'ht_panel_install_ss', label: 'HT Panel Installation' },
+
   { id: 'others', label: 'Others' },
 ];
 
@@ -76,6 +103,28 @@ const REVIEW_SECTIONS = [
   {
     title: "INVERTERS",
     points: ['inverter_install'],
+    indent: true
+  },
+  {
+    title: "CIVIL WORKS",
+    points: ['control_room_civil', 'lt_foundation_civil', 'idt_foundation_civil', 'ht_four_pole_civil', 'switchyard_civil']
+  },
+  {
+    title: "EQUIPMENT INSTALLATION",
+    points: ['lt_panel_install', 'ht_panel_install', 'idt_install', 'rtcc_install', 'scada_install', 'rms_wms_install']
+  },
+  {
+    title: "TRANSMISSION LINE AND SUB-STATION WORKS",
+    isHeaderOnly: true
+  },
+  {
+    title: "Transmission Line Works",
+    points: ['poles_erection_tl', 'cable_stringing_tl'],
+    indent: true
+  },
+  {
+    title: "Sub-Station Works",
+    points: ['equip_foundation_ss', 'bay_erection_ss', 'ht_panel_install_ss'],
     indent: true
   },
   {
@@ -114,7 +163,6 @@ export default function StartMeetingPage() {
   const usersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<any>(usersQuery);
 
-  // Fetch historical meetings for the selected site
   const historicalMeetingsQuery = useMemoFirebase(() => {
     if (!siteId) return null;
     return query(
@@ -359,94 +407,96 @@ export default function StartMeetingPage() {
                    </h3>
                 </div>
                 
-                <div className="space-y-6">
-                  {section.points?.map(pointId => {
-                    const point = REVIEW_POINTS.find(p => p.id === pointId);
-                    if (!point) return null;
+                {!section.isHeaderOnly && (
+                  <div className="space-y-6">
+                    {section.points?.map(pointId => {
+                      const point = REVIEW_POINTS.find(p => p.id === pointId);
+                      if (!point) return null;
 
-                    const pointHistory = previousMeetings?.filter((m: any) => m.observations && m.observations[point.id]) || [];
-                    const latest = pointHistory[0];
-                    const isExpanded = expandedHistory[point.id];
+                      const pointHistory = previousMeetings?.filter((m: any) => m.observations && m.observations[point.id]) || [];
+                      const latest = pointHistory[0];
+                      const isExpanded = expandedHistory[point.id];
 
-                    return (
-                      <div key={point.id} className="space-y-4 group">
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
-                          <div className="md:col-span-4 pt-3 text-left">
-                            <Label className="text-xs font-black uppercase text-foreground tracking-tight">{point.label}</Label>
-                          </div>
-                          
-                          <div className="md:col-span-8">
-                            <Textarea 
-                              placeholder="Enter status / observation..." 
-                              value={observations[point.id] || ""}
-                              onChange={(e) => setObservations({ ...observations, [point.id]: e.target.value })}
-                              className="rounded-sm bg-background border-primary/10 min-h-[100px] text-sm font-medium shadow-sm focus-visible:ring-primary/20"
-                            />
-                          </div>
-                        </div>
-
-                        {siteId && (
-                          <div className="space-y-3 animate-in fade-in duration-500 pt-2 w-full">
-                            <div className="flex items-center justify-between border-t border-dashed pt-4">
-                                <div className="flex items-center gap-2">
-                                  <History className="h-3.5 w-3.5 text-primary opacity-40" />
-                                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Historical Context</Label>
-                                </div>
-                                {pointHistory.length > 1 && (
-                                  <Button 
-                                    type="button" 
-                                    variant="link" 
-                                    size="sm" 
-                                    className="h-auto p-0 text-[10px] font-bold uppercase tracking-tight text-primary/60 hover:text-primary"
-                                    onClick={() => setExpandedHistory(prev => ({...prev, [point.id]: !isExpanded}))}
-                                  >
-                                    {isExpanded ? "Collapse History" : `Expand Audit Trail (${pointHistory.length})`}
-                                  </Button>
-                                )}
+                      return (
+                        <div key={point.id} className="space-y-4 group">
+                          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                            <div className="md:col-span-4 pt-3 text-left">
+                              <Label className="text-xs font-black uppercase text-foreground tracking-tight">{point.label}</Label>
                             </div>
+                            
+                            <div className="md:col-span-8">
+                              <Textarea 
+                                placeholder="Enter status / observation..." 
+                                value={observations[point.id] || ""}
+                                onChange={(e) => setObservations({ ...observations, [point.id]: e.target.value })}
+                                className="rounded-sm bg-background border-primary/10 min-h-[100px] text-sm font-medium shadow-sm focus-visible:ring-primary/20"
+                              />
+                            </div>
+                          </div>
 
-                            <div className="space-y-2">
-                                {isHistoryLoading ? (
-                                  <Skeleton className="h-14 w-full bg-muted/20 rounded-sm" />
-                                ) : pointHistory.length > 0 ? (
-                                  <>
-                                    {!isExpanded ? (
-                                      <div className="p-4 rounded-sm bg-muted/20 border border-border/50 text-[11px] italic text-muted-foreground shadow-inner text-left w-full">
-                                          <div className="flex justify-between items-center mb-1.5">
-                                            <span className="font-black text-[9px] uppercase not-italic text-foreground/40">{latest.userName}</span>
-                                            <span className="font-mono text-[9px] not-italic opacity-50">{latest.date}</span>
-                                          </div>
-                                          <p className="leading-relaxed whitespace-pre-wrap">"{latest.observations[point.id]}"</p>
-                                      </div>
-                                    ) : (
-                                      <div className="space-y-2 animate-in slide-in-from-top-1 duration-300 w-full">
-                                          {pointHistory.map((h, hIdx) => (
-                                            <div key={h.id} className={cn(
-                                              "p-4 rounded-sm border text-[11px] italic text-left w-full",
-                                              hIdx === 0 ? "bg-primary/5 border-primary/10 text-primary/80" : "bg-muted/10 border-border/40 text-muted-foreground"
-                                            )}>
-                                              <div className="flex justify-between items-center mb-1.5">
-                                                <span className="font-black text-[9px] uppercase not-italic text-foreground/40">{h.userName}</span>
-                                                <span className="font-mono text-[9px] not-italic opacity-50">{h.date}</span>
-                                              </div>
-                                              <p className="leading-relaxed whitespace-pre-wrap">"{h.observations[point.id]}"</p>
-                                            </div>
-                                          ))}
-                                      </div>
-                                    )}
-                                  </>
-                                ) : (
-                                  <div className="p-4 rounded-sm bg-muted/5 border border-dashed text-[10px] text-muted-foreground/30 italic text-center uppercase font-bold tracking-tighter w-full">
-                                      No previous history discovered for this point.
+                          {siteId && (
+                            <div className="space-y-3 animate-in fade-in duration-500 pt-2 w-full">
+                              <div className="flex items-center justify-between border-t border-dashed pt-4">
+                                  <div className="flex items-center gap-2">
+                                    <History className="h-3.5 w-3.5 text-primary opacity-40" />
+                                    <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Historical Context</Label>
                                   </div>
-                                )}
+                                  {pointHistory.length > 1 && (
+                                    <Button 
+                                      type="button" 
+                                      variant="link" 
+                                      size="sm" 
+                                      className="h-auto p-0 text-[10px] font-bold uppercase tracking-tight text-primary/60 hover:text-primary"
+                                      onClick={() => setExpandedHistory(prev => ({...prev, [point.id]: !isExpanded}))}
+                                    >
+                                      {isExpanded ? "Collapse History" : `Expand Audit Trail (${pointHistory.length})`}
+                                    </Button>
+                                  )}
+                              </div>
+
+                              <div className="space-y-2">
+                                  {isHistoryLoading ? (
+                                    <Skeleton className="h-14 w-full bg-muted/20 rounded-sm" />
+                                  ) : pointHistory.length > 0 ? (
+                                    <>
+                                      {!isExpanded ? (
+                                        <div className="p-4 rounded-sm bg-muted/20 border border-border/50 text-[11px] italic text-muted-foreground shadow-inner text-left w-full">
+                                            <div className="flex justify-between items-center mb-1.5">
+                                              <span className="font-black text-[9px] uppercase not-italic text-foreground/40">{latest.userName}</span>
+                                              <span className="font-mono text-[9px] not-italic opacity-50">{latest.date}</span>
+                                            </div>
+                                            <p className="leading-relaxed whitespace-pre-wrap">"{latest.observations[point.id]}"</p>
+                                        </div>
+                                      ) : (
+                                        <div className="space-y-2 animate-in slide-in-from-top-1 duration-300 w-full">
+                                            {pointHistory.map((h, hIdx) => (
+                                              <div key={h.id} className={cn(
+                                                "p-4 rounded-sm border text-[11px] italic text-left w-full",
+                                                hIdx === 0 ? "bg-primary/5 border-primary/10 text-primary/80" : "bg-muted/10 border-border/40 text-muted-foreground"
+                                              )}>
+                                                <div className="flex justify-between items-center mb-1.5">
+                                                  <span className="font-black text-[9px] uppercase not-italic text-foreground/40">{h.userName}</span>
+                                                  <span className="font-mono text-[9px] not-italic opacity-50">{h.date}</span>
+                                                </div>
+                                                <p className="leading-relaxed whitespace-pre-wrap">"{h.observations[point.id]}"</p>
+                                              </div>
+                                            ))}
+                                        </div>
+                                      )}
+                                    </>
+                                  ) : (
+                                    <div className="p-4 rounded-sm bg-muted/5 border border-dashed text-[10px] text-muted-foreground/30 italic text-center uppercase font-bold tracking-tighter w-full">
+                                        No previous history discovered for this point.
+                                    </div>
+                                  )}
+                              </div>
                             </div>
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             ))}
           </CardContent>
