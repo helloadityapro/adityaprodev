@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -31,7 +30,8 @@ import {
   Check,
   Users,
   LayoutGrid,
-  Printer
+  Printer,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,7 @@ import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { useToast } from '@/hooks/use-toast';
 
 type Meeting = {
   id: string;
@@ -305,26 +306,26 @@ export default function MeetingsListPage() {
       {/* Meeting Detail Dialog */}
       <Dialog open={!!viewingMeeting} onOpenChange={(o) => !o && setViewingMeeting(null)}>
         <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
+          <DialogHeader className="p-4 sm:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><NotebookPen className="h-5 w-5 text-primary" /></div>
               <div>
-                <DialogTitle className="text-xl font-black uppercase tracking-tight">Review Meeting Audit</DialogTitle>
+                <DialogTitle className="text-base sm:text-xl font-black uppercase tracking-tight">Review Meeting Audit</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{viewingMeeting?.date} • {viewingMeeting?.siteName}</DialogDescription>
               </div>
             </div>
             <div className="flex items-center gap-2 no-print">
-               <Button onClick={handlePrint} variant="outline" size="sm" className="h-9 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+               <Button onClick={handlePrint} variant="outline" size="sm" className="h-8 sm:h-9 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
                  <Printer className="h-4 w-4 mr-2" />
                  Print Report
                </Button>
-               <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><X className="h-5 w-5" /></Button></DialogClose>
+               <DialogClose asChild className="sm:hidden"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-5 w-5" /></Button></DialogClose>
             </div>
           </DialogHeader>
 
           <ScrollArea className="flex-1">
             {viewingMeeting && (
-              <div className="p-8 space-y-10 text-left">
+              <div className="p-4 sm:p-8 space-y-10 text-left">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <div className="space-y-6">
                     <div className="space-y-1">
