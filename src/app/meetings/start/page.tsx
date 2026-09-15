@@ -53,7 +53,8 @@ const REVIEW_POINTS = [
   { id: 'control_room_civil', label: 'Control Room' },
   { id: 'lt_foundation_civil', label: 'LT Panel Foundation' },
   { id: 'idt_foundation_civil', label: 'IDT Foundation' },
-  { id: 'ht_four_pole_civil', label: 'HT Panel Four-Pole Erection' },
+  { id: 'ht_panel_foundation_civil', label: 'HT Panel Foundation' },
+  { id: 'pole_erection_civil', label: 'Four-Pole/Two Pole Erection' },
   { id: 'switchyard_civil', label: 'Switch-yard Civil Work' },
 
   // EQUIPMENT INSTALLATION
@@ -107,7 +108,7 @@ const REVIEW_SECTIONS = [
   },
   {
     title: "CIVIL WORKS",
-    points: ['control_room_civil', 'lt_foundation_civil', 'idt_foundation_civil', 'ht_four_pole_civil', 'switchyard_civil']
+    points: ['control_room_civil', 'lt_foundation_civil', 'idt_foundation_civil', 'ht_panel_foundation_civil', 'pole_erection_civil', 'switchyard_civil']
   },
   {
     title: "EQUIPMENT INSTALLATION",
@@ -219,7 +220,7 @@ export default function StartMeetingPage() {
 
   const addExternalAttendee = () => {
     const name = attendeeSearch.trim();
-    if (!name) return;
+    if (name === "") return;
     const newId = `ext_${Date.now()}`;
     setAttendees(prev => [...prev, { id: newId, name: `${name} (Ext)` }]);
     setAttendeeSearch("");

@@ -67,7 +67,8 @@ const REVIEW_POINTS = [
   { id: 'control_room_civil', label: 'Control Room', category: 'CIVIL WORKS' },
   { id: 'lt_foundation_civil', label: 'LT Panel Foundation', category: 'CIVIL WORKS' },
   { id: 'idt_foundation_civil', label: 'IDT Foundation', category: 'CIVIL WORKS' },
-  { id: 'ht_four_pole_civil', label: 'HT Panel Four-Pole Erection', category: 'CIVIL WORKS' },
+  { id: 'ht_panel_foundation_civil', label: 'HT Panel Foundation', category: 'CIVIL WORKS' },
+  { id: 'pole_erection_civil', label: 'Four-Pole/Two Pole Erection', category: 'CIVIL WORKS' },
   { id: 'switchyard_civil', label: 'Switch-yard Civil Work', category: 'CIVIL WORKS' },
 
   // EQUIPMENT INSTALLATION
