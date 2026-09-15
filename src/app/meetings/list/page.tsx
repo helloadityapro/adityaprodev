@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -29,7 +30,8 @@ import {
   Plus,
   Check,
   Users,
-  LayoutGrid
+  LayoutGrid,
+  Printer
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -112,6 +114,9 @@ const CATEGORIES = [
 export default function MeetingsListPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
+  const router = useRouter();
+
   const [searchTerm, setSearchTerm] = React.useState("");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [viewingMeeting, setViewingMeeting] = React.useState<Meeting | null>(null);
@@ -136,6 +141,12 @@ export default function MeetingsListPage() {
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
+  };
+
+  const handlePrint = () => {
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
@@ -236,13 +247,13 @@ export default function MeetingsListPage() {
               <div className="pt-2 border-t border-primary/5 flex justify-end gap-1">
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm"><Eye className="h-4 w-4" /></Button>
                 {(isAdmin || m.userId === user?.uid) && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}><Trash2 className="h-4 w-4" /> </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}><Trash2 className="h-3.5 w-3.5" /> </Button>
                 )}
               </div>
             </CardContent>
           </Card>
         )) : (
-          <div className="p-12 text-center text-muted-foreground italic border-2 border-dashed rounded-sm opacity-30 uppercase font-black text-[10px] tracking-widest">No meeting records discovered</div>
+          <div className="p-12 text-center text-muted-foreground italic text-sm border-2 border-dashed rounded-sm uppercase font-black text-[10px] tracking-widest">No meeting records discovered</div>
         )}
       </div>
 
@@ -294,13 +305,20 @@ export default function MeetingsListPage() {
       {/* Meeting Detail Dialog */}
       <Dialog open={!!viewingMeeting} onOpenChange={(o) => !o && setViewingMeeting(null)}>
         <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><NotebookPen className="h-5 w-5 text-primary" /></div>
               <div>
                 <DialogTitle className="text-xl font-black uppercase tracking-tight">Review Meeting Audit</DialogTitle>
                 <DialogDescription className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{viewingMeeting?.date} • {viewingMeeting?.siteName}</DialogDescription>
               </div>
+            </div>
+            <div className="flex items-center gap-2 no-print">
+               <Button onClick={handlePrint} variant="outline" size="sm" className="h-9 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+                 <Printer className="h-4 w-4 mr-2" />
+                 Print Report
+               </Button>
+               <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full"><X className="h-5 w-5" /></Button></DialogClose>
             </div>
           </DialogHeader>
 
@@ -325,7 +343,7 @@ export default function MeetingsListPage() {
                     </div>
                   </div>
 
-                  <div className="bg-slate-900 rounded-sm p-6 flex flex-col justify-center gap-4 shadow-xl text-white">
+                  <div className="bg-slate-900 rounded-sm p-6 flex flex-col justify-center gap-4 shadow-xl text-white no-print">
                     <div className="flex items-center justify-between">
                        <Label className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Voice Recording</Label>
                        <Volume2 className="h-4 w-4 text-primary/40" />
@@ -392,17 +410,112 @@ export default function MeetingsListPage() {
                   </div>
                 </div>
 
-                <div className="pt-8 border-t flex flex-col gap-2">
+                <div className="pt-8 border-t flex flex-col gap-2 no-print">
                    <p className="text-[8px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-30 text-center">End of Review Document • Aditya Pro Compliance Engine</p>
                 </div>
               </div>
             )}
           </ScrollArea>
-          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0">
+          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0 no-print">
             <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-10 tracking-widest">Close Audit</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Hidden Printable Area */}
+      {viewingMeeting && (
+        <div id="printable-meeting-area" className="hidden print:block p-10 bg-white text-black font-sans">
+          {/* Header with Logo */}
+          <div className="flex justify-between items-start mb-8 border-b-2 border-black pb-6">
+            <div className="space-y-2">
+              <h1 className="text-2xl font-black uppercase">Review Meeting Audit</h1>
+              <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Official Documentation • Aditya Pro</p>
+            </div>
+            <div className="text-right">
+              <img src="https://images.unsplash.com/photo-1566093097221-ac2335b09e70?auto=format&fit=crop&q=80&w=200&h=200" alt="AdityaPro Logo" className="h-16 w-16 ml-auto object-contain" />
+            </div>
+          </div>
+
+          {/* Site Info Table */}
+          <div className="grid grid-cols-2 gap-8 mb-10">
+            <div className="space-y-4">
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Project Site</label>
+                <p className="text-base font-bold">{viewingMeeting.siteName}</p>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Meeting Lead</label>
+                <p className="text-sm font-bold">{viewingMeeting.userName}</p>
+              </div>
+            </div>
+            <div className="space-y-4 text-right">
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Audit Date</label>
+                <p className="text-sm font-bold font-mono">{viewingMeeting.date}</p>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Registry Ref</label>
+                <p className="text-[10px] font-mono font-bold uppercase tracking-tight">{viewingMeeting.id}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Attendees */}
+          <div className="mb-10">
+            <h3 className="text-xs font-black uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Attendees</h3>
+            <div className="flex flex-wrap gap-2">
+              {viewingMeeting.attendees && viewingMeeting.attendees.length > 0 ? viewingMeeting.attendees.map(a => (
+                <span key={a.id} className="text-[11px] font-bold border border-slate-200 px-3 py-1 bg-slate-50 rounded-sm">
+                  {a.name}
+                </span>
+              )) : (
+                <p className="text-xs italic text-slate-400">No additional attendees recorded.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Technical Review */}
+          <div className="mb-10 space-y-8">
+            <h3 className="text-xs font-black uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Technical Review Protocol</h3>
+            {CATEGORIES.map(category => {
+              const points = REVIEW_POINTS.filter(p => p.category === category);
+              const hasObservations = points.some(p => viewingMeeting.observations[p.id]);
+              if (!hasObservations) return null;
+
+              return (
+                <div key={category} className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{category}</h4>
+                  <div className="grid grid-cols-1 gap-3">
+                    {points.map(p => {
+                      const obs = viewingMeeting.observations[p.id];
+                      if (!obs) return null;
+                      return (
+                        <div key={p.id} className="grid grid-cols-3 gap-4 border-b border-slate-50 pb-2">
+                          <div className="text-[10px] font-bold uppercase text-slate-600 pt-1">{p.label}</div>
+                          <div className="col-span-2 text-[11px] font-medium italic">"{obs}"</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Critical Observations */}
+          <div className="mt-12">
+            <h3 className="text-xs font-black uppercase tracking-widest border-b-2 border-red-200 text-red-700 pb-2 mb-4">Critical Observations Registry</h3>
+            <div className="p-6 bg-red-50 border border-red-100 rounded-sm text-[11px] font-medium italic text-red-950">
+              "{viewingMeeting.criticalPoints || 'Zero critical blockers identified during this meeting.'}"
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="mt-20 text-center">
+            <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">End of Official Audit Record • Aditya Pro Systems</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
