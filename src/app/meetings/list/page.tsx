@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc, limit, where } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -119,6 +119,8 @@ export default function MeetingsListPage() {
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
@@ -279,6 +281,14 @@ export default function MeetingsListPage() {
     }
   };
 
+  const handleCloseDetail = () => {
+    setViewingMeeting(null);
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    const queryStr = params.toString();
+    router.replace(`${pathname}${queryStr ? `?${queryStr}` : ''}`);
+  };
+
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
@@ -433,7 +443,7 @@ export default function MeetingsListPage() {
       </div>
 
       {/* Meeting Detail Dialog */}
-      <Dialog open={!!viewingMeeting} onOpenChange={(o) => !o && setViewingMeeting(null)}>
+      <Dialog open={!!viewingMeeting} onOpenChange={(o) => !o && handleCloseDetail()}>
         <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-4 sm:p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
             <div className="flex items-center gap-3">
@@ -471,18 +481,6 @@ export default function MeetingsListPage() {
                         {viewingMeeting.userName}
                       </p>
                     </div>
-                  </div>
-
-                  <div className="bg-slate-900 rounded-sm p-6 flex flex-col justify-center gap-4 shadow-xl text-white no-print">
-                    <div className="flex items-center justify-between">
-                       <Label className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Voice Recording</Label>
-                       <Volume2 className="h-4 w-4 text-primary/40" />
-                    </div>
-                    {viewingMeeting.recordingUrl ? (
-                      <audio src={viewingMeeting.recordingUrl} controls className="w-full h-10 accent-primary" />
-                    ) : (
-                      <p className="text-[10px] italic text-white/30 uppercase font-black text-center py-2 tracking-widest">No audio captured during this session</p>
-                    )}
                   </div>
                 </div>
 
@@ -554,3 +552,4 @@ export default function MeetingsListPage() {
     </div>
   );
 }
+
