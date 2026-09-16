@@ -3,7 +3,7 @@
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
-import { collection, query, doc, limit, where } from 'firebase/firestore';
+import { collection, doc, query, orderBy, where, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -58,7 +58,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 
 const REVIEW_POINTS = [
@@ -142,7 +141,6 @@ export default function MeetingsMatrixPage() {
   const [siteSearch, setSiteSearch] = React.useState("");
   
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
-  const [expandedCells, setExpandedCells] = React.useState<Set<string>>(new Set());
   const [isExportingPDF, setIsExportingPDF] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -190,7 +188,7 @@ export default function MeetingsMatrixPage() {
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('l', 'mm', 'a4');
-      const logoUrl = '/assets/icon.png';
+      const logoUrl = '/icon.png';
 
       // Load logo
       let logoProps: any = null;
@@ -235,17 +233,29 @@ export default function MeetingsMatrixPage() {
           currY += 6;
 
           REVIEW_POINTS.filter(p => p.category === cat).forEach(point => {
-            const h = 8;
+            // Calculate dynamic height based on text wrapping
+            const wrapWidth = colW - 4;
+            let maxLines = 1;
+            items.forEach(m => {
+              const obs = m.observations[point.id] || '-';
+              const lines = doc.splitTextToSize(obs, wrapWidth);
+              if (lines.length > maxLines) maxLines = lines.length;
+            });
+            
+            const h = Math.max(10, maxLines * 4 + 2); // Minimum 10mm height or line-based
+
             if (currY + h > 190) { doc.addPage(); currY = 20; addHeaderLogo(doc); }
+            
             doc.rect(margin, currY, col1W, h);
             doc.setFontSize(6);
             doc.setFont('helvetica', 'bold');
-            doc.text(doc.splitTextToSize(point.label, col1W - 4), margin + 2, currY + 4);
+            doc.text(doc.splitTextToSize(point.label.toUpperCase(), col1W - 4), margin + 2, currY + 4);
             
             items.forEach((m, i) => {
               doc.rect(margin + col1W + (i * colW), currY, colW, h);
               const obs = m.observations[point.id] || '-';
               doc.setFont('helvetica', 'normal');
+              doc.setFontSize(7);
               doc.text(doc.splitTextToSize(obs, colW - 4), margin + col1W + (i * colW) + 2, currY + 4);
             });
             currY += h;
@@ -261,13 +271,6 @@ export default function MeetingsMatrixPage() {
     } finally {
       setIsExportingPDF(false);
     }
-  };
-
-  const toggleCell = (cellId: string) => {
-    const next = new Set(expandedCells);
-    if (next.has(cellId)) next.delete(cellId);
-    else next.add(cellId);
-    setExpandedCells(next);
   };
 
   const handleExport = () => {
@@ -308,6 +311,8 @@ export default function MeetingsMatrixPage() {
   };
 
   if (isProfileLoading || sitesLoading || meetingsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
+
+  if (!isAdmin) return null;
 
   return (
     <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
@@ -434,7 +439,6 @@ export default function MeetingsMatrixPage() {
                           {sortedMeetings.map((m) => {
                             const observation = m.observations[point.id];
                             const cellId = `${m.id}-${point.id}`;
-                            const isExpanded = expandedCells.has(cellId);
                             
                             return (
                               <TableCell key={cellId} className="text-center border-r border-b p-0 group align-top">
@@ -442,24 +446,9 @@ export default function MeetingsMatrixPage() {
                                   <TooltipTrigger asChild>
                                     <div className="w-full h-full flex flex-col p-4 cursor-default hover:bg-muted/10 transition-colors font-medium text-left relative min-h-[60px]">
                                       {observation ? (
-                                        <div className="space-y-2">
-                                          <p className={cn(
-                                            "text-[10px] text-foreground leading-relaxed font-bold break-words",
-                                            !isExpanded && "line-clamp-2"
-                                          )}>
-                                            {observation}
-                                          </p>
-                                          {observation.length > 30 && (
-                                            <Button 
-                                              variant="ghost" 
-                                              size="icon" 
-                                              className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                                              onClick={(e) => { e.stopPropagation(); toggleCell(cellId); }}
-                                            >
-                                              {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-                                            </Button>
-                                          )}
-                                        </div>
+                                        <p className="text-[10px] text-foreground leading-relaxed font-bold break-words whitespace-normal">
+                                          {observation}
+                                        </p>
                                       ) : <span className="text-muted-foreground/20 font-black text-center w-full block">-</span>}
                                     </div>
                                   </TooltipTrigger>
@@ -494,7 +483,6 @@ export default function MeetingsMatrixPage() {
                     </TableCell>
                     {sortedMeetings.map((m) => {
                       const cellId = `critical-${m.id}`;
-                      const isExpanded = expandedCells.has(cellId);
                       
                       return (
                         <TableCell key={cellId} className="p-0 border-r border-b align-top">
@@ -502,24 +490,9 @@ export default function MeetingsMatrixPage() {
                             <TooltipTrigger asChild>
                               <div className="w-full h-full p-4 hover:bg-red-100/50 transition-colors cursor-default text-left flex flex-col justify-start relative min-h-[80px]">
                                  {m.criticalPoints ? (
-                                   <div className="space-y-2">
-                                      <p className={cn(
-                                        "text-[10px] font-black text-red-950 leading-tight uppercase tracking-tighter break-words",
-                                        !isExpanded && "line-clamp-3"
-                                      )}>
-                                        {m.criticalPoints}
-                                      </p>
-                                      {m.criticalPoints.length > 30 && (
-                                        <Button 
-                                          variant="ghost" 
-                                          size="icon" 
-                                          className="h-6 w-6 absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-red-700"
-                                          onClick={(e) => { e.stopPropagation(); toggleCell(cellId); }}
-                                        >
-                                          {isExpanded ? <Minimize2 className="h-3 w-3" /> : <Maximize2 className="h-3 w-3" />}
-                                        </Button>
-                                      )}
-                                   </div>
+                                    <p className="text-[10px] font-black text-red-950 leading-tight uppercase tracking-tighter break-words whitespace-normal">
+                                      {m.criticalPoints}
+                                    </p>
                                  ) : <span className="text-red-900/10 font-black text-center w-full block">-</span>}
                               </div>
                             </TooltipTrigger>
@@ -557,10 +530,16 @@ export default function MeetingsMatrixPage() {
            <Separator orientation="vertical" className="h-4 hidden sm:block" />
            <div className="flex items-center gap-2">
               <Info className="h-3.5 w-3.5 text-primary opacity-50" />
-              <span className="text-[10px] font-bold text-muted-foreground italic leading-none">Hover cell to view detailed notes</span>
-           </div>
+              <span className="text-[10px] font-bold text-muted-foreground italic leading-none">Matrix view expanded: All text visible by default</span>
         </div>
+      </div>
       </Card>
     </div>
   );
 }
+
+function SortIcon({ column, config }: { column: SortKey, config: { key: SortKey; direction: 'asc' | 'desc' } }) {
+  if (config.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+}
+

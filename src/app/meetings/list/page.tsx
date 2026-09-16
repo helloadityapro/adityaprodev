@@ -152,7 +152,7 @@ export default function MeetingsListPage() {
     try {
       const { default: jsPDF } = await import('jspdf');
       const doc = new jsPDF('p', 'mm', 'a4');
-      const logoUrl = '/assets/icon.png';
+      const logoUrl = '/icon.png';
 
       // Load logo
       let logoProps: any = null;
@@ -394,13 +394,13 @@ export default function MeetingsListPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
+                  <TableHead className="px-6 cursor-pointer hover:bg-muted/5" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
+                  <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('site')}>
                     <div className="flex items-center">Project Site <SortIcon column="site" /></div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('personnel')}>
+                  <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('personnel')}>
                     <div className="flex items-center">Personnel <SortIcon column="personnel" /></div>
                   </TableHead>
                   <TableHead>Critical Observations</TableHead>
