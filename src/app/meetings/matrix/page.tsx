@@ -30,7 +30,10 @@ import {
   Check,
   Info,
   Loader2,
-  FileText
+  FileText,
+  X,
+  RotateCw,
+  RotateCcw
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -55,6 +58,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { useToast } from '@/hooks/use-toast';
 
 const REVIEW_POINTS = [
   { id: 'mms_civil', label: 'MMS Civil-work', category: 'MMS & MODULES INSTALLATION' },
@@ -129,6 +134,7 @@ type SortKey = 'company' | 'name' | 'total' | string;
 export default function MeetingsMatrixPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const { toast } = useToast();
   const router = useRouter();
 
   const [selectedSiteId, setSelectedSiteId] = React.useState<string>("all");
@@ -259,7 +265,7 @@ export default function MeetingsMatrixPage() {
 
   const toggleCell = (cellId: string) => {
     const next = new Set(expandedCells);
-    if (next.has(cellId)) next.delete(id);
+    if (next.has(cellId)) next.delete(cellId);
     else next.add(cellId);
     setExpandedCells(next);
   };
@@ -287,6 +293,8 @@ export default function MeetingsMatrixPage() {
     XLSX.writeFile(workbook, `Meetings_Matrix_${selectedSiteId}_${format(new Date(), 'yyyyMMdd')}.xlsx`);
   };
 
+  const [sortConfigState, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
+
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
       key,
@@ -294,9 +302,9 @@ export default function MeetingsMatrixPage() {
     }));
   };
 
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary shrink-0" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
+  const SortIconComponent = ({ column }: { column: SortKey }) => {
+    if (sortConfigState.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
+    return sortConfigState.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary shrink-0" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
   };
 
   if (isProfileLoading || sitesLoading || meetingsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
@@ -396,7 +404,7 @@ export default function MeetingsMatrixPage() {
         <ScrollArea className="flex-1 w-full relative">
           <div className="min-w-full">
             <TooltipProvider delayDuration={0}>
-              <Table className="border-separate border-spacing-0 table-fixed w-full text-[10px]">
+              <Table className="border-separate border-spacing-0 text-[10px] min-w-full w-max table-fixed">
                 <TableHeader className="sticky top-0 z-40">
                   <TableRow className="hover:bg-transparent">
                     <TableHead className="w-[220px] font-black uppercase tracking-widest bg-primary text-white sticky left-0 top-0 z-30 px-4 py-4 border-r border-white/10">Observation Point</TableHead>
