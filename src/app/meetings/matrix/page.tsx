@@ -28,7 +28,9 @@ import {
   FilterX,
   History,
   Check,
-  Info
+  Info,
+  Loader2,
+  FileText
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -135,6 +137,7 @@ export default function MeetingsMatrixPage() {
   
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
   const [expandedCells, setExpandedCells] = React.useState<Set<string>>(new Set());
+  const [isExportingPDF, setIsExportingPDF] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -142,6 +145,7 @@ export default function MeetingsMatrixPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
+  const site = React.useMemo(() => allSites?.find(s => s.id === selectedSiteId), [allSites, selectedSiteId]);
 
   const meetingsQuery = useMemoFirebase(() => {
     if (selectedSiteId === 'all') return query(collection(firestore, 'meetings'), limit(100));
@@ -174,9 +178,88 @@ export default function MeetingsMatrixPage() {
     });
   }, [meetings, queryDateRange]);
 
+  const handleExportPDF = async () => {
+    if (sortedMeetings.length === 0) return;
+    setIsExportingPDF(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('l', 'mm', 'a4');
+      const logoUrl = '/assets/icon.png';
+
+      // Load logo
+      let logoProps: any = null;
+      try {
+        logoProps = await doc.getImageProperties(logoUrl);
+      } catch (e) { console.warn("Logo failed", e); }
+
+      const addHeaderLogo = (pdfDoc: any) => {
+        if (!logoProps) return;
+        const areaSize = 20;
+        pdfDoc.addImage(logoUrl, 'PNG', 297 - areaSize - 10, 10, areaSize, areaSize);
+      };
+
+      const drawMatrix = (items: Meeting[]) => {
+        addHeaderLogo(doc);
+        const margin = 10;
+        let currY = 30;
+        doc.setFontSize(14);
+        doc.setFont('helvetica', 'bold');
+        doc.text(`MEETINGS MATRIX: ${selectedSiteId === 'all' ? 'GLOBAL' : site?.name}`, margin, 15);
+        
+        doc.setFontSize(8);
+        const col1W = 50;
+        const remainingW = 297 - margin * 2 - col1W;
+        const colW = remainingW / items.length;
+
+        // Header Row
+        doc.rect(margin, currY, col1W, 10);
+        doc.text('OBSERVATION POINT', margin + 2, currY + 6);
+        items.forEach((m, i) => {
+          doc.rect(margin + col1W + (i * colW), currY, colW, 10);
+          doc.text(m.date.split(' ')[0], margin + col1W + (i * colW) + 2, currY + 6);
+        });
+        currY += 10;
+
+        CATEGORIES.forEach(cat => {
+          if (currY > 180) { doc.addPage(); currY = 20; addHeaderLogo(doc); }
+          doc.setFillColor(240, 240, 240);
+          doc.rect(margin, currY, 277, 6, 'F');
+          doc.setFont('helvetica', 'bold');
+          doc.text(cat, margin + 2, currY + 4);
+          currY += 6;
+
+          REVIEW_POINTS.filter(p => p.category === cat).forEach(point => {
+            const h = 8;
+            if (currY + h > 190) { doc.addPage(); currY = 20; addHeaderLogo(doc); }
+            doc.rect(margin, currY, col1W, h);
+            doc.setFontSize(6);
+            doc.setFont('helvetica', 'bold');
+            doc.text(doc.splitTextToSize(point.label, col1W - 4), margin + 2, currY + 4);
+            
+            items.forEach((m, i) => {
+              doc.rect(margin + col1W + (i * colW), currY, colW, h);
+              const obs = m.observations[point.id] || '-';
+              doc.setFont('helvetica', 'normal');
+              doc.text(doc.splitTextToSize(obs, colW - 4), margin + col1W + (i * colW) + 2, currY + 4);
+            });
+            currY += h;
+          });
+        });
+      };
+
+      drawMatrix(sortedMeetings);
+      doc.save(`Meetings_Matrix_${site?.name || 'Global'}.pdf`);
+      toast({ title: 'PDF Exported' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Export Failed' });
+    } finally {
+      setIsExportingPDF(false);
+    }
+  };
+
   const toggleCell = (cellId: string) => {
     const next = new Set(expandedCells);
-    if (next.has(cellId)) next.delete(cellId);
+    if (next.has(cellId)) next.delete(id);
     else next.add(cellId);
     setExpandedCells(next);
   };
@@ -248,6 +331,9 @@ export default function MeetingsMatrixPage() {
             </Select>
             <Button onClick={handleExport} disabled={sortedMeetings.length === 0} variant="outline" className="h-11 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 px-8 shadow-sm">
               <FileDown className="h-4 w-4 mr-2" /> Export Matrix
+            </Button>
+            <Button onClick={handleExportPDF} disabled={sortedMeetings.length === 0 || isExportingPDF} variant="outline" className="h-11 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 px-8 shadow-sm">
+              {isExportingPDF ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileText className="h-4 w-4 mr-2" />} Export PDF
             </Button>
           </div>
         </div>

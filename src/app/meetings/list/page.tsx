@@ -31,7 +31,8 @@ import {
   Check,
   Users,
   LayoutGrid,
-  Printer,
+  FileDown,
+  Loader2,
   X
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -122,6 +123,7 @@ export default function MeetingsListPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [viewingMeeting, setViewingMeeting] = React.useState<Meeting | null>(null);
+  const [isExporting, setIsExporting] = React.useState(false);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -145,9 +147,135 @@ export default function MeetingsListPage() {
     }));
   };
 
-  const handlePrint = () => {
-    if (typeof window !== 'undefined') {
-      window.print();
+  const exportToPDF = async (m: Meeting) => {
+    setIsExporting(true);
+    try {
+      const { default: jsPDF } = await import('jspdf');
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const logoUrl = '/assets/icon.png';
+
+      // Load logo
+      let logoProps: any = null;
+      try {
+        logoProps = await doc.getImageProperties(logoUrl);
+      } catch (e) {
+        console.warn("Logo load failed", e);
+      }
+
+      const addHeaderLogo = (pdfDoc: any) => {
+        if (!logoProps) return;
+        try {
+          const areaSize = 20;
+          const startX = 210 - areaSize - 15;
+          const startY = 10;
+          const ratio = logoProps.width / logoProps.height;
+          let renderW = areaSize;
+          let renderH = areaSize;
+          if (ratio > 1) renderH = areaSize / ratio;
+          else renderW = areaSize * ratio;
+          const x = startX + (areaSize - renderW) / 2;
+          const y = startY + (areaSize - renderH) / 2;
+          pdfDoc.addImage(logoUrl, 'PNG', x, y, renderW, renderH);
+        } catch (e) {
+          pdfDoc.addImage(logoUrl, 'PNG', 170, 10, 20, 20);
+        }
+      };
+
+      addHeaderLogo(doc);
+
+      const margin = 15;
+      let currY = 40;
+      const colWidthLabel = 65;
+      const colWidthValue = 115;
+      const rowHeight = 8;
+
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(14);
+      doc.text('REVIEW MEETING REPORT', margin, currY - 10);
+      
+      const drawRow = (label: string, value: string) => {
+        if (currY > 270) { doc.addPage(); currY = 20; addHeaderLogo(doc); currY += 10; }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.rect(margin, currY, colWidthLabel, rowHeight);
+        doc.text(label, margin + 2, currY + 5.5);
+        doc.setFont('helvetica', 'normal');
+        doc.rect(margin + colWidthLabel, currY, colWidthValue, rowHeight);
+        const splitVal = doc.splitTextToSize(String(value || '—'), colWidthValue - 4);
+        doc.text(splitVal, margin + colWidthLabel + 2, currY + 5.5);
+        currY += Math.max(rowHeight, splitVal.length * 4 + 4);
+      };
+
+      drawRow('PROJECT SITE', m.siteName);
+      drawRow('MEETING LEAD', m.userName);
+      drawRow('AUDIT DATE', m.date);
+      drawRow('REGISTRY REF', m.id);
+
+      currY += 5;
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.text('TECHNICAL OBSERVATIONS', margin, currY);
+      currY += 5;
+
+      CATEGORIES.forEach(category => {
+        const points = REVIEW_POINTS.filter(p => p.category === category);
+        const hasObs = points.some(p => m.observations[p.id]);
+        if (!hasObs) return;
+
+        if (currY > 260) { doc.addPage(); currY = 20; addHeaderLogo(doc); currY += 10; }
+        doc.setFillColor(240, 240, 240);
+        doc.rect(margin, currY, 180, 7, 'F');
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(8);
+        doc.text(category, margin + 2, currY + 5);
+        currY += 7;
+
+        points.forEach(p => {
+          const obs = m.observations[p.id];
+          if (!obs) return;
+          
+          const splitLabel = doc.splitTextToSize(p.label.toUpperCase(), 50);
+          const splitObs = doc.splitTextToSize(obs, 120);
+          const h = Math.max(8, splitObs.length * 4 + 4);
+
+          if (currY + h > 280) { doc.addPage(); currY = 20; addHeaderLogo(doc); currY += 10; }
+
+          doc.rect(margin, currY, 55, h);
+          doc.setFontSize(7);
+          doc.setFont('helvetica', 'bold');
+          doc.text(splitLabel, margin + 2, currY + 4);
+
+          doc.rect(margin + 55, currY, 125, h);
+          doc.setFontSize(8);
+          doc.setFont('helvetica', 'normal');
+          doc.text(splitObs, margin + 57, currY + 5);
+
+          currY += h;
+        });
+        currY += 3;
+      });
+
+      if (m.criticalPoints) {
+        currY += 5;
+        if (currY > 250) { doc.addPage(); currY = 20; addHeaderLogo(doc); currY += 10; }
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(9);
+        doc.setTextColor(200, 0, 0);
+        doc.text('CRITICAL FINDINGS', margin, currY);
+        currY += 5;
+        doc.setFont('helvetica', 'normal');
+        doc.setTextColor(0, 0, 0);
+        const splitCrit = doc.splitTextToSize(m.criticalPoints, 170);
+        doc.rect(margin, currY, 180, splitCrit.length * 5 + 6);
+        doc.text(splitCrit, margin + 5, currY + 6);
+      }
+
+      doc.save(`Meeting_Report_${m.siteName.replace(/\s+/g, '_')}_${m.id.slice(0, 8)}.pdf`);
+      toast({ title: 'PDF Exported' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Export Error' });
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -316,9 +444,9 @@ export default function MeetingsListPage() {
               </div>
             </div>
             <div className="flex items-center gap-2 no-print">
-               <Button onClick={handlePrint} variant="outline" size="sm" className="h-8 sm:h-9 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
-                 <Printer className="h-4 w-4 mr-2" />
-                 Print Report
+               <Button onClick={() => viewingMeeting && exportToPDF(viewingMeeting)} disabled={isExporting} variant="outline" size="sm" className="h-8 sm:h-9 rounded-sm font-bold border-primary text-primary hover:bg-primary/5">
+                 {isExporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileDown className="h-4 w-4 mr-2" />}
+                 Export PDF
                </Button>
                <DialogClose asChild className="sm:hidden"><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><X className="h-5 w-5" /></Button></DialogClose>
             </div>
@@ -423,101 +551,6 @@ export default function MeetingsListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Hidden Printable Area */}
-      {viewingMeeting && (
-        <div id="printable-meeting-area" className="hidden print:block p-10 bg-white text-black font-sans">
-          {/* Header with Logo */}
-          <div className="flex justify-between items-start mb-8 border-b-2 border-black pb-6">
-            <div className="space-y-2">
-              <h1 className="text-2xl font-black uppercase">Review Meeting Audit</h1>
-              <p className="text-[10px] font-bold uppercase tracking-widest opacity-60">Official Documentation • Aditya Pro</p>
-            </div>
-            <div className="text-right">
-              <img src="https://images.unsplash.com/photo-1566093097221-ac2335b09e70?auto=format&fit=crop&q=80&w=200&h=200" alt="AdityaPro Logo" className="h-16 w-16 ml-auto object-contain" />
-            </div>
-          </div>
-
-          {/* Site Info Table */}
-          <div className="grid grid-cols-2 gap-8 mb-10">
-            <div className="space-y-4">
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Project Site</label>
-                <p className="text-base font-bold">{viewingMeeting.siteName}</p>
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Meeting Lead</label>
-                <p className="text-sm font-bold">{viewingMeeting.userName}</p>
-              </div>
-            </div>
-            <div className="space-y-4 text-right">
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Audit Date</label>
-                <p className="text-sm font-bold font-mono">{viewingMeeting.date}</p>
-              </div>
-              <div>
-                <label className="text-[10px] font-black uppercase text-slate-500 block mb-1">Registry Ref</label>
-                <p className="text-[10px] font-mono font-bold uppercase tracking-tight">{viewingMeeting.id}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Attendees */}
-          <div className="mb-10">
-            <h3 className="text-xs font-black uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Attendees</h3>
-            <div className="flex flex-wrap gap-2">
-              {viewingMeeting.attendees && viewingMeeting.attendees.length > 0 ? viewingMeeting.attendees.map(a => (
-                <span key={a.id} className="text-[11px] font-bold border border-slate-200 px-3 py-1 bg-slate-50 rounded-sm">
-                  {a.name}
-                </span>
-              )) : (
-                <p className="text-xs italic text-slate-400">No additional attendees recorded.</p>
-              )}
-            </div>
-          </div>
-
-          {/* Technical Review */}
-          <div className="mb-10 space-y-8">
-            <h3 className="text-xs font-black uppercase tracking-widest border-b border-slate-200 pb-2 mb-4">Technical Review Protocol</h3>
-            {CATEGORIES.map(category => {
-              const points = REVIEW_POINTS.filter(p => p.category === category);
-              const hasObservations = points.some(p => viewingMeeting.observations[p.id]);
-              if (!hasObservations) return null;
-
-              return (
-                <div key={category} className="space-y-4">
-                  <h4 className="text-[10px] font-black uppercase text-slate-400 tracking-widest">{category}</h4>
-                  <div className="grid grid-cols-1 gap-3">
-                    {points.map(p => {
-                      const obs = viewingMeeting.observations[p.id];
-                      if (!obs) return null;
-                      return (
-                        <div key={p.id} className="grid grid-cols-3 gap-4 border-b border-slate-50 pb-2">
-                          <div className="text-[10px] font-bold uppercase text-slate-600 pt-1">{p.label}</div>
-                          <div className="col-span-2 text-[11px] font-medium italic">"{obs}"</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-
-          {/* Critical Observations */}
-          <div className="mt-12">
-            <h3 className="text-xs font-black uppercase tracking-widest border-b-2 border-red-200 text-red-700 pb-2 mb-4">Critical Observations Registry</h3>
-            <div className="p-6 bg-red-50 border border-red-100 rounded-sm text-[11px] font-medium italic text-red-950">
-              "{viewingMeeting.criticalPoints || 'Zero critical blockers identified during this meeting.'}"
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="mt-20 text-center">
-            <p className="text-[9px] font-black text-slate-300 uppercase tracking-[0.4em]">End of Official Audit Record • Aditya Pro Systems</p>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
