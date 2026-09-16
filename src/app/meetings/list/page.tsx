@@ -520,7 +520,7 @@ export default function MeetingsListPage() {
                                  {p.label}
                               </div>
                               <p className="text-xs font-medium leading-relaxed italic text-foreground/80">
-                                {viewingMeeting.observations[p.id] ? `"${viewingMeeting.observations[p.id]}"` : "No specific observations logged."}
+                                {viewingMeeting.observations[p.id] ? `"${viewingMeeting.observations[p.id]}"` : "-"}
                               </p>
                             </div>
                           ))}
