@@ -324,7 +324,7 @@ export default function MeetingsMatrixPage() {
           <div className="flex items-center gap-4">
             <div className="bg-primary/10 p-2.5 rounded-sm shrink-0"><LayoutGrid className="h-7 w-7 text-primary" /></div>
             <div className="min-w-0 text-left">
-              <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tight text-primary leading-tight truncate">
+              <h1 className="text-xl md:text-3xl font-black uppercase tracking-tight text-primary leading-tight truncate">
                 {selectedSiteId === 'all' ? "Global Matrix" : allSites?.find(s => s.id === selectedSiteId)?.name}
               </h1>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1">Cross-session technical audit</p>
@@ -542,4 +542,3 @@ function SortIcon({ column, config }: { column: SortKey, config: { key: SortKey;
   if (config.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
   return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
 }
-
