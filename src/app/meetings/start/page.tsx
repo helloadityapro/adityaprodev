@@ -29,7 +29,8 @@ import {
   Plus,
   UserPlus,
   Navigation,
-  Globe
+  Globe,
+  Calendar
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -134,6 +135,8 @@ const REVIEW_SECTIONS = [
   }
 ];
 
+const LOCAL_STORAGE_KEY = 'adityapro_meeting_draft_v2';
+
 export default function StartMeetingPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -142,6 +145,7 @@ export default function StartMeetingPage() {
 
   const [siteId, setSiteId] = React.useState("");
   const [siteName, setSiteName] = React.useState("");
+  const [meetingDate, setMeetingDate] = React.useState(format(new Date(), 'yyyy-MM-dd'));
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
 
@@ -187,6 +191,30 @@ export default function StartMeetingPage() {
     });
   }, [rawPreviousMeetings]);
 
+  // Load draft from localStorage on mount
+  React.useEffect(() => {
+    const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (savedDraft) {
+      try {
+        const draft = JSON.parse(savedDraft);
+        if (draft.siteId) setSiteId(draft.siteId);
+        if (draft.siteName) setSiteName(draft.siteName);
+        if (draft.meetingDate) setMeetingDate(draft.meetingDate);
+        if (draft.attendees) setAttendees(draft.attendees);
+        if (draft.observations) setObservations(draft.observations);
+        if (draft.criticalPoints) setCriticalPoints(draft.criticalPoints);
+      } catch (e) {
+        console.error("Failed to load meeting draft", e);
+      }
+    }
+  }, []);
+
+  // Save draft to localStorage on any field change
+  React.useEffect(() => {
+    const draft = { siteId, siteName, meetingDate, attendees, observations, criticalPoints };
+    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
+  }, [siteId, siteName, meetingDate, attendees, observations, criticalPoints]);
+
   const handleSaveMeeting = async () => {
     if (!user || !userProfile || !siteId) {
       toast({ variant: 'destructive', title: 'Site Required', description: 'Please select a project site.' });
@@ -198,7 +226,7 @@ export default function StartMeetingPage() {
       await addDocumentNonBlocking(collection(firestore, 'meetings'), {
         siteId,
         siteName,
-        date: format(new Date(), 'yyyy-MM-dd HH:mm'),
+        date: meetingDate,
         observations,
         customPoints: [], 
         criticalPoints,
@@ -209,6 +237,8 @@ export default function StartMeetingPage() {
         createdAt: serverTimestamp()
       });
 
+      // Clear draft on success
+      localStorage.removeItem(LOCAL_STORAGE_KEY);
       setIsSuccess(true);
       toast({ title: 'Meeting Saved', description: 'Site review record archived successfully.' });
     } catch (e: any) {
@@ -269,41 +299,56 @@ export default function StartMeetingPage() {
         <Card className="rounded-sm shadow-md border-primary/10">
           <CardHeader className="py-4 border-b bg-muted/5">
             <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-              <Building2 className="h-4 w-4 text-primary" /> Site Context
+              <Building2 className="h-4 w-4 text-primary" /> Site & Date Context
             </CardTitle>
           </CardHeader>
-          <CardContent className="pt-6">
-            <div className="space-y-2">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground">Select Project Site</Label>
-              <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" role="combobox" className={cn("w-full justify-between h-12 rounded-sm font-bold border-primary/20 text-left", !siteId && "text-muted-foreground")}>
-                    <span className="truncate">{siteName || "Choose site..."}</span>
-                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-2xl">
-                  <div className="flex items-center border-b px-3 bg-muted/20">
-                    <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input 
-                      placeholder="Search sites..." 
-                      className="h-10 border-none text-sm bg-transparent focus-visible:ring-0" 
-                      value={siteSearch} 
-                      onChange={e => setSiteSearch(e.target.value)} 
-                    />
-                  </div>
-                  <ScrollArea className="h-[200px]">
-                    <div className="p-1">
-                      {allSites?.filter((s: any) => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map((s: any) => (
-                        <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase text-left" onClick={() => { setSiteId(s.id); setSiteName(s.name); setIsSitePopoverOpen(false); }}>
-                          <Check className={cn("mr-2 h-4 w-4 text-primary", siteId === s.id ? "opacity-100" : "opacity-0")} />
-                          {s.name}
-                        </Button>
-                      ))}
+          <CardContent className="pt-6 space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Meeting Date</Label>
+                <div className="relative">
+                  <Input 
+                    type="date" 
+                    value={meetingDate} 
+                    onChange={e => setMeetingDate(e.target.value)} 
+                    className="h-12 rounded-sm font-bold border-primary/20 bg-background"
+                  />
+                  <Calendar className="absolute right-3 top-4 h-4 w-4 text-muted-foreground pointer-events-none" />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Select Project Site</Label>
+                <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" role="combobox" className={cn("w-full justify-between h-12 rounded-sm font-bold border-primary/20 text-left", !siteId && "text-muted-foreground")}>
+                      <span className="truncate">{siteName || "Choose site..."}</span>
+                      <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-2xl">
+                    <div className="flex items-center border-b px-3 bg-muted/20">
+                      <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                      <Input 
+                        placeholder="Search sites..." 
+                        className="h-10 border-none text-sm bg-transparent focus-visible:ring-0" 
+                        value={siteSearch} 
+                        onChange={e => setSiteSearch(e.target.value)} 
+                      />
                     </div>
-                  </ScrollArea>
-                </PopoverContent>
-              </Popover>
+                    <ScrollArea className="h-[200px]">
+                      <div className="p-1">
+                        {allSites?.filter((s: any) => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map((s: any) => (
+                          <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase text-left" onClick={() => { setSiteId(s.id); setSiteName(s.name); setIsSitePopoverOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4 text-primary", siteId === s.id ? "opacity-100" : "opacity-0")} />
+                            {s.name}
+                          </Button>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </PopoverContent>
+                </Popover>
+              </div>
             </div>
           </CardContent>
         </Card>
