@@ -158,7 +158,6 @@ export default function StartMeetingPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [expandedHistory, setExpandedHistory] = React.useState<Record<string, boolean>>({});
-  const [copyStatus, setCopyStatus] = React.useState<'idle' | 'not-found'>('idle');
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -215,18 +214,6 @@ export default function StartMeetingPage() {
     const draft = { siteId, siteName, meetingDate, attendees, observations, criticalPoints };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
   }, [siteId, siteName, meetingDate, attendees, observations, criticalPoints]);
-
-  const handleCopyPrevious = () => {
-    if (previousMeetings.length > 0) {
-      const latest = previousMeetings[0];
-      setObservations(latest.observations || {});
-      setCriticalPoints(latest.criticalPoints || "");
-      toast({ title: "Data Copied", description: `Loaded observations from session dated ${latest.date}.` });
-      setCopyStatus('idle');
-    } else {
-      setCopyStatus('not-found');
-    }
-  };
 
   const handleCopyPointPrevious = (pointId: string) => {
     if (previousMeetings.length > 0) {
@@ -286,7 +273,7 @@ export default function StartMeetingPage() {
 
   if (isSuccess) {
     return (
-      <div className="flex items-center justify-center min-h-[70vh] px-4 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex items-center justify-center min-h-[60vh] px-4 animate-in fade-in zoom-in-95 duration-500">
         <Card className="max-w-md w-full rounded-sm shadow-2xl border-emerald-500/20">
           <CardHeader className="text-center pt-8">
             <div className="flex justify-center mb-6">
@@ -335,11 +322,11 @@ export default function StartMeetingPage() {
               <div className="space-y-2">
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Meeting Date</Label>
                 <div className="relative">
-                  <Input 
+                  <input 
                     type="date" 
                     value={meetingDate} 
                     onChange={e => setMeetingDate(e.target.value)} 
-                    className="h-12 rounded-sm font-bold border-primary/20 bg-background"
+                    className="flex h-12 w-full rounded-sm border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 font-bold border-primary/20"
                   />
                   <Calendar className="absolute right-3 top-4 h-4 w-4 text-muted-foreground pointer-events-none" />
                 </div>
@@ -349,7 +336,7 @@ export default function StartMeetingPage() {
                 <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Select Project Site</Label>
                 <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                   <PopoverTrigger asChild>
-                    <Button variant="outline" role="combobox" className={cn("w-full justify-between h-12 rounded-sm font-bold border-primary/20 text-left", !siteId && "text-muted-foreground")}>
+                    <Button variant="outline" role="combobox" className={cn("w-full justify-between h-12 rounded-sm font-bold border-primary/10 text-left", !siteId && "text-muted-foreground")}>
                       <span className="truncate">{siteName || "Choose site..."}</span>
                       <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                     </Button>
@@ -367,7 +354,7 @@ export default function StartMeetingPage() {
                     <ScrollArea className="h-[200px]">
                       <div className="p-1">
                         {allSites?.filter((s: any) => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map((s: any) => (
-                          <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase text-left" onClick={() => { setSiteId(s.id); setSiteName(s.name); setCopyStatus('idle'); setIsSitePopoverOpen(false); }}>
+                          <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase text-left" onClick={() => { setSiteId(s.id); setSiteName(s.name); setIsSitePopoverOpen(false); }}>
                             <Check className={cn("mr-2 h-4 w-4 text-primary", siteId === s.id ? "opacity-100" : "opacity-0")} />
                             {s.name}
                           </Button>
@@ -376,20 +363,6 @@ export default function StartMeetingPage() {
                     </ScrollArea>
                   </PopoverContent>
                 </Popover>
-                {siteId && (
-                  <div className="flex items-center gap-4 mt-2 px-1">
-                    <button 
-                      type="button"
-                      onClick={handleCopyPrevious}
-                      className="text-[10px] font-black uppercase text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
-                    >
-                      Copy All From Previous
-                    </button>
-                    {copyStatus === 'not-found' && (
-                      <span className="text-[10px] font-bold text-destructive uppercase animate-in fade-in">No previous meeting found.</span>
-                    )}
-                  </div>
-                )}
               </div>
             </div>
           </CardContent>
