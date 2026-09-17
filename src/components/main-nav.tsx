@@ -1,3 +1,4 @@
+
 "use client"
 
 import Link from "next/link"
@@ -60,7 +61,8 @@ import {
   Bell,
   Cpu,
   GlassWater,
-  NotebookPen
+  NotebookPen,
+  PlugZap
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -198,6 +200,18 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                 </CollapsibleContent>
               </SidebarMenuItem>
             </Collapsible>
+          )}
+
+          {/* Liaisoning */}
+          {canShow('liaisoning') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Liaisoning" isActive={pathname.startsWith('/liaisoning')} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/liaisoning/list">
+                  <PlugZap className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Liaisoning</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
           )}
 
           {/* Inventory */}

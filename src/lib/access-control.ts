@@ -26,6 +26,7 @@ export type PageKey =
   | 'trips' 
   | 'meetings'
   | 'meetings-matrix'
+  | 'liaisoning'
   | 'attendance'
   | 'attendance-map'
   | 'checklists-installation'
@@ -93,6 +94,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'trips', label: 'Vehicle Trips', category: 'Operations', path: '/vehicles/trips/manage' },
   { id: 'meetings', label: 'Review Meetings', category: 'Operations', path: '/meetings/list' },
   { id: 'meetings-matrix', label: 'Meetings Matrix', category: 'Operations', path: '/meetings/matrix' },
+  { id: 'liaisoning', label: 'Liaisoning Tracker', category: 'Operations', path: '/liaisoning/list' },
   { id: 'attendance', label: 'Personnel Attendance', category: 'Operations', path: '/attendance' },
   { id: 'attendance-map', label: 'Personnel Live Map', category: 'Operations', path: '/attendance/map-view' },
 
@@ -166,6 +168,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
     if (path.includes('/matrix')) return 'meetings-matrix';
     return 'meetings';
   }
+  if (path.startsWith('/liaisoning')) return 'liaisoning';
   if (path.startsWith('/attendance')) return 'attendance';
   if (path.startsWith('/checklists/installation')) return 'checklists-installation';
   if (path.startsWith('/checklists/ht-line')) return 'checklists-ht-line';

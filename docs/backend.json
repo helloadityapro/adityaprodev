@@ -44,6 +44,82 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
+    "LiaisoningRecord": {
+      "title": "Liaisoning Progress Record",
+      "type": "object",
+      "description": "Progress tracker for grid connectivity and electrical approvals.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "status": { "type": "string", "enum": ["In Progress", "Completed"] },
+        "completionPercentage": { "type": "number" },
+        "stages": {
+          "type": "object",
+          "properties": {
+            "grid_connectivity": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "estimate_approval": { 
+              "type": "object",
+              "properties": {
+                "base": { "$ref": "#/backend/entities/LiaisoningStage" },
+                "ae_je": { "type": "boolean" },
+                "dyee": { "type": "boolean" },
+                "ee": { "type": "boolean" },
+                "circle_office": { "type": "boolean" }
+              }
+            },
+            "estimate_sanction": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "supervision_testing": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "material_inspection": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "work_progress": { 
+              "type": "object",
+              "properties": {
+                "base": { "$ref": "#/backend/entities/LiaisoningStage" },
+                "started": { "type": "boolean" },
+                "not_started": { "type": "boolean" },
+                "row": { "type": "boolean" }
+              }
+            },
+            "wcr": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "pre_commissioning": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "format_ii_approval": { 
+              "type": "object",
+              "properties": {
+                "base": { "$ref": "#/backend/entities/LiaisoningStage" },
+                "eet": { "type": "boolean" },
+                "om": { "type": "boolean" },
+                "setqa": { "type": "boolean" }
+              }
+            },
+            "ptc": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "clearance": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "commissioning": { "$ref": "#/backend/entities/LiaisoningStage" }
+          }
+        },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "updatedBy": { "type": "string" }
+      }
+    },
+    "LiaisoningStage": {
+      "title": "Liaisoning Stage",
+      "type": "object",
+      "properties": {
+        "status": { "type": "string", "enum": ["Pending", "In Progress", "Completed"] },
+        "remarks": { "type": "string" },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string" },
+              "url": { "type": "string" },
+              "storagePath": { "type": "string" },
+              "uploadedAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        }
+      }
+    },
     "AttendanceSettings": {
       "title": "Attendance Settings",
       "type": "object",
@@ -856,6 +932,10 @@
     "/meetings/{meetingId}": {
       "schema": { "$ref": "#/backend/entities/Meeting" },
       "description": "Structured site review meetings with voice recording."
+    },
+    "/liaisoning_records/{siteId}": {
+      "schema": { "$ref": "#/backend/entities/LiaisoningRecord" },
+      "description": "Liaisoning progress tracker for grid connectivity."
     }
   }
 }
