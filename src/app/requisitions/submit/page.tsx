@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from "react";
@@ -15,13 +14,23 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ClipboardList, Plus, Trash2, CheckCircle2, Building2, Save, Layers } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ClipboardList, Plus, Trash2, CheckCircle2, Building2, Save, Layers, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { sendNotification } from "@/lib/notifications";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Separator } from "@/components/ui/separator";
+import { Badge } from "@/components/ui/badge";
+
+const COMMON_MATERIALS = [
+  "Solar Module", "Solar Panel", "Inverter", "Wiring Harness", "DC Cable", "AC Cable", "MC4 Connector",
+  "Column Post", "Rafter", "Purlin", "Back Bracing", "Bracing Connector", "Front Bracing", "Sag Rod", "Mid Clamp", "End Clamp",
+  "Earthing Strip", "Chemical Earthing", "Lightening Arrestor", "Labelling Stickers", "ACDB",
+  "Nylon Cable Tie", "PVC Conduit", "UPVC Pipe", "Module Mounting Structure",
+  "Lugs", "Ferrules", "Glands", "Isolator", "Fuse", "Breaker", "LT Panel", "VCB", "RMU", "Balance of System (BoS)"
+];
 
 const itemSchema = z.object({
   itemId: z.string().min(1, "Material selection is required"),
@@ -142,9 +151,18 @@ export default function SubmitRequisitionPage() {
     }
   };
 
+  const getSpellingSuggestion = (val: string) => {
+    if (!val || val.length < 3) return null;
+    const lowerVal = val.toLowerCase();
+    return COMMON_MATERIALS.find(m => {
+      const lowerM = m.toLowerCase();
+      return (lowerM.includes(lowerVal) || lowerVal.includes(lowerM)) && lowerM !== lowerVal;
+    });
+  };
+
   const accessibleSites = React.useMemo(() => {
     if (!allSites) return [];
-    return allSites.sort((a, b) => a.name.localeCompare(b.name));
+    return [...allSites].sort((a, b) => a.name.localeCompare(b.name));
   }, [allSites]);
 
   if (isProfileLoading) return <div className="p-8"><Skeleton className="h-10 w-48" /></div>;
@@ -209,7 +227,7 @@ export default function SubmitRequisitionPage() {
                       </div>
                       <ScrollArea className="h-[200px]">
                         <div className="p-1">
-                          {allSites?.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map(site => (
+                          {filteredSites.map(site => (
                             <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { 
                               field.onChange(site.id); 
                               form.setValue('siteName', site.name); 
@@ -271,6 +289,8 @@ export default function SubmitRequisitionPage() {
                   {fields.map((field, index) => {
                     const selectedMasterItem = masterInventory?.find(m => m.id === form.watch(`items.${index}.itemId`));
                     const isSet = selectedMasterItem?.unit === 'Sets';
+                    const currentName = form.watch(`items.${index}.itemName`);
+                    const spellingSuggestion = getSpellingSuggestion(currentName);
                     
                     return (
                       <Card key={field.id} className="relative bg-muted/5 border-dashed rounded-sm">
@@ -322,6 +342,29 @@ export default function SubmitRequisitionPage() {
                                   <FormMessage />
                                 </FormItem>
                               )} />
+                              {spellingSuggestion && (
+                                <div className="mt-2 flex items-center gap-2">
+                                  <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 py-1.5 px-3 rounded-sm flex items-center gap-2">
+                                    <Sparkles className="h-3 w-3" />
+                                    <span className="text-[10px] font-bold uppercase tracking-tight">Suggestion:</span>
+                                    <Button 
+                                      variant="link" 
+                                      type="button"
+                                      className="p-0 h-auto text-[11px] font-black underline decoration-dashed underline-offset-4"
+                                      onClick={() => {
+                                        const match = masterInventory?.find(m => m.name === spellingSuggestion);
+                                        if (match) {
+                                          form.setValue(`items.${index}.itemId`, match.id);
+                                          form.setValue(`items.${index}.itemName`, match.name);
+                                          form.setValue(`items.${index}.unit`, match.unit);
+                                        }
+                                      }}
+                                    >
+                                      {spellingSuggestion}
+                                    </Button>
+                                  </Badge>
+                                </div>
+                              )}
                             </div>
                             <div className="md:col-span-3">
                               <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
@@ -341,7 +384,7 @@ export default function SubmitRequisitionPage() {
                           </div>
 
                           {/* Sub-items Expansion Logic */}
-                          {isSet && selectedMasterItem.subItems && selectedMasterItem.subItems.length > 0 && (
+                          {isSet && selectedMasterItem?.subItems && selectedMasterItem.subItems.length > 0 && (
                             <div className="mt-4 p-4 bg-primary/[0.03] border border-primary/10 rounded-sm animate-in slide-in-from-top-2 duration-300">
                               <div className="flex items-center gap-2 mb-3">
                                 <Layers className="h-3.5 w-3.5 text-primary" />
@@ -388,7 +431,7 @@ export default function SubmitRequisitionPage() {
 
               <div className="flex justify-end pt-4 border-t gap-3">
                 <Button variant="ghost" type="button" onClick={() => router.back()} className="h-12 px-8 font-bold rounded-sm">Cancel</Button>
-                <Button type="submit" disabled={isSubmitting} className="min-w-[200px] h-12 rounded-sm font-black uppercase tracking-widest shadow-xl">
+                <Button type="submit" disabled={isSubmitting} className="min-w-[220px] h-12 rounded-sm font-black uppercase tracking-widest shadow-xl">
                   {isSubmitting ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Submitting...</> : <><Save className="mr-2 h-4 w-4" /> Submit Requisition</>}
                 </Button>
               </div>
