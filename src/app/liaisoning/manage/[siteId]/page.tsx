@@ -135,13 +135,21 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     if (!site) return;
     const initialStages: Record<string, StageData> = {};
     MAIN_STAGES.forEach(s => {
-      initialStages[s.id] = {
+      const stageObj: StageData = {
         status: 'Pending',
         remarks: "",
         documents: [],
-        subStages: s.subStages ? s.subStages.reduce((acc: any, ss) => ({ ...acc, [ss.id]: false }), {}) : undefined,
-        progressFlags: s.flags ? [] : undefined
       };
+
+      if (s.subStages) {
+        stageObj.subStages = s.subStages.reduce((acc: any, ss) => ({ ...acc, [ss.id]: false }), {});
+      }
+
+      if (s.flags) {
+        stageObj.progressFlags = [];
+      }
+
+      initialStages[s.id] = stageObj;
     });
 
     setDocumentNonBlocking(recordRef, {
@@ -241,7 +249,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     }
   };
 
-  if (siteLoading || recordLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
+  if (siteLoading || recordLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   if (!record) {
     return (
