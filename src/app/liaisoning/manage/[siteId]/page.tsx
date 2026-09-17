@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -33,7 +32,8 @@ import {
   CircleDashed,
   LayoutGrid,
   FileCheck,
-  History
+  History,
+  Check
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -43,6 +43,8 @@ import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 
 type LiaisoningDocument = {
   url: string;
@@ -117,7 +119,6 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   const { toast } = useToast();
 
   const [activeStageId, setActiveStageId] = React.useState<string>('grid_connectivity');
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [uploadingStageId, setUploadingStageId] = React.useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = React.useState(0);
 
@@ -239,7 +240,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     }
   };
 
-  if (siteLoading || recordLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+  if (siteLoading || recordLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[600px] w-full" /></div>;
 
   if (!record) {
     return (
