@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, where, limit } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -77,48 +77,50 @@ export default function LiaisoningRegistryPage() {
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div className="space-y-1">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 p-2.5 rounded-sm shrink-0">
-              <PlugZap className="h-8 w-8 text-primary" />
-            </div>
-            <div>
-              <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Liaisoning Hub</h1>
-              <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest opacity-60">Grid Connectivity & Approval Tracker</p>
+      <div className="flex flex-col gap-1">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+          <div className="space-y-1">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2.5 rounded-sm shrink-0">
+                <PlugZap className="h-8 w-8 text-primary" />
+              </div>
+              <div>
+                <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Liaisoning Hub</h1>
+                <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest opacity-60">Grid Connectivity & Approval Tracker</p>
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-          <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-            <PopoverTrigger asChild>
-              <Button className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg px-8">
-                <Plus className="mr-2 h-4 w-4" /> Start New Tracking
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[300px] p-0" align="end">
-              <div className="bg-primary/5 p-3 border-b">
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Select Project Site</h3>
-              </div>
-              <div className="flex items-center border-b px-3">
-                <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                <Input placeholder="Search sites..." className="h-10 border-none" value={siteSearch} onChange={e => setSiteSearch(e.target.value)} />
-              </div>
-              <ScrollArea className="h-[250px]">
-                <div className="p-1">
-                  {accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map(site => (
-                    <Button key={site.id} variant="ghost" className="w-full justify-start h-auto py-3 px-4 mb-0.5 text-xs text-left" onClick={() => router.push(`/liaisoning/manage/${site.id}`)}>
-                      <div className="flex flex-col items-start min-w-0">
-                        <span className="font-bold truncate w-full uppercase tracking-tight">{site.name}</span>
-                        <span className="text-[9px] text-muted-foreground uppercase opacity-60">{site.projectCompany}</span>
-                      </div>
-                    </Button>
-                  ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg px-8">
+                  <Plus className="mr-2 h-4 w-4" /> Start New Tracking
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[300px] p-0" align="end">
+                <div className="bg-primary/5 p-3 border-b">
+                  <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Select Project Site</h3>
                 </div>
-              </ScrollArea>
-            </PopoverContent>
-          </Popover>
+                <div className="flex items-center border-b px-3">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Input placeholder="Search sites..." className="h-10 border-none" value={siteSearch} onChange={e => setSiteSearch(e.target.value)} />
+                </div>
+                <ScrollArea className="h-[250px]">
+                  <div className="p-1">
+                    {accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map(site => (
+                      <Button key={site.id} variant="ghost" className="w-full justify-start h-auto py-3 px-4 mb-0.5 text-xs text-left" onClick={() => router.push(`/liaisoning/manage/${site.id}`)}>
+                        <div className="flex flex-col items-start min-w-0">
+                          <span className="font-bold truncate w-full uppercase tracking-tight">{site.name}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase opacity-60">{site.projectCompany}</span>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          </div>
         </div>
       </div>
 
