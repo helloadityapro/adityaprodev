@@ -211,7 +211,7 @@ export default function MeetingsListPage() {
       drawRow('PROJECT SITE', m.siteName);
       drawRow('MEETING LEAD', m.userName);
       drawRow('AUDIT DATE', m.date);
-      drawRow('REGISTRY REF', m.id);
+      drawRow('ATTENDEES', m.attendees?.map(a => a.name).join(', ') || 'Only Lead');
 
       currY += 5;
       doc.setFont('helvetica', 'bold');
@@ -544,7 +544,7 @@ export default function MeetingsListPage() {
               </div>
             )}
           </ScrollArea>
-          <DialogFooter className="p-4 bg-muted/5 border-t shrink-0 no-print">
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print">
             <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-10 tracking-widest">Close Audit</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
@@ -552,4 +552,3 @@ export default function MeetingsListPage() {
     </div>
   );
 }
-
