@@ -14,25 +14,18 @@ import {
   ArrowLeft, 
   CheckCircle2, 
   Clock, 
-  AlertCircle, 
   Plus, 
   X, 
   Upload, 
   FileText, 
-  Download, 
   Trash2, 
   Loader2, 
-  Save, 
   ExternalLink,
   ChevronRight,
   ShieldCheck,
   Building2,
-  Settings2,
-  CircleCheck,
-  CircleDashed,
   LayoutGrid,
   FileCheck,
-  History,
   Check
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -41,10 +34,10 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { Progress } from "@/components/ui/progress";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { isSuperAdmin } from '@/lib/auth-constants';
 
 type LiaisoningDocument = {
   url: string;
@@ -128,6 +121,10 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   const recordRef = useMemoFirebase(() => doc(firestore, 'liaisoning_records', siteId), [firestore, siteId]);
   const { data: record, isLoading: recordLoading } = useDoc<LiaisoningRecord>(recordRef);
 
+  const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
+  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
+
   const calculateCompletion = (stages: Record<string, StageData>) => {
     const total = MAIN_STAGES.length;
     const completed = Object.values(stages).filter(s => s.status === 'Completed').length;
@@ -147,7 +144,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
       };
     });
 
-    await setDocumentNonBlocking(recordRef, {
+    setDocumentNonBlocking(recordRef, {
       id: siteId,
       siteId,
       siteName: site.name,
@@ -203,14 +200,16 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
           };
 
           const updatedStages = { ...record.stages };
-          updatedStages[stageId].documents = [...(updatedStages[stageId].documents || []), newDoc];
-          
-          updateDocumentNonBlocking(recordRef, {
-            stages: updatedStages,
-            updatedAt: serverTimestamp()
-          });
+          if (updatedStages[stageId]) {
+            updatedStages[stageId].documents = [...(updatedStages[stageId].documents || []), newDoc];
+            
+            updateDocumentNonBlocking(recordRef, {
+              stages: updatedStages,
+              updatedAt: serverTimestamp()
+            });
 
-          toast({ title: 'Document Uploaded' });
+            toast({ title: 'Document Uploaded' });
+          }
           setUploadingStageId(null);
           setUploadProgress(0);
         }
@@ -225,16 +224,18 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     if (!record) return;
     try {
       const storage = getStorage(firebaseApp);
-      await deleteObject(ref(storage, docToDelete.storagePath)).catch(e => console.warn("Storage removal ignored", e));
+      await deleteObject(ref(storage, docToDelete.storagePath)).catch(e => console.warn("Storage removal failed", e));
       
       const updatedStages = { ...record.stages };
-      updatedStages[stageId].documents = updatedStages[stageId].documents.filter(d => d.url !== docToDelete.url);
-      
-      updateDocumentNonBlocking(recordRef, {
-        stages: updatedStages,
-        updatedAt: serverTimestamp()
-      });
-      toast({ title: 'Document Removed' });
+      if (updatedStages[stageId]) {
+        updatedStages[stageId].documents = (updatedStages[stageId].documents || []).filter(d => d.url !== docToDelete.url);
+        
+        updateDocumentNonBlocking(recordRef, {
+          stages: updatedStages,
+          updatedAt: serverTimestamp()
+        });
+        toast({ title: 'Document Removed' });
+      }
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
     }
@@ -256,7 +257,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   }
 
   const currentStage = MAIN_STAGES.find(s => s.id === activeStageId);
-  const activeStageData = record.stages[activeStageId];
+  const activeStageData = record.stages?.[activeStageId] || { status: 'Pending', remarks: '', documents: [] };
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -294,7 +295,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
             <ScrollArea className="h-[65vh]">
               <div className="divide-y">
                 {MAIN_STAGES.map((s, idx) => {
-                  const stageData = record.stages[s.id];
+                  const stageData = record.stages?.[s.id] || { status: 'Pending', documents: [] };
                   const isDone = stageData.status === 'Completed';
                   const isActive = activeStageId === s.id;
                   
