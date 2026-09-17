@@ -325,5 +325,10 @@ service cloud.firestore {
       allow update: if isSignedIn() && (request.auth.uid == resource.data.userId || isAdmin());
       allow delete: if isAdmin();
     }
+
+    match /liaisoning_records/{siteId} {
+      allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
   }
 }
