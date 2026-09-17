@@ -228,6 +228,21 @@ export default function StartMeetingPage() {
     }
   };
 
+  const handleCopyPointPrevious = (pointId: string) => {
+    if (previousMeetings.length > 0) {
+      const latest = previousMeetings[0];
+      const prevObs = latest.observations?.[pointId];
+      if (prevObs) {
+        setObservations(prev => ({ ...prev, [pointId]: prevObs }));
+        toast({ title: "Point Copied", description: `Observation synced from previous meeting.` });
+      } else {
+        toast({ variant: "destructive", title: "No Record", description: `No previous observation found for this specific point.` });
+      }
+    } else {
+      toast({ variant: "destructive", title: "No History", description: `No previous meetings found for this site.` });
+    }
+  };
+
   const handleSaveMeeting = async () => {
     if (!user || !userProfile || !siteId) {
       toast({ variant: 'destructive', title: 'Site Required', description: 'Please select a project site.' });
@@ -368,7 +383,7 @@ export default function StartMeetingPage() {
                       onClick={handleCopyPrevious}
                       className="text-[10px] font-black uppercase text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
                     >
-                      Copy Previous
+                      Copy All From Previous
                     </button>
                     {copyStatus === 'not-found' && (
                       <span className="text-[10px] font-bold text-destructive uppercase animate-in fade-in">No previous meeting found.</span>
@@ -497,13 +512,22 @@ export default function StartMeetingPage() {
                               <Label className="text-xs font-black uppercase text-foreground tracking-tight">{point.label}</Label>
                             </div>
                             
-                            <div className="md:col-span-8">
+                            <div className="md:col-span-8 space-y-2">
                               <Textarea 
                                 placeholder="Enter status / observation..." 
                                 value={observations[point.id] || ""}
                                 onChange={(e) => setObservations({ ...observations, [point.id]: e.target.value })}
                                 className="rounded-sm bg-background border-primary/10 min-h-[100px] text-sm font-medium shadow-sm focus-visible:ring-primary/20"
                               />
+                              {siteId && previousMeetings.length > 0 && (
+                                <button 
+                                  type="button"
+                                  onClick={() => handleCopyPointPrevious(point.id)}
+                                  className="text-[10px] font-black uppercase text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                                >
+                                  Copy Previous
+                                </button>
+                              )}
                             </div>
                           </div>
 
@@ -515,15 +539,13 @@ export default function StartMeetingPage() {
                                     <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Historical Context</Label>
                                   </div>
                                   {pointHistory.length > 1 && (
-                                    <Button 
-                                      type="button" 
-                                      variant="link" 
-                                      size="sm" 
-                                      className="h-auto p-0 text-[10px] font-bold uppercase tracking-tight text-primary/60 hover:text-primary"
+                                    <button 
+                                      type="button"
+                                      className="text-[10px] font-bold uppercase tracking-tight text-primary/60 hover:text-primary"
                                       onClick={() => setExpandedHistory(prev => ({...prev, [point.id]: !isExpanded}))}
                                     >
                                       {isExpanded ? "Collapse History" : `Expand Audit Trail (${pointHistory.length})`}
-                                    </Button>
+                                    </button>
                                   )}
                               </div>
 
