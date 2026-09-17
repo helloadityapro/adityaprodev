@@ -293,7 +293,6 @@ export default function SubmitRequisitionPage() {
                     const isActuallySubItem = nameParts.length > 1;
                     const parentDisplay = isActuallySubItem ? nameParts[0] : currentItemName;
                     const subDisplay = isActuallySubItem ? nameParts.slice(1).join(' - ') : "";
-                    const isSet = selectedMasterItem?.unit === 'Sets';
                     const hasComponents = selectedMasterItem?.subItems && selectedMasterItem.subItems.length > 0;
                     const spellingSuggestion = getSpellingSuggestion(currentItemName);
                     
@@ -311,7 +310,6 @@ export default function SubmitRequisitionPage() {
                                 <FormItem className="flex flex-col">
                                   <FormLabel className="text-[9px] font-bold uppercase">Material Selection</FormLabel>
                                   <div className="flex gap-2">
-                                    {/* Main Selector */}
                                     <div className={cn("min-w-0 transition-all duration-300", hasComponents ? "flex-1" : "w-full")}>
                                       <Popover open={openItemIndex === index} onOpenChange={o => setOpenItemIndex(o ? index : null)}>
                                         <PopoverTrigger asChild>
@@ -349,7 +347,6 @@ export default function SubmitRequisitionPage() {
                                       </Popover>
                                     </div>
 
-                                    {/* Sub-item Selector (The Blue Box) */}
                                     {hasComponents && (
                                       <div className="flex-1 min-w-0 animate-in slide-in-from-left-2 duration-300">
                                         <Popover>
@@ -361,7 +358,7 @@ export default function SubmitRequisitionPage() {
                                                 isActuallySubItem ? "bg-primary/10 border-primary text-primary shadow-sm" : "bg-muted/5 border-dashed text-muted-foreground/30"
                                               )}
                                             >
-                                              <span className="truncate">{subDisplay || "Select Component..."}</span>
+                                              <span className="truncate">{subDisplay || "Select Subitem..."}</span>
                                               <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
                                             </Button>
                                           </PopoverTrigger>
@@ -438,46 +435,6 @@ export default function SubmitRequisitionPage() {
                               </FormItem>
                             </div>
                           </div>
-
-                          {/* Sub-items Expansion Logic */}
-                          {isSet && selectedMasterItem?.subItems && selectedMasterItem.subItems.length > 0 && (
-                            <div className="mt-4 p-4 bg-primary/[0.03] border border-primary/10 rounded-sm animate-in slide-in-from-top-2 duration-300">
-                              <div className="flex items-center gap-2 mb-3">
-                                <Layers className="h-3.5 w-3.5 text-primary" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Set Components - Request Individually</span>
-                              </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                {selectedMasterItem.subItems.map((sub, sIdx) => (
-                                  <Button
-                                    key={sIdx}
-                                    type="button"
-                                    variant="outline"
-                                    size="sm"
-                                    className="h-9 justify-between text-[10px] font-bold uppercase tracking-tight bg-background border-primary/10 hover:bg-primary/5 hover:text-primary transition-all group"
-                                    onClick={() => {
-                                      append({
-                                        itemId: selectedMasterItem.id,
-                                        itemName: `${selectedMasterItem.name} - ${sub.name}`,
-                                        quantity: sub.quantityPerSet,
-                                        unit: sub.unit,
-                                        urgency: form.getValues('urgency'),
-                                        expectedDate: form.getValues('neededBy')
-                                      });
-                                      toast({ title: 'Part Added', description: `${sub.name} added to list.` });
-                                    }}
-                                  >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <Plus className="h-3 w-3 opacity-30 group-hover:opacity-100" />
-                                      <span className="truncate">{sub.name}</span>
-                                    </div>
-                                    <Badge variant="secondary" className="h-5 px-1.5 text-[8px] font-black bg-primary/5 text-primary border-none shrink-0 ml-2">
-                                      {sub.quantityPerSet} {sub.unit}
-                                    </Badge>
-                                  </Button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
                         </CardContent>
                       </Card>
                     );
