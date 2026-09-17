@@ -130,7 +130,7 @@ type Site = {
 
 type SortKey = 'company' | 'name' | 'total' | string;
 
-export default function MeetingsMatrixPage() {
+export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteId: string }> }) {
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
@@ -220,7 +220,12 @@ export default function MeetingsMatrixPage() {
         doc.text('OBSERVATION POINT', margin + 2, currY + 6);
         items.forEach((m, i) => {
           doc.rect(margin + col1W + (i * colW), currY, colW, 10);
-          doc.text(m.date.split(' ')[0], margin + col1W + (i * colW) + 2, currY + 6);
+          // Split site name for multiple lines if needed
+          const splitName = doc.splitTextToSize(m.siteName, colW - 4);
+          doc.setFontSize(6);
+          doc.text(splitName, margin + col1W + (i * colW) + 2, currY + 4);
+          doc.setFontSize(7);
+          doc.text(m.date.split(' ')[0], margin + col1W + (i * colW) + 2, currY + 9);
         });
         currY += 10;
 
@@ -280,14 +285,14 @@ export default function MeetingsMatrixPage() {
     const exportData = REVIEW_POINTS.map(point => {
       const row: any = { 'Category': point.category, 'Observation Point': point.label };
       sortedMeetings.forEach(m => {
-        row[m.date] = m.observations[point.id] || '-';
+        row[`${m.siteName} (${m.date})`] = m.observations[point.id] || '-';
       });
       return row;
     });
 
     const criticalRow: any = { 'Category': 'GENERAL', 'Observation Point': 'CRITICAL POINTS' };
     sortedMeetings.forEach(m => {
-      criticalRow[m.date] = m.criticalPoints || '-';
+      criticalRow[`${m.siteName} (${m.date})`] = m.criticalPoints || '-';
     });
     exportData.push(criticalRow);
 
@@ -324,7 +329,7 @@ export default function MeetingsMatrixPage() {
           <div className="flex items-center gap-4">
             <div className="bg-primary/10 p-2.5 rounded-sm shrink-0"><LayoutGrid className="h-7 w-7 text-primary" /></div>
             <div className="min-w-0 text-left">
-              <h1 className="text-xl md:text-3xl font-black uppercase tracking-tight text-primary leading-tight truncate">
+              <h1 className="text-xl md:text-2xl font-black uppercase tracking-tight text-primary leading-tight truncate">
                 {selectedSiteId === 'all' ? "Global Matrix" : allSites?.find(s => s.id === selectedSiteId)?.name}
               </h1>
               <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.2em] mt-1">Cross-session technical audit</p>
@@ -416,8 +421,9 @@ export default function MeetingsMatrixPage() {
                     {sortedMeetings.map((m) => (
                       <TableHead key={m.id} className="text-center font-black uppercase tracking-tight leading-tight w-[200px] px-2 py-4 bg-primary text-white border-r border-white/10 last:border-0">
                         <div className="flex flex-col items-center gap-1">
-                          <span className="text-[10px] font-mono">{m.date.split(' ')[0]}</span>
-                          <span className="text-[8px] opacity-80">{m.date.split(' ')[1] || ''}</span>
+                          <span className="text-[10px] font-black block truncate max-w-full mb-1">{m.siteName}</span>
+                          <span className="text-[9px] font-mono opacity-90">{m.date.split(' ')[0]}</span>
+                          <span className="text-[8px] opacity-70">{m.date.split(' ')[1] || ''}</span>
                         </div>
                       </TableHead>
                     ))}
@@ -458,7 +464,7 @@ export default function MeetingsMatrixPage() {
                                           <p className="text-[9px] font-black uppercase text-primary tracking-widest border-b border-white/10 pb-1.5">{point.label}</p>
                                           <p className="text-xs leading-relaxed italic font-medium">"{observation}"</p>
                                           <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[8px] font-bold text-white/40 uppercase">
-                                             <span>Log By: {m.userName}</span>
+                                             <span>Site: {m.siteName}</span>
                                              <span className="font-mono">{m.date}</span>
                                           </div>
                                        </div>
@@ -536,9 +542,4 @@ export default function MeetingsMatrixPage() {
       </Card>
     </div>
   );
-}
-
-function SortIcon({ column, config }: { column: SortKey, config: { key: SortKey; direction: 'asc' | 'desc' } }) {
-  if (config.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
 }
