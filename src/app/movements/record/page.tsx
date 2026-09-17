@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
+import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
 import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, setDoc, and, or } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
@@ -28,7 +28,6 @@ import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
 
-// Reusing same schema and types to ensure consistency
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
   quantity: z.coerce.number().min(0.01, "Quantity must be greater than 0"),
@@ -195,7 +194,7 @@ export default function RecordMovementPage() {
     if (selectedSiteId && watchSiteName) {
       const fetchData = async () => {
         // 1. Fetch approved BoM
-        const bomQ = query(collection(firestore, 'project_boms'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
+        const bomQ = query(collection(firestore, 'project_bom'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
         const bomSnap = await getDocs(bomQ);
         setApprovedBomItems(bomSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
 
@@ -249,7 +248,11 @@ export default function RecordMovementPage() {
   }, [allSuppliers, suppliersWithPOs, movementType, sourceOrDestinationType, supplierSearchQuery]);
 
   const filteredLookupItems = React.useMemo(() => {
-    let list: { name: string; unit: string; make: string }[] = [];
+    let list: { name: string; unit: string; make: string; stockLevel: number }[] = [];
+
+    const projectInventoryQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId || ""));
+    // Since this is in a useMemo we can't easily await getDocs here without more state.
+    // Relying on the projectInventory from useCollection if we were using it globally, but for now we list all BoM items.
 
     if (movementType === 'Inward' && sourceOrDestinationType === 'Supplier') {
       const selectedSupplierId = allSuppliers?.find(s => s.name === watchSource)?.id;
@@ -260,9 +263,9 @@ export default function RecordMovementPage() {
       approvedBomItems.forEach(item => {
         if (itemNames.has(item.itemName)) {
           if (item.subItems && item.subItems.length > 0) {
-            item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "" }));
+            item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "", stockLevel: 999999 }));
           } else {
-            list.push({ name: item.itemName, unit: item.unit, make: item.make || "" });
+            list.push({ name: item.itemName, unit: item.unit, make: item.make || "", stockLevel: 999999 });
           }
         }
       });
@@ -272,21 +275,21 @@ export default function RecordMovementPage() {
       
       sourceSiteInventory.forEach(inv => {
         if (inv.stockLevel > 0) {
-          list.push({ name: inv.itemName, unit: inv.unit, make: "" });
+          list.push({ name: inv.itemName, unit: inv.unit, make: "", stockLevel: inv.stockLevel });
         }
       });
     } else {
       approvedBomItems.forEach(item => {
         if (item.subItems && item.subItems.length > 0) {
-          item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "" }));
+          item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "", stockLevel: 999999 }));
         } else {
-          list.push({ name: item.itemName, unit: item.unit, make: item.make || "" });
+          list.push({ name: item.itemName, unit: item.unit, make: item.make || "", stockLevel: 999999 });
         }
       });
     }
 
     return list.filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
-  }, [approvedBomItems, approvedPOs, sourceSiteInventory, itemSearchQuery, movementType, sourceOrDestinationType, watchSource, allSuppliers, allSites, watchSiteName]);
+  }, [approvedBomItems, approvedPOs, sourceSiteInventory, itemSearchQuery, movementType, sourceOrDestinationType, watchSource, allSuppliers, allSites, watchSiteName, firestore, selectedSiteId]);
 
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
     if (!user || !userProfile || !selectedSiteId) return;
@@ -330,7 +333,7 @@ export default function RecordMovementPage() {
       }
 
       for (const item of values.items) {
-        await addDocumentNonBlocking(collection(firestore, 'material_movements'), {
+        addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           ...values,
           itemName: item.itemName,
           quantity: item.quantity,
@@ -345,7 +348,14 @@ export default function RecordMovementPage() {
           createdAt: serverTimestamp()
         });
 
-        if (!isTransfer) {
+        // Stock Update Logic
+        // Rule: 
+        // 1. If Outward: Always deduct from current site immediately (it's leaving).
+        // 2. If Inward and NOT a transfer (from Supplier): Add to current site immediately.
+        // 3. If Inward and IS a transfer: Wait for approval (don't update stock here).
+        const shouldUpdateStock = values.movementType === 'Outward' || !isTransfer;
+
+        if (shouldUpdateStock) {
           const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('itemName', '==', item.itemName));
           const invSnap = await getDocs(invQuery);
           const adjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
@@ -358,14 +368,14 @@ export default function RecordMovementPage() {
             });
           } else {
             const newInvRef = doc(collection(firestore, 'project_inventory'));
-            await setDoc(newInvRef, {
+            setDocumentNonBlocking(newInvRef, {
               siteId: selectedSiteId,
               siteName: values.siteName,
               itemName: item.itemName,
               stockLevel: Math.max(0, adjustment),
               unit: item.unit,
               lastUpdated: serverTimestamp()
-            });
+            }, { merge: true });
           }
         }
       }
@@ -378,7 +388,6 @@ export default function RecordMovementPage() {
       });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
-    } finally {
       setIsSubmitting(false);
     }
   };
@@ -479,7 +488,7 @@ export default function RecordMovementPage() {
                         <FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
+                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none focus-visible:ring-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
                         <ScrollArea className="h-[200px]">{filteredSites.map(site => (
                           <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />{site.name}</Button>
                         ))}</ScrollArea>
@@ -525,11 +534,11 @@ export default function RecordMovementPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
+                          <Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredSuppliers.map(s => (
-                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}>
+                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); setSupplierSearchQuery(""); }}>
                               <Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />
                               {s.name}
                             </Button>
@@ -550,11 +559,11 @@ export default function RecordMovementPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
+                          <Input placeholder="Search sites..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
                           {allSites?.filter(s => s.name !== watchSiteName && s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase())).map(s => (
-                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); }}>
+                            <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); setSupplierSearchQuery(""); }}>
                               <Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />
                               {s.name}
                             </Button>
@@ -658,13 +667,18 @@ export default function RecordMovementPage() {
                                 </FormControl>
                               </PopoverTrigger>
                               <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start">
-                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
+                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none focus-visible:ring-0 text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
                                 <ScrollArea className="h-[250px]">
                                   <div className="p-1">
                                     {filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (
                                       <Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-11 text-xs py-2 px-3 text-left flex items-start gap-2 mb-0.5" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}>
                                         <Check className={cn("mt-0.5 h-3.5 w-3.5 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} />
-                                        <span className="flex-1 break-words leading-tight">{lookup.name}</span>
+                                        <div className="flex flex-col items-start min-w-0">
+                                          <span className="font-bold truncate w-full text-left">{lookup.name}</span>
+                                          {movementType === 'Outward' && (
+                                            <span className="text-[10px] font-black uppercase whitespace-nowrap shrink-0 px-2 py-0.5 rounded-sm bg-primary/5 text-primary">Stock: {lookup.stockLevel.toLocaleString()} {lookup.unit}</span>
+                                          )}
+                                        </div>
                                       </Button>
                                     )) : (
                                       <div className="p-8 text-center text-[10px] font-black uppercase text-muted-foreground italic">No authorized items matching context.</div>

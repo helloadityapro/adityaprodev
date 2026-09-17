@@ -5,8 +5,8 @@ import * as React from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, setDoc, and, or } from "firebase/firestore";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
+import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, and, or } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,7 +23,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { sendNotification } from "@/lib/notifications";
@@ -286,7 +285,7 @@ export default function RecordMovementPage() {
                   id: inv?.id || `new-${fullName}`,
                   itemName: fullName,
                   unit: sub.unit,
-                  stockLevel: 999999 // Suppliers have infinite stock usually
+                  stockLevel: 999999 
                 });
               });
             } else {
@@ -384,7 +383,7 @@ export default function RecordMovementPage() {
       }
 
       for (const item of values.items) {
-        await addDocumentNonBlocking(collection(firestore, 'material_movements'), {
+        addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           ...values,
           itemName: item.itemName,
           quantity: item.quantity,
@@ -399,7 +398,14 @@ export default function RecordMovementPage() {
           createdAt: serverTimestamp()
         });
 
-        if (!isTransfer) {
+        // Stock Update Logic
+        // Rule: 
+        // 1. If Outward: Always deduct from current site immediately (it's leaving).
+        // 2. If Inward and NOT a transfer (from Supplier): Add to current site immediately.
+        // 3. If Inward and IS a transfer: Wait for approval (don't update stock here).
+        const shouldUpdateStock = values.movementType === 'Outward' || !isTransfer;
+
+        if (shouldUpdateStock) {
           const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('itemName', '==', item.itemName));
           const invSnap = await getDocs(invQuery);
           const adjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
@@ -412,14 +418,14 @@ export default function RecordMovementPage() {
             });
           } else {
             const newInvRef = doc(collection(firestore, 'project_inventory'));
-            await setDoc(newInvRef, {
+            setDocumentNonBlocking(newInvRef, {
               siteId: selectedSiteId,
               siteName: values.siteName,
               itemName: item.itemName,
               stockLevel: Math.max(0, adjustment),
               unit: item.unit,
               lastUpdated: serverTimestamp()
-            });
+            }, { merge: true });
           }
         }
       }
@@ -432,7 +438,6 @@ export default function RecordMovementPage() {
       });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
-    } finally {
       setIsSubmitting(false);
     }
   };
