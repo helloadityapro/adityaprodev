@@ -158,6 +158,7 @@ export default function StartMeetingPage() {
   const [isSubmitting, setIsSubmitting] = React.useState(false);
   const [isSuccess, setIsSuccess] = React.useState(false);
   const [expandedHistory, setExpandedHistory] = React.useState<Record<string, boolean>>({});
+  const [copyStatus, setCopyStatus] = React.useState<'idle' | 'not-found'>('idle');
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -214,6 +215,18 @@ export default function StartMeetingPage() {
     const draft = { siteId, siteName, meetingDate, attendees, observations, criticalPoints };
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(draft));
   }, [siteId, siteName, meetingDate, attendees, observations, criticalPoints]);
+
+  const handleCopyPrevious = () => {
+    if (previousMeetings.length > 0) {
+      const latest = previousMeetings[0];
+      setObservations(latest.observations || {});
+      setCriticalPoints(latest.criticalPoints || "");
+      toast({ title: "Data Copied", description: `Loaded observations from session dated ${latest.date}.` });
+      setCopyStatus('idle');
+    } else {
+      setCopyStatus('not-found');
+    }
+  };
 
   const handleSaveMeeting = async () => {
     if (!user || !userProfile || !siteId) {
@@ -339,7 +352,7 @@ export default function StartMeetingPage() {
                     <ScrollArea className="h-[200px]">
                       <div className="p-1">
                         {allSites?.filter((s: any) => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map((s: any) => (
-                          <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase text-left" onClick={() => { setSiteId(s.id); setSiteName(s.name); setIsSitePopoverOpen(false); }}>
+                          <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase text-left" onClick={() => { setSiteId(s.id); setSiteName(s.name); setCopyStatus('idle'); setIsSitePopoverOpen(false); }}>
                             <Check className={cn("mr-2 h-4 w-4 text-primary", siteId === s.id ? "opacity-100" : "opacity-0")} />
                             {s.name}
                           </Button>
@@ -348,6 +361,20 @@ export default function StartMeetingPage() {
                     </ScrollArea>
                   </PopoverContent>
                 </Popover>
+                {siteId && (
+                  <div className="flex items-center gap-4 mt-2 px-1">
+                    <button 
+                      type="button"
+                      onClick={handleCopyPrevious}
+                      className="text-[10px] font-black uppercase text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                    >
+                      Copy Previous
+                    </button>
+                    {copyStatus === 'not-found' && (
+                      <span className="text-[10px] font-bold text-destructive uppercase animate-in fade-in">No previous meeting found.</span>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </CardContent>
