@@ -1,9 +1,10 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp, setDocumentNonBlocking } from '@/firebase';
-import { doc, serverTimestamp, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,7 +27,9 @@ import {
   Building2,
   LayoutGrid,
   FileCheck,
-  Check
+  Check,
+  Lock,
+  LockKeyhole
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -181,6 +184,44 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     });
   };
 
+  const handleToggleSubStage = (stageId: string, subId: string) => {
+    if (!record) return;
+    const stageDef = MAIN_STAGES.find(s => s.id === stageId);
+    if (!stageDef?.subStages) return;
+
+    const currentSubStages = record.stages[stageId]?.subStages || {};
+    const subIdx = stageDef.subStages.findIndex(ss => ss.id === subId);
+    const isChecking = !currentSubStages[subId];
+
+    const nextSubStages = { ...currentSubStages };
+
+    if (isChecking) {
+      // Ensure all previous are checked
+      const allPrevChecked = stageDef.subStages.slice(0, subIdx).every(ss => currentSubStages[ss.id]);
+      if (!allPrevChecked) {
+        toast({ variant: 'destructive', title: 'Sequential Workflow', description: 'Please complete previous approval steps first.' });
+        return;
+      }
+      nextSubStages[subId] = true;
+    } else {
+      // Uncheck this and all subsequent
+      nextSubStages[subId] = false;
+      stageDef.subStages.slice(subIdx + 1).forEach(ss => {
+        nextSubStages[ss.id] = false;
+      });
+    }
+
+    // If unchecking anything, ensure the milestone status is not "Completed"
+    let newStatus = record.stages[stageId].status;
+    const allChecked = stageDef.subStages.every(ss => nextSubStages[ss.id]);
+    
+    if (!allChecked && newStatus === 'Completed') {
+      newStatus = 'In Progress';
+    }
+
+    handleUpdateStage(stageId, { subStages: nextSubStages, status: newStatus });
+  };
+
   const handleUploadDoc = async (stageId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !record) return;
@@ -267,6 +308,12 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   const currentStage = MAIN_STAGES.find(s => s.id === activeStageId);
   const activeStageData = record.stages?.[activeStageId] || { status: 'Pending', remarks: '', documents: [] };
 
+  const isSubStageLocked = (idx: number) => {
+    if (idx === 0) return false;
+    const prevSubId = currentStage?.subStages?.[idx - 1]?.id;
+    return !activeStageData.subStages?.[prevSubId || ''];
+  };
+
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
       <div className="flex flex-col gap-1">
@@ -352,7 +399,23 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
               </div>
               <div className="flex flex-col items-end gap-2">
                 <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest">Update Milestone State</Label>
-                <Select value={activeStageData.status} onValueChange={(val: any) => handleUpdateStage(activeStageId, { status: val })}>
+                <Select 
+                  value={activeStageData.status} 
+                  onValueChange={(val: any) => {
+                    if (val === 'Completed' && currentStage?.subStages) {
+                      const allDone = currentStage.subStages.every(ss => activeStageData.subStages?.[ss.id]);
+                      if (!allDone) {
+                        toast({ 
+                          variant: 'destructive', 
+                          title: 'Milestone Incomplete', 
+                          description: 'All hierarchical sub-stages must be completed before marking this milestone as finished.' 
+                        });
+                        return;
+                      }
+                    }
+                    handleUpdateStage(activeStageId, { status: val });
+                  }}
+                >
                   <SelectTrigger className="h-10 w-[180px] rounded-sm font-black uppercase text-[10px] tracking-widest bg-background border-primary/20">
                     <SelectValue />
                   </SelectTrigger>
@@ -368,26 +431,40 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
               {/* Nested Approvals for specific stages */}
               {currentStage?.subStages && (
                 <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
-                   <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2"><FileCheck className="h-4 w-4" /> Hierarchical Approval Status</Label>
+                   <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2"><FileCheck className="h-4 w-4" /> Sequential Approval Workflow</Label>
                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                     {currentStage.subStages.map(sub => (
-                       <div key={sub.id} className={cn(
-                         "flex items-center space-x-3 p-4 rounded-sm border transition-all cursor-pointer group",
-                         activeStageData.subStages?.[sub.id] ? "bg-green-50 border-green-200" : "bg-muted/5 border-border/50 hover:bg-muted/10"
-                       )} onClick={() => {
-                         const next = { ...(activeStageData.subStages || {}) };
-                         next[sub.id] = !next[sub.id];
-                         handleUpdateStage(activeStageId, { subStages: next });
-                       }}>
-                         <div className={cn(
-                           "h-5 w-5 rounded-sm border-2 flex items-center justify-center transition-all",
-                           activeStageData.subStages?.[sub.id] ? "bg-green-600 border-green-600 text-white" : "bg-white border-muted-foreground/30"
-                         )}>
-                            {activeStageData.subStages?.[sub.id] && <Check className="h-3.5 w-3.5" />}
+                     {currentStage.subStages.map((sub, idx) => {
+                       const isLocked = isSubStageLocked(idx);
+                       const isChecked = !!activeStageData.subStages?.[sub.id];
+
+                       return (
+                         <div 
+                           key={sub.id} 
+                           className={cn(
+                             "flex items-center space-x-3 p-4 rounded-sm border transition-all group",
+                             isLocked ? "opacity-40 bg-muted/20 cursor-not-allowed border-dashed" : "cursor-pointer",
+                             isChecked ? "bg-green-50 border-green-200" : (isLocked ? "" : "bg-muted/5 border-border/50 hover:bg-muted/10")
+                           )} 
+                           onClick={() => {
+                             if (!isLocked) handleToggleSubStage(activeStageId, sub.id);
+                           }}
+                         >
+                           <div className={cn(
+                             "h-5 w-5 rounded-sm border-2 flex items-center justify-center transition-all shrink-0",
+                             isChecked ? "bg-green-600 border-green-600 text-white" : 
+                             isLocked ? "bg-muted/20 border-muted-foreground/10" : "bg-white border-muted-foreground/30"
+                           )}>
+                              {isChecked ? <Check className="h-3.5 w-3.5" /> : isLocked ? <LockKeyhole className="h-2.5 w-2.5 text-muted-foreground/30" /> : null}
+                           </div>
+                           <div className="flex flex-col min-w-0">
+                              <span className={cn("text-[11px] font-bold uppercase tracking-tight", isChecked ? "text-green-800" : "text-foreground/80")}>
+                                {sub.label}
+                              </span>
+                              {isLocked && <span className="text-[8px] font-black uppercase text-muted-foreground/40 mt-0.5">Awaiting previous stage</span>}
+                           </div>
                          </div>
-                         <span className="text-[11px] font-bold uppercase text-foreground/80">{sub.label}</span>
-                       </div>
-                     ))}
+                       );
+                     })}
                    </div>
                 </div>
               )}
