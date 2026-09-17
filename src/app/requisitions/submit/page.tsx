@@ -14,7 +14,7 @@ import { useToast } from "@/hooks/use-toast";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ClipboardList, Plus, Trash2, CheckCircle2, Building2, Save, Layers, Sparkles } from "lucide-react";
+import { Search, Check, ChevronsUpDown, Loader2, ClipboardList, Plus, Trash2, CheckCircle2, Building2, Save, Layers, Sparkles, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { isSuperAdmin } from "@/lib/auth-constants";
@@ -182,7 +182,7 @@ export default function SubmitRequisitionPage() {
           </CardHeader>
           <CardContent className="space-y-4 pb-8 px-8">
             <Button className="w-full h-12 text-sm font-black uppercase bg-emerald-600 shadow-lg" onClick={() => router.push("/requisitions/list")}>Track Requisitions</Button>
-            <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase" onClick={() => { setIsSuccess(false); form.reset(); }}>Raise Another</Button>
+            <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase text-muted-foreground" onClick={() => { setIsSuccess(false); form.reset(); }}>Raise Another</Button>
           </CardContent>
         </Card>
       </div>
@@ -209,8 +209,8 @@ export default function SubmitRequisitionPage() {
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
               <FormField control={form.control} name="siteId" render={({ field }) => (
-                <FormItem className="flex flex-col">
-                  <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Project Site *</FormLabel>
+                <FormItem className="flex flex-col max-w-md">
+                  <FormLabel>Site Name</FormLabel>
                   <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -288,9 +288,14 @@ export default function SubmitRequisitionPage() {
                 <div className="space-y-4">
                   {fields.map((field, index) => {
                     const selectedMasterItem = masterInventory?.find(m => m.id === form.watch(`items.${index}.itemId`));
+                    const currentItemName = form.watch(`items.${index}.itemName`) || "";
+                    const nameParts = currentItemName.split(' - ');
+                    const isActuallySubItem = nameParts.length > 1;
+                    const parentDisplay = isActuallySubItem ? nameParts[0] : currentItemName;
+                    const subDisplay = isActuallySubItem ? nameParts.slice(1).join(' - ') : "";
                     const isSet = selectedMasterItem?.unit === 'Sets';
-                    const currentName = form.watch(`items.${index}.itemName`);
-                    const spellingSuggestion = getSpellingSuggestion(currentName);
+                    const hasComponents = selectedMasterItem?.subItems && selectedMasterItem.subItems.length > 0;
+                    const spellingSuggestion = getSpellingSuggestion(currentItemName);
                     
                     return (
                       <Card key={field.id} className="relative bg-muted/5 border-dashed rounded-sm">
@@ -305,40 +310,91 @@ export default function SubmitRequisitionPage() {
                               <FormField control={form.control} name={`items.${index}.itemId`} render={({ field: itemField }) => (
                                 <FormItem className="flex flex-col">
                                   <FormLabel className="text-[9px] font-bold uppercase">Material Selection</FormLabel>
-                                  <Popover open={openItemIndex === index} onOpenChange={o => setOpenItemIndex(o ? index : null)}>
-                                    <PopoverTrigger asChild>
-                                      <FormControl>
-                                        <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-10 bg-background text-left text-xs rounded-sm", !itemField.value && "text-muted-foreground")}>
-                                          <span className="truncate">{itemField.value ? masterInventory?.find(i => i.id === itemField.value)?.name : "Search Master Inventory..."}</span>
-                                          <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                        </Button>
-                                      </FormControl>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-[400px] p-0 shadow-xl border-primary/10">
-                                      <div className="flex items-center border-b px-3 bg-muted/30">
-                                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                                        <Input placeholder="Filter materials..." className="h-9 border-none focus-visible:ring-0 px-0 text-sm bg-transparent" value={itemSearch} onChange={e => setItemSearch(e.target.value)} />
-                                      </div>
-                                      <ScrollArea className="h-[200px]">
-                                        <div className="p-1">
-                                          {masterInventory?.filter(i => i.name.toLowerCase().includes(itemSearch.toLowerCase())).map(item => (
-                                            <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left" onClick={() => { 
-                                              itemField.onChange(item.id); 
-                                              form.setValue(`items.${index}.itemName`, item.name);
-                                              form.setValue(`items.${index}.unit`, item.unit);
-                                              setOpenItemIndex(null);
-                                              setItemSearch("");
-                                            }}>
-                                              <div className="flex flex-col items-start overflow-hidden">
-                                                <span className="font-bold truncate w-full">{item.name}</span>
-                                                <span className="text-[8px] text-muted-foreground uppercase">{item.make} • {item.unit}</span>
-                                              </div>
+                                  <div className="flex gap-2">
+                                    {/* Main Selector */}
+                                    <div className={cn("min-w-0 transition-all duration-300", hasComponents ? "flex-1" : "w-full")}>
+                                      <Popover open={openItemIndex === index} onOpenChange={o => setOpenItemIndex(o ? index : null)}>
+                                        <PopoverTrigger asChild>
+                                          <FormControl>
+                                            <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm bg-background text-left text-xs px-4", !itemField.value && "text-muted-foreground")}>
+                                              <span className="truncate">{parentDisplay || "Search Material..."}</span>
+                                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                             </Button>
-                                          ))}
-                                        </div>
-                                      </ScrollArea>
-                                    </PopoverContent>
-                                  </Popover>
+                                          </FormControl>
+                                        </PopoverTrigger>
+                                        <PopoverContent className="w-[400px] p-0 shadow-xl border-primary/10" align="start">
+                                          <div className="flex items-center border-b px-3 bg-muted/30">
+                                            <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                                            <Input placeholder="Filter materials..." className="h-9 border-none focus-visible:ring-0 px-0 text-sm bg-transparent" value={itemSearch} onChange={e => setItemSearch(e.target.value)} />
+                                          </div>
+                                          <ScrollArea className="h-[200px]">
+                                            <div className="p-1">
+                                              {masterInventory?.filter(i => i.name.toLowerCase().includes(itemSearch.toLowerCase())).map(item => (
+                                                <Button key={item.id} type="button" variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left rounded-sm" onClick={() => { 
+                                                  itemField.onChange(item.id); 
+                                                  form.setValue(`items.${index}.itemName`, item.name);
+                                                  form.setValue(`items.${index}.unit`, item.unit);
+                                                  setOpenItemIndex(null);
+                                                  setItemSearch("");
+                                                }}>
+                                                  <div className="flex flex-col items-start overflow-hidden">
+                                                    <span className="font-bold truncate w-full">{item.name}</span>
+                                                    <span className="text-[8px] text-muted-foreground uppercase">{item.make} • {item.unit}</span>
+                                                  </div>
+                                                </Button>
+                                              ))}
+                                            </div>
+                                          </ScrollArea>
+                                        </PopoverContent>
+                                      </Popover>
+                                    </div>
+
+                                    {/* Sub-item Selector (The Blue Box) */}
+                                    {hasComponents && (
+                                      <div className="flex-1 min-w-0 animate-in slide-in-from-left-2 duration-300">
+                                        <Popover>
+                                          <PopoverTrigger asChild>
+                                            <Button 
+                                              variant="outline" 
+                                              className={cn(
+                                                "w-full justify-between font-bold h-11 rounded-sm text-left px-4 transition-all",
+                                                isActuallySubItem ? "bg-primary/10 border-primary text-primary shadow-sm" : "bg-muted/5 border-dashed text-muted-foreground/30"
+                                              )}
+                                            >
+                                              <span className="truncate">{subDisplay || "Select Component..."}</span>
+                                              <ChevronDown className="h-4 w-4 opacity-50 shrink-0" />
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[300px] p-0 shadow-2xl border-primary/10" align="start">
+                                            <div className="bg-primary/5 p-3 border-b">
+                                              <p className="text-[10px] font-black uppercase text-primary tracking-widest">Set Components</p>
+                                            </div>
+                                            <ScrollArea className="h-[200px]">
+                                              <div className="p-1">
+                                                {selectedMasterItem?.subItems?.map((sub, sIdx) => (
+                                                  <Button 
+                                                    key={sIdx} 
+                                                    variant="ghost" 
+                                                    className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left group"
+                                                    onClick={() => {
+                                                      form.setValue(`items.${index}.itemName`, `${selectedMasterItem.name} - ${sub.name}`);
+                                                      form.setValue(`items.${index}.quantity`, sub.quantityPerSet);
+                                                      form.setValue(`items.${index}.unit`, sub.unit);
+                                                    }}
+                                                  >
+                                                    <div className="flex flex-col items-start min-w-0">
+                                                      <span className="font-bold truncate w-full group-hover:text-primary">{sub.name}</span>
+                                                      <span className="text-[8px] text-muted-foreground uppercase">{sub.quantityPerSet} {sub.unit}</span>
+                                                    </div>
+                                                  </Button>
+                                                ))}
+                                              </div>
+                                            </ScrollArea>
+                                          </PopoverContent>
+                                        </Popover>
+                                      </div>
+                                    )}
+                                  </div>
                                   <FormMessage />
                                 </FormItem>
                               )} />
@@ -370,7 +426,7 @@ export default function SubmitRequisitionPage() {
                               <FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-[9px] font-bold uppercase">Requested Qty</FormLabel>
-                                  <FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background" /></FormControl>
+                                  <FormControl><Input type="number" step="0.01" placeholder="0.00" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl>
                                   <FormMessage />
                                 </FormItem>
                               )} />
