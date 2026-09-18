@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -23,6 +22,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { sendNotification } from "@/lib/notifications";
@@ -332,7 +332,8 @@ export default function RecordMovementPage() {
               itemName: item.itemName,
               unit: item.unit,
               stockLevel: 999999
-            });
+              });
+            }
           }
         });
       }
@@ -656,16 +657,6 @@ export default function RecordMovementPage() {
                   )} />
                 </div>
 
-                <FormField control={form.control} name="remarks" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">General Remarks / Notes</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Enter any additional details about this movement..." {...field} className="rounded-sm min-h-[80px]" />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
                 <div className="space-y-3">
                   <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
                     <FileUp className="h-4 w-4" /> Upload Artifacts
@@ -727,14 +718,14 @@ export default function RecordMovementPage() {
                                 </FormControl>
                               </PopoverTrigger>
                               <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start">
-                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
+                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none focus-visible:ring-0 text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
                                 <ScrollArea className="h-[250px]">
                                   <div className="p-1">
-                                    {filteredMaterials.length > 0 ? filteredMaterials.map((lookup, lIdx) => (
-                                      <Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-11 text-xs py-2 px-3 text-left flex items-start gap-2 mb-0.5" onClick={() => { itemField.onChange(lookup.itemName); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}>
-                                        <Check className={cn("mt-0.5 h-3.5 w-3.5 text-primary shrink-0", lookup.itemName === itemField.value ? "opacity-100" : "opacity-0")} />
+                                    {filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (
+                                      <Button key={lIdx} type="button" variant="ghost" className="w-full justify-start h-auto min-h-11 text-xs py-2 px-3 text-left flex items-start gap-2 mb-0.5" onClick={() => { itemField.onChange(lookup.name); form.setValue(`items.${index}.unit`, lookup.unit); setOpenItemPopoverIndex(null); setItemSearchQuery(""); }}>
+                                        <Check className={cn("mt-0.5 h-3.5 w-3.5 text-primary shrink-0", lookup.name === itemField.value ? "opacity-100" : "opacity-0")} />
                                         <div className="flex flex-col items-start min-w-0">
-                                          <span className="font-bold truncate w-full text-left">{lookup.itemName}</span>
+                                          <span className="font-bold truncate w-full text-left">{lookup.name}</span>
                                           {movementType === 'Outward' && (
                                             <span className="text-[10px] font-black uppercase whitespace-nowrap shrink-0 px-2 py-0.5 rounded-sm bg-primary/5 text-primary">Stock: {lookup.stockLevel.toLocaleString()} {lookup.unit}</span>
                                           )}
