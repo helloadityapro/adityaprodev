@@ -66,12 +66,10 @@ export default function LiaisoningRegistryPage() {
   }, [records, searchTerm]);
 
   const accessibleSites = React.useMemo(() => {
-    if (!allSites || !userProfile) return [];
-    if (isAdmin) return allSites.sort((a, b) => a.name.localeCompare(b.name));
-    
-    const assignedIds = new Set(userProfile.assignedProjectIds || []);
-    return allSites.filter(s => assignedIds.has(s.id)).sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSites, userProfile, isAdmin]);
+    if (!allSites) return [];
+    // Display all sites irrespective of individual assignments to allow global tracking initialization
+    return [...allSites].sort((a, b) => a.name.localeCompare(b.name));
+  }, [allSites]);
 
   if (sitesLoading || recordsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
