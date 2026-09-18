@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -20,7 +19,9 @@ import {
   FilterX,
   Trash2,
   HardHat,
-  AlertCircle
+  AlertCircle,
+  LayoutGrid,
+  List
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,14 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -84,6 +93,7 @@ export default function LiaisoningRegistryPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const [viewMode, setViewMode] = React.useState<'card' | 'table'>('card');
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
@@ -149,7 +159,7 @@ export default function LiaisoningRegistryPage() {
                   <Plus className="mr-2 h-4 w-4" /> Start New Site
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0" align="end">
+              <PopoverContent className="w-[300px] p-0" align="start">
                 <div className="bg-primary/5 p-3 border-b">
                   <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Select Project Site</h3>
                 </div>
@@ -175,15 +185,35 @@ export default function LiaisoningRegistryPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by site or contractor..." 
-            className="pl-10 h-11 text-sm rounded-sm border-primary/20 bg-background"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="flex items-center gap-4 flex-1">
+          <div className="relative w-full md:w-96">
+            <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+            <Input 
+              placeholder="Search by site or contractor..." 
+              className="pl-10 h-11 text-sm rounded-sm border-primary/20 bg-background"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <div className="flex items-center bg-muted/50 p-1 rounded-sm border border-primary/10">
+            <Button 
+              variant={viewMode === 'card' ? 'default' : 'ghost'} 
+              size="icon" 
+              className="h-8 w-8 rounded-sm"
+              onClick={() => setViewMode('card')}
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant={viewMode === 'table' ? 'default' : 'ghost'} 
+              size="icon" 
+              className="h-8 w-8 rounded-sm"
+              onClick={() => setViewMode('table')}
+            >
+              <List className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary bg-primary/5">
@@ -195,96 +225,172 @@ export default function LiaisoningRegistryPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredRecords.length > 0 ? filteredRecords.map(record => {
-          const nextStageKey = STAGE_ORDER.find(key => record.stages?.[key]?.status !== 'Completed');
-          const nextMilestoneLabel = nextStageKey ? STAGE_LABELS[nextStageKey] : 'All Completed';
+      {viewMode === 'card' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredRecords.length > 0 ? filteredRecords.map(record => {
+            const nextStageKey = STAGE_ORDER.find(key => record.stages?.[key]?.status !== 'Completed');
+            const nextMilestoneLabel = nextStageKey ? STAGE_LABELS[nextStageKey] : 'All Completed';
 
-          return (
-            <Card key={record.id} className="group hover:shadow-xl transition-all duration-300 rounded-sm border-primary/10 overflow-hidden flex flex-col cursor-pointer" onClick={() => router.push(`/liaisoning/manage/${record.siteId}`)}>
-              <CardHeader className="bg-primary/5 border-b p-5">
-                 <div className="flex justify-between items-start gap-4">
-                    <div className="space-y-1 min-w-0">
-                       <CardTitle className="text-lg font-black uppercase tracking-tight truncate text-foreground group-hover:text-primary transition-colors">{record.siteName}</CardTitle>
-                       <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                          <Building2 className="h-3 w-3" />
-                          {allSites?.find(s => s.id === record.siteId)?.projectCompany || '—'}
-                       </p>
-                    </div>
-                    <Badge variant="outline" className={cn(
-                      "rounded-sm font-black uppercase text-[8px] h-5 px-1.5 border-primary/20",
-                      record.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" : "bg-primary/5 text-primary"
-                    )}>
-                      {record.status}
-                    </Badge>
-                 </div>
-              </CardHeader>
-              <CardContent className="p-6 flex-1 space-y-6">
-                 {record.contractorName && (
-                   <div className="flex items-center gap-2 mb-4">
-                      <HardHat className="h-3.5 w-3.5 text-primary opacity-60" />
-                      <span className="text-[10px] font-black uppercase tracking-tight text-foreground/80 truncate">
-                        {record.contractorName}
-                      </span>
+            return (
+              <Card key={record.id} className="group hover:shadow-xl transition-all duration-300 rounded-sm border-primary/10 overflow-hidden flex flex-col cursor-pointer" onClick={() => router.push(`/liaisoning/manage/${record.siteId}`)}>
+                <CardHeader className="bg-primary/5 border-b p-5">
+                   <div className="flex justify-between items-start gap-4">
+                      <div className="space-y-1 min-w-0">
+                         <CardTitle className="text-lg font-black uppercase tracking-tight truncate text-foreground group-hover:text-primary transition-colors">{record.siteName}</CardTitle>
+                         <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                            <Building2 className="h-3 w-3" />
+                            {allSites?.find(s => s.id === record.siteId)?.projectCompany || '—'}
+                         </p>
+                      </div>
+                      <Badge variant="outline" className={cn(
+                        "rounded-sm font-black uppercase text-[8px] h-5 px-1.5 border-primary/20",
+                        record.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" : "bg-primary/5 text-primary"
+                      )}>
+                        {record.status}
+                      </Badge>
                    </div>
-                 )}
+                </CardHeader>
+                <CardContent className="p-6 flex-1 space-y-6">
+                   {record.contractorName && (
+                     <div className="flex items-center gap-2 mb-4">
+                        <HardHat className="h-3.5 w-3.5 text-primary opacity-60" />
+                        <span className="text-[10px] font-black uppercase tracking-tight text-foreground/80 truncate">
+                          {record.contractorName}
+                        </span>
+                     </div>
+                   )}
 
-                 <div className="space-y-3">
-                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                       <span>Progress</span>
-                       <span className="text-primary">{record.completionPercentage}%</span>
-                    </div>
-                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50">
-                       <div 
-                          className="h-full bg-primary transition-all duration-1000 shadow-[0_0_10px_rgba(45,115,255,0.4)]" 
-                          style={{ width: `${record.completionPercentage}%` }} 
-                       />
-                    </div>
-                 </div>
-                 
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="flex items-center gap-3">
-                       <div className="bg-primary/10 p-2 rounded-sm"><Activity className="h-4 w-4 text-primary" /></div>
-                       <div className="flex flex-col min-w-0">
-                          <span className="text-[8px] font-black text-muted-foreground uppercase">Pending Stage</span>
-                          <span className="text-[10px] font-bold uppercase leading-tight line-clamp-2">
-                            {nextMilestoneLabel}
-                          </span>
-                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                       <div className="bg-primary/10 p-2 rounded-sm"><Clock className="h-4 w-4 text-primary" /></div>
-                       <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-muted-foreground uppercase">Activity Date</span>
-                          <span className="text-[10px] font-bold uppercase">{record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM') : '—'}</span>
-                       </div>
-                    </div>
-                 </div>
-              </CardContent>
-              <CardFooter className="bg-muted/10 border-t p-3 flex justify-between items-center">
-                 {isAdmin && (
-                   <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-sm" 
-                    onClick={(e) => { e.stopPropagation(); setDeletingRecordId(record.id); }}
-                   >
-                     <Trash2 className="h-4 w-4" />
+                   <div className="space-y-3">
+                      <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                         <span>Progress</span>
+                         <span className="text-primary">{record.completionPercentage}%</span>
+                      </div>
+                      <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50">
+                         <div 
+                            className="h-full bg-primary transition-all duration-1000 shadow-[0_0_10px_rgba(45,115,255,0.4)]" 
+                            style={{ width: `${record.completionPercentage}%` }} 
+                         />
+                      </div>
+                   </div>
+                   
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="flex items-center gap-3">
+                         <div className="bg-primary/10 p-2 rounded-sm"><Activity className="h-4 w-4 text-primary" /></div>
+                         <div className="flex flex-col min-w-0">
+                            <span className="text-[8px] font-black text-muted-foreground uppercase">Pending Stage</span>
+                            <span className="text-[10px] font-bold uppercase leading-tight line-clamp-2">
+                              {nextMilestoneLabel}
+                            </span>
+                         </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                         <div className="bg-primary/10 p-2 rounded-sm"><Clock className="h-4 w-4 text-primary" /></div>
+                         <div className="flex flex-col">
+                            <span className="text-[8px] font-black text-muted-foreground uppercase">Activity Date</span>
+                            <span className="text-[10px] font-bold uppercase">{record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM') : '—'}</span>
+                         </div>
+                      </div>
+                   </div>
+                </CardContent>
+                <CardFooter className="bg-muted/10 border-t p-3 flex justify-between items-center">
+                   {isAdmin && (
+                     <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-sm" 
+                      onClick={(e) => { e.stopPropagation(); setDeletingRecordId(record.id); }}
+                     >
+                       <Trash2 className="h-4 w-4" />
+                     </Button>
+                   )}
+                   <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all ml-auto">
+                      Details <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
                    </Button>
-                 )}
-                 <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all ml-auto">
-                    Details <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
-                 </Button>
-              </CardFooter>
-            </Card>
-          );
-        }) : (
-          <div className="col-span-full py-32 flex flex-col items-center justify-center text-center gap-4 bg-muted/5 border-2 border-dashed rounded-sm opacity-40">
-             <PlugZap className="h-16 w-16 text-muted-foreground/30" />
-             <p className="text-sm font-bold uppercase tracking-widest">No active trackers found</p>
-          </div>
-        )}
-      </div>
+                </CardFooter>
+              </Card>
+            );
+          }) : (
+            <div className="col-span-full py-32 flex flex-col items-center justify-center text-center gap-4 bg-muted/5 border-2 border-dashed rounded-sm opacity-40">
+               <PlugZap className="h-16 w-16 text-muted-foreground/30" />
+               <p className="text-sm font-bold uppercase tracking-widest">No active trackers found</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden">
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-muted/50">
+                <TableRow>
+                  <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Site Name & Client</TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest">Completion</TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest">Next Milestone</TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest">Contractor</TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest">Last Activity</TableHead>
+                  <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Action</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredRecords.length > 0 ? filteredRecords.map(record => {
+                  const nextStageKey = STAGE_ORDER.find(key => record.stages?.[key]?.status !== 'Completed');
+                  const nextMilestoneLabel = nextStageKey ? STAGE_LABELS[nextStageKey] : 'All Completed';
+
+                  return (
+                    <TableRow key={record.id} className="hover:bg-muted/5 cursor-pointer group" onClick={() => router.push(`/liaisoning/manage/${record.siteId}`)}>
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col">
+                          <span className="font-black text-sm text-foreground group-hover:text-primary transition-colors">{record.siteName}</span>
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{allSites?.find(s => s.id === record.siteId)?.projectCompany || '—'}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-1.5 min-w-[120px]">
+                           <div className="flex justify-between items-center text-[9px] font-black">
+                              <span className="text-primary">{record.completionPercentage}%</span>
+                           </div>
+                           <Progress value={record.completionPercentage} className="h-1" />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="secondary" className="rounded-sm font-bold text-[9px] uppercase bg-primary/5 text-primary border-primary/10">
+                           {nextMilestoneLabel}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {record.contractorName ? (
+                          <div className="flex items-center gap-1.5 text-xs font-bold text-muted-foreground">
+                            <HardHat className="h-3 w-3" />
+                            {record.contractorName}
+                          </div>
+                        ) : '—'}
+                      </TableCell>
+                      <TableCell className="font-mono text-[10px] font-bold text-muted-foreground">
+                        {record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM yyyy') : '—'}
+                      </TableCell>
+                      <TableCell className="text-right px-6" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-end gap-1">
+                          {isAdmin && (
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecordId(record.id)}>
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm">
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }) : (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching records</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
 
       <AlertDialog open={!!deletingRecordId} onOpenChange={(o) => !o && setDeletingRecordId(null)}>
         <AlertDialogContent className="rounded-sm">
