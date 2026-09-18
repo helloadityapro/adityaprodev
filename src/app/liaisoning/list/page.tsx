@@ -231,7 +231,7 @@ export default function LiaisoningRegistryPage() {
 
                  <div className="space-y-3">
                     <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                       <span>Audit Progress</span>
+                       <span>Progress</span>
                        <span className="text-primary">{record.completionPercentage}%</span>
                     </div>
                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50">
@@ -246,7 +246,7 @@ export default function LiaisoningRegistryPage() {
                     <div className="flex items-center gap-3">
                        <div className="bg-primary/10 p-2 rounded-sm"><Activity className="h-4 w-4 text-primary" /></div>
                        <div className="flex flex-col min-w-0">
-                          <span className="text-[8px] font-black text-muted-foreground uppercase">Target Step</span>
+                          <span className="text-[8px] font-black text-muted-foreground uppercase">Pending Stage</span>
                           <span className="text-[10px] font-bold uppercase leading-tight line-clamp-2">
                             {nextMilestoneLabel}
                           </span>

@@ -112,8 +112,8 @@ const MAIN_STAGES = [
     label: '9. Format II – Approval Stages',
     subStages: [
       { id: 'eet', label: 'EE Testing (EET)' },
-      { id: 'om', label: 'Senior Engineer (O&M)' },
-      { id: 'setqa', label: 'SETQA Approved' }
+      { id: 'om', label: 'Superintending Engineer (O&M)' },
+      { id: 'setqa', label: 'SE TQA Approved' }
     ]
   },
   { id: 'ptc', label: '10. Permission to Commission (PTC)' },
@@ -603,7 +603,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
                 {uploadingStageId === activeStageId && (
                   <div className="p-4 border rounded-sm bg-primary/5 space-y-2 animate-in fade-in duration-300">
                      <div className="flex justify-between items-center text-[10px] font-black uppercase text-primary">
-                        <span>Transferring Artifact...</span>
+                        <span>Uploading Please Wait...</span>
                         <span>{Math.round(uploadProgress)}%</span>
                      </div>
                      <Progress value={uploadProgress} className="h-1.5 rounded-none" />

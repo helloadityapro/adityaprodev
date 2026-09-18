@@ -30,7 +30,9 @@ import {
   UserPlus,
   Navigation,
   Globe,
-  Calendar
+  Calendar,
+  Zap,
+  MousePointerClick
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -135,6 +137,13 @@ const REVIEW_SECTIONS = [
   }
 ];
 
+const QUICK_KEYWORDS = [
+  "Yet to Start",
+  "Work in Progress",
+  "Material not received yet",
+  "Work Completed"
+];
+
 const LOCAL_STORAGE_KEY = 'adityapro_meeting_draft_v2';
 
 export default function StartMeetingPage() {
@@ -228,6 +237,10 @@ export default function StartMeetingPage() {
     } else {
       toast({ variant: "destructive", title: "No History", description: `No previous meetings found for this site.` });
     }
+  };
+
+  const handleQuickStatus = (pointId: string, status: string) => {
+    setObservations(prev => ({ ...prev, [pointId]: status }));
   };
 
   const handleSaveMeeting = async () => {
@@ -485,19 +498,35 @@ export default function StartMeetingPage() {
                               <Label className="text-xs font-black uppercase text-foreground tracking-tight">{point.label}</Label>
                             </div>
                             
-                            <div className="md:col-span-8 space-y-2">
-                              <Textarea 
-                                placeholder="Enter status / observation..." 
-                                value={observations[point.id] || ""}
-                                onChange={(e) => setObservations({ ...observations, [point.id]: e.target.value })}
-                                className="rounded-sm bg-background border-primary/10 min-h-[100px] text-sm font-medium shadow-sm focus-visible:ring-primary/20"
-                              />
+                            <div className="md:col-span-8 space-y-3">
+                              <div className="space-y-2">
+                                <Textarea 
+                                  placeholder="Enter status / observation..." 
+                                  value={observations[point.id] || ""}
+                                  onChange={(e) => setObservations({ ...observations, [point.id]: e.target.value })}
+                                  className="rounded-sm bg-background border-primary/10 min-h-[100px] text-sm font-medium shadow-sm focus-visible:ring-primary/20"
+                                />
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  {QUICK_KEYWORDS.map(kw => (
+                                    <Badge 
+                                      key={kw} 
+                                      variant="secondary" 
+                                      className="cursor-pointer bg-primary/5 text-primary hover:bg-primary/10 border-primary/10 text-[9px] font-black uppercase tracking-tighter h-6 px-2 rounded-sm transition-all"
+                                      onClick={() => handleQuickStatus(point.id, kw)}
+                                    >
+                                      {kw}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              </div>
+                              
                               {siteId && previousMeetings.length > 0 && (
                                 <button 
                                   type="button"
                                   onClick={() => handleCopyPointPrevious(point.id)}
-                                  className="text-[10px] font-black uppercase text-primary underline underline-offset-2 hover:text-primary/80 transition-colors"
+                                  className="flex items-center gap-1.5 text-[10px] font-black uppercase text-primary underline underline-offset-4 hover:text-primary/80 transition-colors pt-1"
                                 >
+                                  <RefreshCcw className="h-3 w-3" />
                                   Copy Previous
                                 </button>
                               )}
@@ -581,7 +610,7 @@ export default function StartMeetingPage() {
               placeholder="List major concerns, blockers or high-priority findings requiring immediate attention..." 
               rows={6}
               value={criticalPoints}
-              onChange={e => setCriticalPoints(e.target.value)}
+              onChange={(e) => setCriticalPoints(e.target.value)}
               className="rounded-sm border-red-500/10 focus-visible:ring-red-500/20 text-sm font-medium"
             />
           </CardContent>
