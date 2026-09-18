@@ -27,6 +27,7 @@ import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
+import { Progress } from "@/components/ui/progress";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -42,7 +43,6 @@ const movementSchema = z.object({
   movementDate: z.string().min(1, "Date is required"),
   invoiceNumber: z.string().optional(),
   invoiceDate: z.string().optional(),
-  remarks: z.string().optional(),
   items: z.array(itemSchema).min(1, "Add at least one item"),
 });
 
@@ -177,7 +177,6 @@ export default function RecordMovementPage() {
       movementDate: format(new Date(), 'yyyy-MM-dd'),
       invoiceNumber: "",
       invoiceDate: format(new Date(), 'yyyy-MM-dd'),
-      remarks: "",
       items: [{ itemName: "", quantity: 0, unit: "Numbers" }]
     },
   });
@@ -219,7 +218,6 @@ export default function RecordMovementPage() {
   }, [selectedSiteId, watchSiteName, firestore]);
 
   React.useEffect(() => {
-    // Only fetch source inventory for INWARD from another site
     if (movementType === 'Inward' && sourceOrDestinationType === 'Site' && watchSource) {
       const sourceSiteId = allSites?.find(s => s.name === watchSource)?.id;
       if (sourceSiteId) {
@@ -252,23 +250,22 @@ export default function RecordMovementPage() {
     return list.filter(s => s.name.toLowerCase().includes(supplierSearchQuery.toLowerCase()));
   }, [allSuppliers, suppliersWithPOs, movementType, sourceOrDestinationType, supplierSearchQuery]);
 
-  const filteredMaterials = React.useMemo(() => {
-    let list: { itemName: string; unit: string; stockLevel: number; id: string }[] = [];
+  const filteredLookupItems = React.useMemo(() => {
+    let list: { name: string; unit: string; make: string; stockLevel: number; id: string }[] = [];
 
     if (movementType === 'Outward') {
-      // OUTWARD: Always use recording site's inventory (what we have in stock to send out)
       projectInventory?.forEach(inv => {
         if (inv.stockLevel > 0) {
           list.push({
             id: inv.id,
-            itemName: inv.itemName,
+            name: inv.itemName,
             unit: inv.unit,
+            make: "",
             stockLevel: inv.stockLevel
           });
         }
       });
     } else {
-      // INWARD
       if (sourceOrDestinationType === 'Supplier') {
         const selectedSupplierId = allSuppliers?.find(s => s.name === watchSource)?.id;
         const supplierPOs = approvedPOs.filter(po => po.supplierId === selectedSupplierId);
@@ -283,8 +280,9 @@ export default function RecordMovementPage() {
                 const inv = projectInventory?.find(i => i.itemName === fullName);
                 list.push({
                   id: inv?.id || `new-${fullName}`,
-                  itemName: fullName,
+                  name: fullName,
                   unit: sub.unit,
+                  make: item.make || "",
                   stockLevel: 999999 
                 });
               });
@@ -292,27 +290,27 @@ export default function RecordMovementPage() {
               const inv = projectInventory?.find(i => i.itemName === item.itemName);
               list.push({
                 id: inv?.id || `new-${item.id}`,
-                itemName: item.itemName,
+                name: item.itemName,
                 unit: item.unit,
+                make: item.make || "",
                 stockLevel: 999999
               });
             }
           }
         });
       } else if (sourceOrDestinationType === 'Site') {
-        // Inward from another site: Use source site's inventory
         sourceSiteInventory.forEach(inv => {
           if (inv.stockLevel > 0) {
             list.push({
               id: inv.id,
-              itemName: inv.itemName,
+              name: inv.itemName,
               unit: inv.unit,
+              make: "",
               stockLevel: inv.stockLevel
             });
           }
         });
       } else {
-        // Fallback or generic Inward from BoM
         approvedBomItems.forEach(item => {
           if (item.subItems && item.subItems.length > 0) {
             item.subItems.forEach(sub => {
@@ -320,8 +318,9 @@ export default function RecordMovementPage() {
               const inv = projectInventory?.find(i => i.itemName === fullName);
               list.push({
                 id: inv?.id || `new-${fullName}`,
-                itemName: fullName,
+                name: fullName,
                 unit: sub.unit,
+                make: item.make || "",
                 stockLevel: 999999
               });
             });
@@ -329,17 +328,17 @@ export default function RecordMovementPage() {
             const inv = projectInventory?.find(i => i.itemName === item.itemName);
             list.push({
               id: inv?.id || `new-${item.id}`,
-              itemName: item.itemName,
+              name: item.itemName,
               unit: item.unit,
+              make: item.make || "",
               stockLevel: 999999
-              });
-            }
+            });
           }
         });
       }
     }
 
-    return list.filter(m => m.itemName.toLowerCase().includes(itemSearchQuery.toLowerCase()));
+    return list.filter(m => m.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
   }, [movementType, projectInventory, sourceOrDestinationType, watchSource, allSuppliers, approvedPOs, approvedBomItems, sourceSiteInventory, itemSearchQuery]);
 
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
@@ -399,11 +398,6 @@ export default function RecordMovementPage() {
           createdAt: serverTimestamp()
         });
 
-        // Stock Update Logic
-        // Rule: 
-        // 1. If Outward: Always deduct from current site immediately (it's leaving).
-        // 2. If Inward and NOT a transfer (from Supplier): Add to current site immediately.
-        // 3. If Inward and IS a transfer: Wait for approval (don't update stock here).
         const shouldUpdateStock = values.movementType === 'Outward' || !isTransfer;
 
         if (shouldUpdateStock) {
@@ -413,7 +407,7 @@ export default function RecordMovementPage() {
 
           if (!invSnap.empty) {
             const invDoc = invSnap.docs[0];
-            updateDocumentNonBlocking(doc(firestore, 'project_inventory', invDoc.id), {
+            updateDocumentNonBlocking(invDoc.ref, {
               stockLevel: increment(adjustment),
               lastUpdated: serverTimestamp()
             });
@@ -439,6 +433,7 @@ export default function RecordMovementPage() {
       });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -576,7 +571,7 @@ export default function RecordMovementPage() {
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             <span className="truncate">{field.value || "Select Vendor..."}</span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -601,7 +596,7 @@ export default function RecordMovementPage() {
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             <span className="truncate">{field.value || "Select Target Site..."}</span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -718,7 +713,7 @@ export default function RecordMovementPage() {
                                 </FormControl>
                               </PopoverTrigger>
                               <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start">
-                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none focus-visible:ring-0 text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
+                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none focus-visible:ring-0 px-0 text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
                                 <ScrollArea className="h-[250px]">
                                   <div className="p-1">
                                     {filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (
