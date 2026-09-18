@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
 import { collection, query, orderBy, doc, where, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
@@ -29,6 +28,7 @@ import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
 
 type Site = { id: string; name: string; projectCompany: string };
+
 type LiaisoningRecord = {
   id: string;
   siteId: string;
@@ -36,7 +36,30 @@ type LiaisoningRecord = {
   completionPercentage: number;
   status: string;
   updatedAt: any;
+  stages: Record<string, { status: string }>;
 };
+
+const STAGE_LABELS: Record<string, string> = {
+  grid_connectivity: 'Grid Connectivity',
+  estimate_approval: 'Estimate Approval',
+  estimate_sanction: 'Estimate Sanction',
+  supervision_testing: 'Supervision & Testing',
+  material_inspection: 'Material Inspection',
+  work_progress: 'Work Progress',
+  wcr: 'WCR Submission',
+  pre_commissioning: 'Pre-Commissioning',
+  format_ii_approval: 'Format II Approval',
+  ptc: 'PTC Issuance',
+  clearance: 'Clearance Certificate',
+  commissioning: 'Final Commissioning'
+};
+
+const STAGE_ORDER = [
+  'grid_connectivity', 'estimate_approval', 'estimate_sanction', 
+  'supervision_testing', 'material_inspection', 'work_progress', 
+  'wcr', 'pre_commissioning', 'format_ii_approval', 'ptc', 
+  'clearance', 'commissioning'
+];
 
 export default function LiaisoningRegistryPage() {
   const firestore = useFirestore();
@@ -71,7 +94,7 @@ export default function LiaisoningRegistryPage() {
     return [...allSites].sort((a, b) => a.name.localeCompare(b.name));
   }, [allSites]);
 
-  if (sitesLoading || recordsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
+  if (sitesLoading || recordsLoading) return <div className="p-4 sm:p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500 pb-20">
@@ -143,63 +166,70 @@ export default function LiaisoningRegistryPage() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredRecords.length > 0 ? filteredRecords.map(record => (
-          <Card key={record.id} className="group hover:shadow-xl transition-all duration-300 rounded-sm border-primary/10 overflow-hidden flex flex-col cursor-pointer" onClick={() => router.push(`/liaisoning/manage/${record.siteId}`)}>
-            <CardHeader className="bg-primary/5 border-b p-5">
-               <div className="flex justify-between items-start gap-4">
-                  <div className="space-y-1 min-w-0">
-                     <CardTitle className="text-lg font-black uppercase tracking-tight truncate text-foreground group-hover:text-primary transition-colors">{record.siteName}</CardTitle>
-                     <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
-                        <Building2 className="h-3 w-3" />
-                        {allSites?.find(s => s.id === record.siteId)?.projectCompany || '—'}
-                     </p>
-                  </div>
-                  <Badge variant="outline" className={cn(
-                    "rounded-sm font-black uppercase text-[8px] h-5 px-1.5 border-primary/20",
-                    record.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" : "bg-primary/5 text-primary"
-                  )}>
-                    {record.status}
-                  </Badge>
-               </div>
-            </CardHeader>
-            <CardContent className="p-6 flex-1 space-y-6">
-               <div className="space-y-3">
-                  <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                     <span>Global Progress</span>
-                     <span className="text-primary">{record.completionPercentage}%</span>
-                  </div>
-                  <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50">
-                     <div 
-                        className="h-full bg-primary transition-all duration-1000" 
-                        style={{ width: `${record.completionPercentage}%` }} 
-                     />
-                  </div>
-               </div>
-               
-               <div className="grid grid-cols-2 gap-4">
-                  <div className="flex items-center gap-3">
-                     <div className="bg-primary/10 p-2 rounded-sm"><Activity className="h-4 w-4 text-primary" /></div>
-                     <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-muted-foreground uppercase">Next Milestone</span>
-                        <span className="text-[10px] font-bold uppercase truncate max-w-[100px]">Approval Pending</span>
-                     </div>
-                  </div>
-                  <div className="flex items-center gap-3">
-                     <div className="bg-primary/10 p-2 rounded-sm"><Clock className="h-4 w-4 text-primary" /></div>
-                     <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-muted-foreground uppercase">Last Activity</span>
-                        <span className="text-[10px] font-bold uppercase">{record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM') : '—'}</span>
-                     </div>
-                  </div>
-               </div>
-            </CardContent>
-            <CardFooter className="bg-muted/10 border-t p-4 flex justify-end">
-               <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all">
-                  View <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
-               </Button>
-            </CardFooter>
-          </Card>
-        )) : (
+        {filteredRecords.length > 0 ? filteredRecords.map(record => {
+          const nextStageKey = STAGE_ORDER.find(key => record.stages?.[key]?.status !== 'Completed');
+          const nextMilestoneLabel = nextStageKey ? STAGE_LABELS[nextStageKey] : 'All Completed';
+
+          return (
+            <Card key={record.id} className="group hover:shadow-xl transition-all duration-300 rounded-sm border-primary/10 overflow-hidden flex flex-col cursor-pointer" onClick={() => router.push(`/liaisoning/manage/${record.siteId}`)}>
+              <CardHeader className="bg-primary/5 border-b p-5">
+                 <div className="flex justify-between items-start gap-4">
+                    <div className="space-y-1 min-w-0">
+                       <CardTitle className="text-lg font-black uppercase tracking-tight truncate text-foreground group-hover:text-primary transition-colors">{record.siteName}</CardTitle>
+                       <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
+                          <Building2 className="h-3 w-3" />
+                          {allSites?.find(s => s.id === record.siteId)?.projectCompany || '—'}
+                       </p>
+                    </div>
+                    <Badge variant="outline" className={cn(
+                      "rounded-sm font-black uppercase text-[8px] h-5 px-1.5 border-primary/20",
+                      record.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" : "bg-primary/5 text-primary"
+                    )}>
+                      {record.status}
+                    </Badge>
+                 </div>
+              </CardHeader>
+              <CardContent className="p-6 flex-1 space-y-6">
+                 <div className="space-y-3">
+                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                       <span>Global Progress</span>
+                       <span className="text-primary">{record.completionPercentage}%</span>
+                    </div>
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50">
+                       <div 
+                          className="h-full bg-primary transition-all duration-1000" 
+                          style={{ width: `${record.completionPercentage}%` }} 
+                       />
+                    </div>
+                 </div>
+                 
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="flex items-center gap-3">
+                       <div className="bg-primary/10 p-2 rounded-sm"><Activity className="h-4 w-4 text-primary" /></div>
+                       <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-muted-foreground uppercase">Next Milestone</span>
+                          <span className="text-[10px] font-bold uppercase leading-tight">
+                            {nextMilestoneLabel}
+                          </span>
+                       </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                       <div className="bg-primary/10 p-2 rounded-sm"><Clock className="h-4 w-4 text-primary" /></div>
+                       <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-muted-foreground uppercase">Last Activity</span>
+                          <span className="text-[10px] font-bold uppercase">{record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM') : '—'}</span>
+                       </div>
+                    </div>
+                 </div>
+              </CardContent>
+              <CardFooter className="bg-muted/10 border-t p-4 flex justify-end">
+                 <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all">
+                    Manage Tracker <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
+                 </Button>
+              </CardFooter>
+            </Card>
+          );
+        }) : (
           <div className="col-span-full py-32 flex flex-col items-center justify-center text-center gap-4 bg-muted/5 border-2 border-dashed rounded-sm opacity-40">
              <PlugZap className="h-16 w-16 text-muted-foreground/30" />
              <p className="text-sm font-bold uppercase tracking-widest">No liaisoning records found</p>
