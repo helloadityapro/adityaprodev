@@ -1,9 +1,19 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp, setDocumentNonBlocking } from '@/firebase';
-import { doc, serverTimestamp, collection, query, where, getDocs, updateDoc } from 'firebase/firestore';
+import { 
+  useFirestore, 
+  useUser, 
+  useDoc, 
+  useMemoFirebase, 
+  updateDocumentNonBlocking, 
+  useFirebaseApp, 
+  setDocumentNonBlocking,
+  useCollection
+} from '@/firebase';
+import { doc, serverTimestamp, collection, query, where, getDocs, updateDoc, ref as firestoreRef } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,7 +37,10 @@ import {
   LayoutGrid,
   FileCheck,
   Check,
-  LockKeyhole
+  LockKeyhole,
+  HardHat,
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -38,6 +51,9 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 
 type LiaisoningDocument = {
   url: string;
@@ -61,6 +77,8 @@ type LiaisoningRecord = {
   status: 'In Progress' | 'Completed';
   completionPercentage: number;
   stages: Record<string, StageData>;
+  contractorId?: string;
+  contractorName?: string;
 };
 
 const MAIN_STAGES = [
@@ -114,12 +132,18 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   const [activeStageId, setActiveStageId] = React.useState<string>('grid_connectivity');
   const [uploadingStageId, setUploadingStageId] = React.useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = React.useState(0);
+  
+  const [isContractorPopoverOpen, setIsContractorPopoverOpen] = React.useState(false);
+  const [contractorSearch, setContractorSearch] = React.useState("");
 
   const siteRef = useMemoFirebase(() => doc(firestore, 'sites', siteId), [firestore, siteId]);
   const { data: site, isLoading: siteLoading } = useDoc<any>(siteRef);
 
   const recordRef = useMemoFirebase(() => doc(firestore, 'liaisoning_records', siteId), [firestore, siteId]);
   const { data: record, isLoading: recordLoading } = useDoc<LiaisoningRecord>(recordRef);
+
+  const contractorsQuery = useMemoFirebase(() => collection(firestore, 'contractors'), [firestore]);
+  const { data: allContractors } = useCollection<any>(contractorsQuery);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -181,6 +205,22 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     });
   };
 
+  const handleAssignContractor = async (contractor: any) => {
+    if (!record) return;
+    try {
+      await updateDocumentNonBlocking(recordRef, {
+        contractorId: contractor.id,
+        contractorName: contractor.name,
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: 'Contractor Assigned', description: `${contractor.name} linked to this site tracker.` });
+      setIsContractorPopoverOpen(false);
+      setContractorSearch("");
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Assignment Failed', description: e.message });
+    }
+  };
+
   const handleToggleSubStage = (stageId: string, subId: string) => {
     if (!record) return;
     const stageDef = MAIN_STAGES.find(s => s.id === stageId);
@@ -193,7 +233,6 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     const nextSubStages = { ...currentSubStages };
 
     if (isChecking) {
-      // Ensure all previous are checked
       const allPrevChecked = stageDef.subStages.slice(0, subIdx).every(ss => currentSubStages[ss.id]);
       if (!allPrevChecked) {
         toast({ variant: 'destructive', title: 'Sequential Workflow', description: 'Please complete previous approval steps first.' });
@@ -201,14 +240,12 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
       }
       nextSubStages[subId] = true;
     } else {
-      // Uncheck this and all subsequent
       nextSubStages[subId] = false;
       stageDef.subStages.slice(subIdx + 1).forEach(ss => {
         nextSubStages[ss.id] = false;
       });
     }
 
-    // If unchecking anything, ensure the milestone status is not "Completed"
     let newStatus = record.stages[stageId].status;
     const allChecked = stageDef.subStages.every(ss => nextSubStages[ss.id]);
     
@@ -322,7 +359,53 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
               <div className="bg-primary/10 p-2.5 sm:p-3 rounded-sm shrink-0"><Building2 className="h-6 w-6 sm:h-8 sm:w-8 text-primary" /></div>
               <div className="min-w-0">
                 <h1 className="text-xl sm:text-2xl md:text-3xl font-black uppercase tracking-tight truncate leading-none">{site?.name}</h1>
-                <p className="text-[8px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest mt-1 opacity-60">Liaisoning Progress Lifecycle</p>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2">
+                  <p className="text-[8px] sm:text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">{site?.projectCompany}</p>
+                  
+                  <Separator orientation="vertical" className="h-3 hidden sm:block" />
+                  
+                  {/* Contractor Assignment UI */}
+                  <Popover open={isContractorPopoverOpen} onOpenChange={setIsContractorPopoverOpen}>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-1.5 text-[8px] sm:text-[10px] font-black uppercase text-primary hover:opacity-80 transition-opacity">
+                        <HardHat className="h-3 w-3" />
+                        {record.contractorName || "Assign Contractor"}
+                        <ChevronDown className="h-2.5 w-2.5 opacity-40" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-[300px] p-0" align="start">
+                      <div className="bg-primary/5 p-3 border-b">
+                        <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Select Site Contractor</h3>
+                      </div>
+                      <div className="flex items-center border-b px-3">
+                        <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                        <Input 
+                          placeholder="Search registry..." 
+                          className="h-10 border-none focus-visible:ring-0 text-xs" 
+                          value={contractorSearch} 
+                          onChange={e => setContractorSearch(e.target.value)} 
+                        />
+                      </div>
+                      <ScrollArea className="h-[200px]">
+                        <div className="p-1">
+                          {allContractors?.filter((c: any) => c.name.toLowerCase().includes(contractorSearch.toLowerCase())).map((c: any) => (
+                            <Button 
+                              key={c.id} 
+                              variant="ghost" 
+                              className="w-full justify-start h-auto py-2.5 px-3 mb-0.5 text-xs text-left"
+                              onClick={() => handleAssignContractor(c)}
+                            >
+                              <div className="flex flex-col items-start min-w-0">
+                                <span className="font-bold truncate w-full uppercase tracking-tight">{c.name}</span>
+                                <span className="text-[9px] text-muted-foreground uppercase opacity-60">{c.role}</span>
+                              </div>
+                            </Button>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
            </div>
            <div className="flex flex-col items-start sm:items-end gap-2 w-full md:w-auto">

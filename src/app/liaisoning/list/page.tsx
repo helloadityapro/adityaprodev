@@ -83,7 +83,7 @@ export default function LiaisoningRegistryPage() {
                 <PlugZap className="h-8 w-8 text-primary" />
               </div>
               <div>
-                <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Liaisoning Hub</h1>
+                <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Track Progress</h1>
                 <p className="text-muted-foreground text-sm font-medium uppercase tracking-widest opacity-60">Grid Connectivity & Approval Tracker</p>
               </div>
             </div>
@@ -93,7 +93,7 @@ export default function LiaisoningRegistryPage() {
             <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
               <PopoverTrigger asChild>
                 <Button className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg px-8">
-                  <Plus className="mr-2 h-4 w-4" /> Start New Tracking
+                  <Plus className="mr-2 h-4 w-4" /> Start New Site
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-[300px] p-0" align="end">
@@ -195,7 +195,7 @@ export default function LiaisoningRegistryPage() {
             </CardContent>
             <CardFooter className="bg-muted/10 border-t p-4 flex justify-end">
                <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all">
-                  Manage Tracker <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
+                  View <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
                </Button>
             </CardFooter>
           </Card>

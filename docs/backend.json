@@ -52,6 +52,8 @@
         "id": { "type": "string" },
         "siteId": { "type": "string" },
         "siteName": { "type": "string" },
+        "contractorId": { "type": "string" },
+        "contractorName": { "type": "string" },
         "status": { "type": "string", "enum": ["In Progress", "Completed"] },
         "completionPercentage": { "type": "number" },
         "stages": {
