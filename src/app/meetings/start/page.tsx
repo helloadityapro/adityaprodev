@@ -32,11 +32,10 @@ import {
   Globe,
   Calendar,
   Zap,
-  MousePointerClick
+  MousePointerClick,
+  RefreshCcw
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -629,7 +628,7 @@ export default function StartMeetingPage() {
           <Button 
             onClick={handleSaveMeeting} 
             disabled={isSubmitting || !siteId}
-            className="flex-1 sm:flex-none sm:min-w-[200px] h-12 rounded-sm font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 order-1 sm:order-2"
+            className="flex-1 sm:flex-none sm:min-w-[200px] h-12 rounded-sm font-black uppercase text-xs tracking-widest h-12 px-10 shadow-xl shadow-primary/20 order-1 sm:order-2"
           >
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             Save Meeting Record
