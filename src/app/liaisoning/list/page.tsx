@@ -16,12 +16,12 @@ import {
   Activity, 
   CheckCircle2, 
   Clock,
-  FilterX,
-  Trash2,
-  HardHat,
-  AlertCircle,
-  LayoutGrid,
-  List
+  FilterX, 
+  Trash2, 
+  HardHat, 
+  AlertCircle, 
+  LayoutGrid, 
+  List 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,6 +49,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Progress } from "@/components/ui/progress";
 import { useToast } from '@/hooks/use-toast';
 
 type Site = { id: string; name: string; projectCompany: string };
@@ -188,7 +189,7 @@ export default function LiaisoningRegistryPage() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="flex items-center gap-4 flex-1">
           <div className="relative w-full md:w-96">
-            <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
             <Input 
               placeholder="Search by site or contractor..." 
               className="pl-10 h-11 text-sm rounded-sm border-primary/20 bg-background"
