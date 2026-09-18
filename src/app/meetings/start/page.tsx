@@ -42,6 +42,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 const REVIEW_POINTS = [
   { id: 'mms_civil', label: 'MMS Civil-work' },
