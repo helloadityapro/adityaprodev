@@ -41,6 +41,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { format } from 'date-fns';
 
 const REVIEW_POINTS = [
   { id: 'mms_civil', label: 'MMS Civil-work' },
@@ -454,7 +455,7 @@ export default function StartMeetingPage() {
             {attendees.length > 0 && (
               <div className="flex flex-wrap gap-2 pt-2">
                 {attendees.map(a => (
-                  <Badge key={a.id} variant="secondary" className="pl-2.5 pr-1 h-7 rounded-sm gap-1.5 flex items-center font-bold text-[10px] bg-primary/5 text-primary border border-primary/10">
+                  <Badge key={a.id} variant="secondary" className="pl-2.5 pr-1 py-1 h-7 rounded-sm gap-1.5 flex items-center font-bold text-[10px] bg-primary/5 text-primary border border-primary/10">
                     <User className="h-3 w-3 text-primary/40" />
                     <span className="truncate max-w-[120px]">{a.name}</span>
                     <X className="h-3 w-3 cursor-pointer hover:text-destructive transition-colors" onClick={(e) => { e.stopPropagation(); setAttendees(prev => prev.filter(x => x.id !== a.id)); }} />
