@@ -1,8 +1,9 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter } from 'next/navigation';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc, where, limit } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -16,7 +17,10 @@ import {
   Activity, 
   CheckCircle2, 
   Clock,
-  FilterX
+  FilterX,
+  Trash2,
+  HardHat,
+  AlertCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -26,6 +30,17 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Label } from '@/components/ui/label';
 import { format } from 'date-fns';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { useToast } from '@/hooks/use-toast';
 
 type Site = { id: string; name: string; projectCompany: string };
 
@@ -37,6 +52,7 @@ type LiaisoningRecord = {
   status: string;
   updatedAt: any;
   stages: Record<string, { status: string }>;
+  contractorName?: string;
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -51,24 +67,27 @@ const STAGE_LABELS: Record<string, string> = {
   format_ii_approval: 'Format II Approval',
   ptc: 'PTC Issuance',
   clearance: 'Clearance Certificate',
-  commissioning: 'Final Commissioning'
+  commissioning: 'Final Commissioning',
+  commissioning_certificate: 'Commissioning Certificate (SE-O&M)'
 };
 
 const STAGE_ORDER = [
   'grid_connectivity', 'estimate_approval', 'estimate_sanction', 
   'supervision_testing', 'material_inspection', 'work_progress', 
   'wcr', 'pre_commissioning', 'format_ii_approval', 'ptc', 
-  'clearance', 'commissioning'
+  'clearance', 'commissioning', 'commissioning_certificate'
 ];
 
 export default function LiaisoningRegistryPage() {
   const firestore = useFirestore();
   const { user } = useUser();
   const router = useRouter();
+  const { toast } = useToast();
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearch, setSiteSearch] = React.useState("");
+  const [deletingRecordId, setDeletingRecordId] = React.useState<string | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<any>(userProfileRef);
@@ -84,15 +103,26 @@ export default function LiaisoningRegistryPage() {
     if (!records) return [];
     return records.filter(r => 
       r.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      r.status.toLowerCase().includes(searchTerm.toLowerCase())
+      r.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (r.contractorName || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
   }, [records, searchTerm]);
 
   const accessibleSites = React.useMemo(() => {
     if (!allSites) return [];
-    // Display all sites irrespective of individual assignments to allow global tracking initialization
     return [...allSites].sort((a, b) => a.name.localeCompare(b.name));
   }, [allSites]);
+
+  const handleDelete = async () => {
+    if (!deletingRecordId) return;
+    try {
+      await deleteDocumentNonBlocking(doc(firestore, 'liaisoning_records', deletingRecordId));
+      toast({ title: 'Record Removed', description: 'The site tracker has been deleted.' });
+      setDeletingRecordId(null);
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
+    }
+  };
 
   if (sitesLoading || recordsLoading) return <div className="p-4 sm:p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
@@ -125,7 +155,7 @@ export default function LiaisoningRegistryPage() {
                 </div>
                 <div className="flex items-center border-b px-3">
                   <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                  <Input placeholder="Search sites..." className="h-10 border-none" value={siteSearch} onChange={e => setSiteSearch(e.target.value)} />
+                  <Input placeholder="Search sites..." className="h-10 border-none focus-visible:ring-0" value={siteSearch} onChange={e => setSiteSearch(e.target.value)} />
                 </div>
                 <ScrollArea className="h-[250px]">
                   <div className="p-1">
@@ -147,10 +177,10 @@ export default function LiaisoningRegistryPage() {
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
         <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Search className="absolute left-3 top-3.5 h-4 w-4 text-muted-foreground" />
           <Input 
-            placeholder="Search registry by site..." 
-            className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background"
+            placeholder="Search by site or contractor..." 
+            className="pl-10 h-11 text-sm rounded-sm border-primary/20 bg-background"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -190,14 +220,23 @@ export default function LiaisoningRegistryPage() {
                  </div>
               </CardHeader>
               <CardContent className="p-6 flex-1 space-y-6">
+                 {record.contractorName && (
+                   <div className="flex items-center gap-2 mb-4">
+                      <HardHat className="h-3.5 w-3.5 text-primary opacity-60" />
+                      <span className="text-[10px] font-black uppercase tracking-tight text-foreground/80 truncate">
+                        {record.contractorName}
+                      </span>
+                   </div>
+                 )}
+
                  <div className="space-y-3">
                     <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                       <span>Global Progress</span>
+                       <span>Audit Progress</span>
                        <span className="text-primary">{record.completionPercentage}%</span>
                     </div>
                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden border border-border/50">
                        <div 
-                          className="h-full bg-primary transition-all duration-1000" 
+                          className="h-full bg-primary transition-all duration-1000 shadow-[0_0_10px_rgba(45,115,255,0.4)]" 
                           style={{ width: `${record.completionPercentage}%` }} 
                        />
                     </div>
@@ -206,9 +245,9 @@ export default function LiaisoningRegistryPage() {
                  <div className="grid grid-cols-2 gap-4">
                     <div className="flex items-center gap-3">
                        <div className="bg-primary/10 p-2 rounded-sm"><Activity className="h-4 w-4 text-primary" /></div>
-                       <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-muted-foreground uppercase">Next Milestone</span>
-                          <span className="text-[10px] font-bold uppercase leading-tight">
+                       <div className="flex flex-col min-w-0">
+                          <span className="text-[8px] font-black text-muted-foreground uppercase">Target Step</span>
+                          <span className="text-[10px] font-bold uppercase leading-tight line-clamp-2">
                             {nextMilestoneLabel}
                           </span>
                        </div>
@@ -216,15 +255,25 @@ export default function LiaisoningRegistryPage() {
                     <div className="flex items-center gap-3">
                        <div className="bg-primary/10 p-2 rounded-sm"><Clock className="h-4 w-4 text-primary" /></div>
                        <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-muted-foreground uppercase">Last Activity</span>
+                          <span className="text-[8px] font-black text-muted-foreground uppercase">Activity Date</span>
                           <span className="text-[10px] font-bold uppercase">{record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM') : '—'}</span>
                        </div>
                     </div>
                  </div>
               </CardContent>
-              <CardFooter className="bg-muted/10 border-t p-4 flex justify-end">
-                 <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all">
-                    Manage Tracker <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
+              <CardFooter className="bg-muted/10 border-t p-3 flex justify-between items-center">
+                 {isAdmin && (
+                   <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className="h-8 w-8 text-destructive hover:bg-destructive/10 rounded-sm" 
+                    onClick={(e) => { e.stopPropagation(); setDeletingRecordId(record.id); }}
+                   >
+                     <Trash2 className="h-4 w-4" />
+                   </Button>
+                 )}
+                 <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all ml-auto">
+                    Details <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
                  </Button>
               </CardFooter>
             </Card>
@@ -232,10 +281,29 @@ export default function LiaisoningRegistryPage() {
         }) : (
           <div className="col-span-full py-32 flex flex-col items-center justify-center text-center gap-4 bg-muted/5 border-2 border-dashed rounded-sm opacity-40">
              <PlugZap className="h-16 w-16 text-muted-foreground/30" />
-             <p className="text-sm font-bold uppercase tracking-widest">No liaisoning records found</p>
+             <p className="text-sm font-bold uppercase tracking-widest">No active trackers found</p>
           </div>
         )}
       </div>
+
+      <AlertDialog open={!!deletingRecordId} onOpenChange={(o) => !o && setDeletingRecordId(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+              <AlertCircle className="h-5 w-5" /> Delete Site Tracker?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              This will permanently remove the Liaisoning progress record and all attached documentation for this site. This action cannot be reversed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px]">
+              Confirm Purge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

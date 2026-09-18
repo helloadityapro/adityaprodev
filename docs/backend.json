@@ -95,7 +95,8 @@
             },
             "ptc": { "$ref": "#/backend/entities/LiaisoningStage" },
             "clearance": { "$ref": "#/backend/entities/LiaisoningStage" },
-            "commissioning": { "$ref": "#/backend/entities/LiaisoningStage" }
+            "commissioning": { "$ref": "#/backend/entities/LiaisoningStage" },
+            "commissioning_certificate": { "$ref": "#/backend/entities/LiaisoningStage" }
           }
         },
         "updatedAt": { "type": "string", "format": "date-time" },

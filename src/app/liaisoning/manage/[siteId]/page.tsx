@@ -118,7 +118,8 @@ const MAIN_STAGES = [
   },
   { id: 'ptc', label: '10. Permission to Commission (PTC)' },
   { id: 'clearance', label: '11. Clearance Certificate / Release Order' },
-  { id: 'commissioning', label: '12. Commissioning' }
+  { id: 'commissioning', label: '12. Commissioning' },
+  { id: 'commissioning_certificate', label: '13. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
 ];
 
 export default function ManageLiaisoningPage({ params }: { params: Promise<{ siteId: string }> }) {
@@ -324,7 +325,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     }
   };
 
-  if (siteLoading || recordLoading) return <div className="p-4 sm:p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
+  if (siteLoading || recordLoading) return <div className="p-4 sm:p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-[500px] w-full" /></div>;
 
   if (!record) {
     return (
