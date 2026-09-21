@@ -21,7 +21,7 @@ import {
   Trash2, 
   Calendar,
   Clock,
-  User,
+  User as UserIcon, 
   Navigation,
   FileDown,
   CheckCircle2,
@@ -61,6 +61,7 @@ import {
   ZoomIn,
   ZoomOut,
   RotateCcw as RotateIcon,
+  RotateCw,
   ChevronLeft,
   ChevronRight,
   IndianRupee,
@@ -1857,3 +1858,4 @@ function ScheduledTripsDialog({
     </Dialog>
   );
 }
+
