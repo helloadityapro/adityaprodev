@@ -71,12 +71,12 @@ const REVIEW_POINTS = [
 
   // TRANSMISSION LINE WORKS
   { id: 'poles_erection_tl', label: 'Poles Erection' },
-  { id: 'cable_stringing_tl', label: 'Cable Stringing' },
+  { id: 'cable_stringing_tl', label: 'Conductor Stringing' },
 
   // SUB-STATION WORKS
   { id: 'equip_foundation_ss', label: 'Equipment Foundation' },
   { id: 'bay_erection_ss', label: 'Bay Erection' },
-  { id: 'ht_panel_install_ss', label: 'HT Panel Installation' },
+  { id: 'ht_panel_install_ss', label: 'Metering Cubicle, CT and PT Installation' },
 
   { id: 'others', label: 'Others' },
 ];
