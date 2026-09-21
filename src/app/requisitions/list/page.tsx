@@ -55,6 +55,16 @@ import {
   DialogFooter,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { slugifyRole } from '@/lib/access-control';
@@ -435,14 +445,14 @@ export default function RequisitionsListPage() {
                               <div className="flex justify-end gap-1">
                                 {isMgrOfReq && (
                                   <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'ManagerApproved', 'Approved by Manager.')}><CheckCircle2 className="h-4 w-4" /></Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Rejected by Manager.')}><XCircle className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'ManagerApproved', 'Approved by Manager.')}><CheckCircle2 className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Rejected by Manager.')}><XCircle className="h-4 w-4" /></Button>
                                   </div>
                                 )}
                                 {canAdminApprove && (
                                   <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'Approved', 'Final Approved by Admin.')}><CheckCircle2 className="h-4 w-4" /></Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Final Rejected by Admin.')}><XCircle className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'Approved', 'Final Approved by Admin.')}><CheckCircle2 className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Final Rejected by Admin.')}><XCircle className="h-4 w-4" /></Button>
                                   </div>
                                 )}
                                 {canAssign && (
@@ -458,7 +468,7 @@ export default function RequisitionsListPage() {
                                 )}
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => toggleExpand(req.id)}><Eye className="h-4 w-4" /></Button>
                                 {(isAdmin || (isOwner && req.status === 'Pending')) && (
-                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => setDeletingReq(req)}><Trash2 className="h-4 w-4" /></Button>
+                                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50" onClick={() => setDeletingReq(req)} title="Delete"><Trash2 className="h-4 w-4" /></Button>
                                 )}
                               </div>
                             </TableCell>
@@ -552,7 +562,7 @@ export default function RequisitionsListPage() {
           <AlertDialogHeader>
             <AlertDialogTitle className="text-destructive flex items-center gap-2 font-black uppercase tracking-tight"><Trash2 className="h-5 w-5" /> Remove Requisition?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed">
-              Are you sure you want to permanently delete this material request for <strong>{deletingReq?.siteName}</strong>? This action cannot be reversed.
+              Are you sure you want to permanently delete the requirement for <strong>{deletingReq?.siteName}</strong>? This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
