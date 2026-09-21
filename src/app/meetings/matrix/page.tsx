@@ -35,7 +35,9 @@ import {
   RotateCw,
   RotateCcw,
   Users,
-  User as UserIcon
+  User as UserIcon,
+  UserCog,
+  ChevronDown
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
