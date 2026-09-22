@@ -40,7 +40,6 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -410,7 +409,7 @@ export default function StartMeetingPage() {
                     <Input 
                       placeholder="Search or type new name..." 
                       className="h-10 border-none text-sm bg-transparent focus-visible:ring-0" 
-                      value={assigneeSearch} 
+                      value={attendeeSearch} 
                       onChange={e => setAttendeeSearch(e.target.value)} 
                     />
                   </div>
