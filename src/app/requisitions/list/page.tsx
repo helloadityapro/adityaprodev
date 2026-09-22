@@ -109,7 +109,7 @@ type Requisition = {
   createdAt: any;
 };
 
-type UserProfile = { id: string; username: string; role: string; email: string };
+type UserProfile = { id: string; username: string; role: string; email: string, department: string };
 type SortKey = 'date' | 'site' | 'urgency' | 'status';
 
 export default function RequisitionsListPage() {
@@ -132,13 +132,17 @@ export default function RequisitionsListPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
   const isManager = userProfile?.role === 'Site Manager';
+  const isPurchaseDept = userProfile?.department === 'Purchase & Supply Chain' || userProfile?.department === 'Procurement and Supply-chain';
 
   const reqsQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'material_requisitions');
-    if (isAdmin) return query(colRef, limit(500));
+    
+    // Admin or Purchase Dept see all
+    if (isAdmin || isPurchaseDept) return query(colRef, limit(500));
+    
     return query(colRef, or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid), where('assignedToId', '==', user.uid)), limit(500));
-  }, [firestore, user, isProfileLoading, isAdmin]);
+  }, [firestore, user, isProfileLoading, isAdmin, isPurchaseDept, isManager]);
 
   const { data: requisitions, isLoading: isReqsLoading } = useCollection<Requisition>(reqsQuery);
 
