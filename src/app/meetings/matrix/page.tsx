@@ -362,7 +362,7 @@ export default function MeetingsMatrixPage() {
   const scroll = (direction: 'left' | 'right') => {
     if (scrollContainerRef.current) {
       const { scrollLeft } = scrollContainerRef.current;
-      const scrollTo = direction === 'left' ? scrollLeft - 300 : scrollLeft + 300;
+      const scrollTo = direction === 'left' ? scrollLeft - 400 : scrollLeft + 400;
       scrollContainerRef.current.scrollTo({ left: scrollTo, behavior: 'smooth' });
     }
   };
@@ -531,8 +531,11 @@ export default function MeetingsMatrixPage() {
       </div>
 
       <Card className="rounded-sm border-primary/10 shadow-xl overflow-hidden min-h-[600px] flex flex-col relative">
-        <ScrollArea className="flex-1 w-full relative">
-          <div ref={scrollContainerRef} className="min-w-full">
+        <div 
+          ref={scrollContainerRef}
+          className="flex-1 w-full relative overflow-auto custom-scrollbar"
+        >
+          <div className="min-w-full">
             <TooltipProvider delayDuration={0}>
               <Table className="border-separate border-spacing-0 text-[10px] min-w-full w-max table-fixed">
                 <TableHeader className="sticky top-0 z-40">
@@ -646,8 +649,7 @@ export default function MeetingsMatrixPage() {
               </Table>
             </TooltipProvider>
           </div>
-          <ScrollBar orientation="horizontal" />
-        </ScrollArea>
+        </div>
         
         {/* Navigation Floating Buttons */}
         <div className="fixed right-6 bottom-24 flex flex-col gap-3 z-[60] no-print">
@@ -688,3 +690,4 @@ export default function MeetingsMatrixPage() {
     </div>
   );
 }
+
