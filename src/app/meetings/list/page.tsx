@@ -378,6 +378,12 @@ export default function MeetingsListPage() {
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
                   <User className="h-3.5 w-3.5 text-primary/40" /> {m.userName}
                 </div>
+                {m.attendees && m.attendees.length > 0 && (
+                  <div className="flex items-center gap-2 text-[9px] font-medium text-muted-foreground uppercase pl-5">
+                    <Users className="h-3 w-3 opacity-40" />
+                    <span>{m.attendees.length} Attendee{m.attendees.length > 1 ? 's' : ''}</span>
+                  </div>
+                )}
                 <div className="p-2 bg-red-50/50 border border-red-100 rounded-sm text-[10px] text-red-900 font-medium italic line-clamp-2">
                   "{m.criticalPoints || 'No critical points logged.'}"
                 </div>
@@ -400,17 +406,18 @@ export default function MeetingsListPage() {
         <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
           <CardContent className="p-0">
             <Table>
-              <TableHeader className="bg-muted/30">
+              <TableHeader>
                 <TableRow>
-                  <TableHead className="px-6 cursor-pointer hover:bg-muted/5" onClick={() => handleSort('date')}>
+                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}>
                     <div className="flex items-center">Date & Time <SortIcon column="date" /></div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('site')}>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('site')}>
                     <div className="flex items-center">Project Site <SortIcon column="site" /></div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:bg-muted/5" onClick={() => handleSort('personnel')}>
-                    <div className="flex items-center">Personnel <SortIcon column="personnel" /></div>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('personnel')}>
+                    <div className="flex items-center">Meeting Lead <SortIcon column="personnel" /></div>
                   </TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest">Meeting Attendees</TableHead>
                   <TableHead>Critical Observations</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
@@ -421,6 +428,12 @@ export default function MeetingsListPage() {
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground uppercase">{m.date}</TableCell>
                     <TableCell><div className="flex items-center gap-2 font-bold text-sm text-foreground"><Building2 className="h-3.5 w-3.5 text-primary opacity-40" />{m.siteName}</div></TableCell>
                     <TableCell><div className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><User className="h-3.5 w-3.5 text-primary opacity-40" />{m.userName}</div></TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1.5 text-[10px] font-medium text-muted-foreground max-w-[200px] truncate">
+                        <Users className="h-3.5 w-3.5 text-primary opacity-30 shrink-0" />
+                        <span>{m.attendees && m.attendees.length > 0 ? m.attendees.map(a => a.name).join(', ') : 'Lead Only'}</span>
+                      </div>
+                    </TableCell>
                     <TableCell className="max-w-[250px] truncate text-xs font-medium text-red-700 italic" title={m.criticalPoints}>"{m.criticalPoints || '-'}"</TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1">
@@ -540,7 +553,7 @@ export default function MeetingsListPage() {
               </div>
             )}
           </ScrollArea>
-          <DialogFooter className="p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print">
+          <DialogFooter className="p-3 sm:p-4 bg-muted/5 border-t gap-2 sm:gap-3 shrink-0 no-print">
             <DialogClose asChild><Button variant="outline" className="w-full sm:w-auto rounded-sm font-black uppercase text-[10px] h-11 px-10 tracking-widest">Close Audit</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
