@@ -422,13 +422,13 @@ export default function MeetingsMatrixPage() {
       <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="flex flex-col gap-1.5 flex-1">
-            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Location Context</Label>
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Select Site</Label>
             <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-full justify-between h-11 rounded-sm bg-background border-primary/10 font-bold text-xs uppercase shadow-inner">
                   <div className="flex items-center gap-2 truncate">
                     <Building2 className="h-4 w-4 text-primary opacity-60" />
-                    <span className="truncate">{selectedSiteId === 'all' ? "Global View" : allSites?.find(s => s.id === selectedSiteId)?.name}</span>
+                    <span className="truncate">{selectedSiteId === 'all' ? "All Sites" : allSites?.find(s => s.id === selectedSiteId)?.name}</span>
                   </div>
                   <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50 shrink-0" />
                 </Button>
@@ -441,7 +441,7 @@ export default function MeetingsMatrixPage() {
                 <ScrollArea className="h-[250px]">
                   <div className="p-1">
                     <Button variant="ghost" className="w-full justify-start h-10 text-xs font-black uppercase rounded-sm mb-1 px-4" onClick={() => { setSelectedSiteId('all'); setIsSitePopoverOpen(false); }}>
-                      <Globe className="h-3.5 w-3.5 mr-2" /> Global Registry
+                      <Globe className="h-3.5 w-3.5 mr-2" /> Show All Sites
                     </Button>
                     {allSites?.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map(s => (
                       <Button key={s.id} variant="ghost" className="w-full justify-start h-auto py-3 px-4 text-xs text-left rounded-sm mb-0.5" onClick={() => { setSelectedSiteId(s.id); setIsSitePopoverOpen(false); }}>
@@ -540,7 +540,7 @@ export default function MeetingsMatrixPage() {
               <Table className="border-separate border-spacing-0 text-[10px] min-w-full w-max table-fixed">
                 <TableHeader className="sticky top-0 z-40">
                   <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-[220px] font-black uppercase tracking-widest bg-primary text-white sticky left-0 top-0 z-50 px-4 py-4 border-r border-white/10">Technical Attribute</TableHead>
+                    <TableHead className="w-[220px] font-black uppercase tracking-widest bg-primary text-white sticky left-0 top-0 z-50 px-4 py-4 border-r border-white/10">Meeting Items</TableHead>
                     {sortedMeetings.map((m) => (
                       <TableHead key={m.id} className="text-center font-black uppercase tracking-tight leading-tight w-[240px] px-3 py-4 bg-primary text-white border-r border-white/10 last:border-0">
                         <div className="flex flex-col items-center gap-1.5">
@@ -674,11 +674,11 @@ export default function MeetingsMatrixPage() {
         <div className="p-4 border-t bg-muted/5 flex flex-wrap items-center justify-center gap-8 shrink-0 z-10 no-print">
            <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-primary" />
-              <span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">Standard Attributes</span>
+              <span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">General Points</span>
            </div>
            <div className="flex items-center gap-2">
               <div className="h-2 w-2 rounded-full bg-red-600" />
-              <span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">Critical Blockers</span>
+              <span className="text-[9px] font-black uppercase text-foreground/70 tracking-widest">Critical Points</span>
            </div>
            <Separator orientation="vertical" className="h-4 hidden sm:block" />
            <div className="flex items-center gap-2">

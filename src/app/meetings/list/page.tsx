@@ -16,7 +16,6 @@ import {
   User, 
   Clock, 
   Calendar, 
-  Volume2, 
   ChevronRight, 
   Trash2, 
   Eye, 
@@ -374,7 +373,6 @@ export default function MeetingsListPage() {
                   <span className="text-[10px] font-mono font-black text-primary uppercase">{m.date}</span>
                   <h3 className="font-bold text-sm leading-tight text-foreground">{m.siteName}</h3>
                 </div>
-                {m.recordingUrl && <Badge variant="secondary" className="h-5 px-1.5 bg-primary/10 text-primary border-none"><Volume2 className="h-3 w-3" /></Badge>}
               </div>
               <div className="space-y-2">
                 <div className="flex items-center gap-1.5 text-[10px] font-bold text-muted-foreground uppercase">
@@ -414,7 +412,6 @@ export default function MeetingsListPage() {
                     <div className="flex items-center">Personnel <SortIcon column="personnel" /></div>
                   </TableHead>
                   <TableHead>Critical Observations</TableHead>
-                  <TableHead className="text-center">Audio</TableHead>
                   <TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -425,7 +422,6 @@ export default function MeetingsListPage() {
                     <TableCell><div className="flex items-center gap-2 font-bold text-sm text-foreground"><Building2 className="h-3.5 w-3.5 text-primary opacity-40" />{m.siteName}</div></TableCell>
                     <TableCell><div className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><User className="h-3.5 w-3.5 text-primary opacity-40" />{m.userName}</div></TableCell>
                     <TableCell className="max-w-[250px] truncate text-xs font-medium text-red-700 italic" title={m.criticalPoints}>"{m.criticalPoints || 'None logged.'}"</TableCell>
-                    <TableCell className="text-center">{m.recordingUrl ? <Badge variant="secondary" className="h-5 px-1.5 bg-primary/10 text-primary border-none"><Volume2 className="h-3 w-3" /></Badge> : '—'}</TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"><Eye className="h-4 w-4" /></Button>
