@@ -421,7 +421,7 @@ export default function MeetingsListPage() {
                     <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground uppercase">{m.date}</TableCell>
                     <TableCell><div className="flex items-center gap-2 font-bold text-sm text-foreground"><Building2 className="h-3.5 w-3.5 text-primary opacity-40" />{m.siteName}</div></TableCell>
                     <TableCell><div className="flex items-center gap-2 text-xs font-bold text-muted-foreground"><User className="h-3.5 w-3.5 text-primary opacity-40" />{m.userName}</div></TableCell>
-                    <TableCell className="max-w-[250px] truncate text-xs font-medium text-red-700 italic" title={m.criticalPoints}>"{m.criticalPoints || 'None logged.'}"</TableCell>
+                    <TableCell className="max-w-[250px] truncate text-xs font-medium text-red-700 italic" title={m.criticalPoints}>"{m.criticalPoints || '-'}"</TableCell>
                     <TableCell className="text-right px-6">
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"><Eye className="h-4 w-4" /></Button>
@@ -500,7 +500,7 @@ export default function MeetingsListPage() {
                 <div className="space-y-6">
                   <div className="flex items-center gap-2 border-b-2 border-primary/10 pb-2">
                     <History className="h-4 w-4 text-primary" />
-                    <h3 className="text-xs font-black uppercase tracking-widest text-primary">Technical Review Protocol</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-primary">Technical Review</h3>
                   </div>
                   <div className="space-y-8">
                     {CATEGORIES.map(category => (
@@ -527,10 +527,10 @@ export default function MeetingsListPage() {
                 <div className="space-y-4">
                   <div className="flex items-center gap-2 border-b-2 border-red-500/20 pb-2">
                     <ShieldAlert className="h-4 w-4 text-red-600" />
-                    <h3 className="text-xs font-black uppercase tracking-widest text-red-700">Critical Observations Registry</h3>
+                    <h3 className="text-xs font-black uppercase tracking-widest text-red-700">Critical Observations</h3>
                   </div>
                   <div className="p-6 bg-red-50/50 border-2 border-red-100 rounded-sm text-sm font-medium leading-relaxed italic text-red-950">
-                    "{viewingMeeting.criticalPoints || 'Zero critical blockers identified during this meeting.'}"
+                    "{viewingMeeting.criticalPoints || '-'}"
                   </div>
                 </div>
 

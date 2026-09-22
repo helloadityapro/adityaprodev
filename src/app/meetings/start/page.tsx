@@ -241,7 +241,11 @@ export default function StartMeetingPage() {
   };
 
   const handleQuickStatus = (pointId: string, status: string) => {
-    setObservations(prev => ({ ...prev, [pointId]: status }));
+    setObservations(prev => {
+      const existing = prev[pointId] || "";
+      const newValue = existing ? `${status} - ${existing}` : status;
+      return { ...prev, [pointId]: newValue };
+    });
   };
 
   const handleSaveMeeting = async () => {
@@ -406,7 +410,7 @@ export default function StartMeetingPage() {
                     <Input 
                       placeholder="Search or type new name..." 
                       className="h-10 border-none text-sm bg-transparent focus-visible:ring-0" 
-                      value={attendeeSearch} 
+                      value={assigneeSearch} 
                       onChange={e => setAttendeeSearch(e.target.value)} 
                     />
                   </div>
@@ -470,7 +474,7 @@ export default function StartMeetingPage() {
         <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
           <CardHeader className="bg-primary/5 border-b py-4">
             <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
-              <NotebookPen className="h-4 w-4 text-primary" /> Technical Review Protocol
+              <NotebookPen className="h-4 w-4 text-primary" /> Technical Review Points
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0 divide-y">
