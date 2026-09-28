@@ -93,7 +93,7 @@ const REVIEW_POINTS = [
 
   // TRANSMISSION LINE WORKS
   { id: 'poles_erection_tl', label: 'Poles Erection', category: 'Transmission Line Works' },
-  { id: id: 'cable_stringing_tl', label: 'Cable Stringing', category: 'Transmission Line Works' },
+  { id: 'cable_stringing_tl', label: 'Cable Stringing', category: 'Transmission Line Works' },
 
   // SUB-STATION WORKS
   { id: 'equip_foundation_ss', label: 'Equipment Foundation', category: 'Sub-Station Works' },
@@ -385,11 +385,6 @@ export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteI
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
-  };
-
-  const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary shrink-0" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
   };
 
   if (isProfileLoading || sitesLoading || meetingsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
@@ -733,3 +728,7 @@ export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteI
   );
 }
 
+function SortIcon({ column, config }: { column: SortKey, config: { key: SortKey; direction: 'asc' | 'desc' } }) {
+  if (config.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+}
