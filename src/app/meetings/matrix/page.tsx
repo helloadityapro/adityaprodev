@@ -144,7 +144,8 @@ type UserProfile = {
 
 type SortKey = 'company' | 'name' | 'total' | string;
 
-export default function MeetingsMatrixPage() {
+export default function MeetingsMatrixPage({ params }: { params: Promise<{ siteId: string }> }) {
+  const { siteId: initialSiteId } = React.use(params);
   const firestore = useFirestore();
   const { user } = useUser();
   const { toast } = useToast();
@@ -155,6 +156,8 @@ export default function MeetingsMatrixPage() {
   const [siteSearch, setSiteSearch] = React.useState("");
   
   const [dateFilter, setDateFilter] = React.useState<string>("7days");
+  const [customStart, setCustomStart] = React.useState<string>(format(subDays(new Date(), 7), 'yyyy-MM-dd'));
+  const [customEnd, setCustomEnd] = React.useState<string>(format(new Date(), 'yyyy-MM-dd'));
   const [isExportingPDF, setIsExportingPDF] = React.useState(false);
 
   // Personnel filters
@@ -194,9 +197,10 @@ export default function MeetingsMatrixPage() {
       case 'lastMonth': return { start: startOfDay(subMonths(today, 1)), end: endOfDay(today) };
       case 'lastYear': return { start: startOfDay(subYears(today, 1)), end: endOfDay(today) };
       case 'allTime': return { start: new Date(0), end: new Date(2100, 0, 1) };
+      case 'custom': return { start: startOfDay(new Date(customStart)), end: endOfDay(new Date(customEnd)) };
       default: return { start: startOfDay(subDays(today, 7)), end: endOfDay(today) };
     }
-  }, [dateFilter]);
+  }, [dateFilter, customStart, customEnd]);
 
   const sortedMeetings = React.useMemo(() => {
     if (!meetings) return [];
@@ -375,6 +379,18 @@ export default function MeetingsMatrixPage() {
     setSelectedAttendeeIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
   };
 
+  const handleSort = (key: SortKey) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: SortKey }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30 shrink-0" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary shrink-0" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary shrink-0" />;
+  };
+
   if (isProfileLoading || sitesLoading || meetingsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   if (!isAdmin) return null;
@@ -407,6 +423,7 @@ export default function MeetingsMatrixPage() {
                 <SelectItem value="lastMonth" className="text-[10px] font-black uppercase">Last Month</SelectItem>
                 <SelectItem value="lastYear" className="text-[10px] font-black uppercase">Last Year</SelectItem>
                 <SelectItem value="allTime" className="text-[10px] font-black uppercase">All Time</SelectItem>
+                <SelectItem value="custom" className="text-[10px] font-black uppercase text-primary">Custom Range</SelectItem>
               </SelectContent>
             </Select>
             <Button onClick={handleExport} disabled={sortedMeetings.length === 0} variant="outline" className="h-11 rounded-sm font-bold border-primary text-primary hover:bg-primary/5 px-8 shadow-sm">
@@ -417,6 +434,30 @@ export default function MeetingsMatrixPage() {
             </Button>
           </div>
         </div>
+
+        {dateFilter === 'custom' && (
+          <div className="flex items-center gap-3 p-4 bg-primary/5 rounded-sm border border-primary/10 animate-in slide-in-from-top-2 duration-300 mt-2">
+            <div className="flex-1 space-y-1.5">
+              <Label className="text-[9px] font-black uppercase text-primary tracking-widest px-1">Start Date</Label>
+              <Input 
+                type="date" 
+                value={customStart} 
+                onChange={e => setCustomStart(e.target.value)} 
+                className="h-9 text-[10px] rounded-sm bg-background border-primary/20 font-bold"
+              />
+            </div>
+            <ArrowRight className="h-4 w-4 text-primary/40 mt-6 shrink-0" />
+            <div className="flex-1 space-y-1.5">
+              <Label className="text-[9px] font-black uppercase text-primary tracking-widest px-1">End Date</Label>
+              <Input 
+                type="date" 
+                value={customEnd} 
+                onChange={e => setCustomEnd(e.target.value)} 
+                className="h-9 text-[10px] rounded-sm bg-background border-primary/20 font-bold"
+              />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
@@ -477,7 +518,7 @@ export default function MeetingsMatrixPage() {
                 <ScrollArea className="h-[200px]">
                   <div className="p-2 space-y-1">
                     {filteredLeads.map(u => (
-                      <div key={u.id} className="flex items-center space-x-3 p-2 rounded-sm hover:bg-primary/5 cursor-pointer" onClick={() => toggleLead(u.id)}>
+                      <div key={u.id} className="flex items-center space-x-3 p-2 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer" onClick={() => toggleLead(u.id)}>
                         <Checkbox checked={selectedLeadIds.includes(u.id)} />
                         <span className="text-xs font-bold uppercase">{u.username}</span>
                       </div>
@@ -509,7 +550,7 @@ export default function MeetingsMatrixPage() {
                 <ScrollArea className="h-[200px]">
                   <div className="p-2 space-y-1">
                     {filteredAttendees.map(u => (
-                      <div key={u.id} className="flex items-center space-x-3 p-2 rounded-sm hover:bg-primary/5 cursor-pointer" onClick={() => toggleAttendee(u.id)}>
+                      <div key={u.id} className="flex items-center space-x-3 p-2 rounded-sm hover:bg-primary/5 transition-colors cursor-pointer" onClick={() => toggleAttendee(u.id)}>
                         <Checkbox checked={selectedAttendeeIds.includes(u.id)} />
                         <span className="text-xs font-bold uppercase">{u.username}</span>
                       </div>
@@ -690,4 +731,3 @@ export default function MeetingsMatrixPage() {
     </div>
   );
 }
-
