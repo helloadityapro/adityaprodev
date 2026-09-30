@@ -208,7 +208,12 @@ service cloud.firestore {
     match /requirements/{reqId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();
-      allow update: if isSignedIn();
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        resource.data.userId == request.auth.uid || 
+        request.auth.uid == resource.data.siteManagerId || 
+        isAdmin()
+      );
       allow delete: if isSignedIn() && (
         request.auth.uid == resource.data.userId || 
         request.auth.uid == resource.data.siteManagerId || 
@@ -316,7 +321,8 @@ service cloud.firestore {
         resource.data.siteManagerId == request.auth.uid ||
         resource.data.assignedToId == request.auth.uid
       );
-      allow delete: if isAdmin();
+      // Fixed: Allow owners to delete their own pending requests
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid && resource.data.status == 'Pending');
     }
 
     match /meetings/{meetingId} {
