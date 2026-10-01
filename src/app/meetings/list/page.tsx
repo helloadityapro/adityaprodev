@@ -4,7 +4,7 @@ import * as React from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, query, orderBy, doc, limit, where } from 'firebase/firestore';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -32,7 +32,8 @@ import {
   LayoutGrid,
   FileDown,
   Loader2,
-  X
+  X,
+  AlertCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -42,6 +43,16 @@ import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -125,6 +136,7 @@ export default function MeetingsListPage() {
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [viewingMeeting, setViewingMeeting] = React.useState<Meeting | null>(null);
   const [isExporting, setIsExporting] = React.useState(false);
+  const [meetingToDelete, setMeetingToDelete] = React.useState<Meeting | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -316,8 +328,11 @@ export default function MeetingsListPage() {
     return result;
   }, [meetings, searchTerm, sortConfig]);
 
-  const handleDelete = (id: string) => {
-    deleteDocumentNonBlocking(doc(firestore, 'meetings', id));
+  const confirmDelete = () => {
+    if (!meetingToDelete) return;
+    deleteDocumentNonBlocking(doc(firestore, 'meetings', meetingToDelete.id));
+    toast({ title: 'Record Removed', description: `Meeting at ${meetingToDelete.siteName} has been deleted.` });
+    setMeetingToDelete(null);
   };
 
   if (isProfileLoading || isMeetingsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
@@ -348,7 +363,7 @@ export default function MeetingsListPage() {
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Search site, personnel or findings..." 
-            className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background"
+            className="pl-10 h-11 text-sm rounded-sm border-primary/20 bg-background"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -391,7 +406,7 @@ export default function MeetingsListPage() {
               <div className="pt-2 border-t border-primary/5 flex justify-end gap-1">
                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm"><Eye className="h-4 w-4" /></Button>
                 {(isAdmin || m.userId === user?.uid) && (
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}><Trash2 className="h-3.5 w-3.5" /> </Button>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={(e) => { e.stopPropagation(); setMeetingToDelete(m); }}><Trash2 className="h-3.5 w-3.5" /> </Button>
                 )}
               </div>
             </CardContent>
@@ -439,7 +454,7 @@ export default function MeetingsListPage() {
                       <div className="flex justify-end gap-1">
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm opacity-0 group-hover:opacity-100 transition-opacity"><Eye className="h-4 w-4" /></Button>
                         {(isAdmin || m.userId === user?.uid) && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); handleDelete(m.id); }}><Trash2 className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => { e.stopPropagation(); setMeetingToDelete(m); }}><Trash2 className="h-4 w-4" /></Button>
                         )}
                       </div>
                     </TableCell>
@@ -558,6 +573,26 @@ export default function MeetingsListPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Delete Confirmation Alert */}
+      <AlertDialog open={!!meetingToDelete} onOpenChange={(o) => !o && setMeetingToDelete(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+              <AlertCircle className="h-5 w-5" /> Delete Meeting Record?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              Are you sure you want to permanently remove the review meeting record for <strong>{meetingToDelete?.siteName}</strong>? This action will purge all technical observations and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Keep Record</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] shadow-lg">
+              Confirm Deletion
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
