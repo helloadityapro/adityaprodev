@@ -33,7 +33,9 @@ import {
   Calendar,
   Zap,
   MousePointerClick,
-  RefreshCcw
+  RefreshCcw,
+  HardHat,
+  UserCog
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -201,6 +203,15 @@ export default function StartMeetingPage() {
     });
   }, [rawPreviousMeetings]);
 
+  const sitePersonnel = React.useMemo(() => {
+    if (!siteId || !allUsers) return null;
+    const team = allUsers.filter(u => u.assignedProjectIds?.includes(siteId));
+    return {
+      managers: team.filter(u => u.role === 'Site Manager').map(u => u.username).join(', ') || 'Unassigned',
+      engineers: team.filter(u => u.role === 'Site Engineer').map(u => u.username).join(', ') || 'Unassigned'
+    };
+  }, [siteId, allUsers]);
+
   // Load draft from localStorage on mount
   React.useEffect(() => {
     const savedDraft = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -246,6 +257,16 @@ export default function StartMeetingPage() {
       const newValue = existing ? `${status} - ${existing}` : status;
       return { ...prev, [pointId]: newValue };
     });
+  };
+
+  const resetForm = () => {
+    setSiteId("");
+    setSiteName("");
+    setAttendees([]);
+    setObservations({});
+    setCriticalPoints("");
+    setMeetingDate(format(new Date(), 'yyyy-MM-dd'));
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
   };
 
   const handleSaveMeeting = async () => {
@@ -305,6 +326,9 @@ export default function StartMeetingPage() {
           <CardFooter className="space-y-4 pb-8 px-8 flex flex-col">
             <Button className="w-full h-12 text-sm font-black uppercase tracking-widest shadow-lg" onClick={() => router.push("/meetings/list")}>
               View Meetings Data
+            </Button>
+            <Button variant="outline" className="w-full h-12 text-sm font-bold uppercase tracking-widest" onClick={() => { setIsSuccess(false); resetForm(); }}>
+              Start New Meeting
             </Button>
             <Button variant="ghost" className="w-full h-10 text-[10px] font-black uppercase text-muted-foreground" onClick={() => router.push("/dashboard")}>
               Go to Dashboard
@@ -372,9 +396,12 @@ export default function StartMeetingPage() {
                     <ScrollArea className="h-[200px]">
                       <div className="p-1">
                         {allSites?.filter((s: any) => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map((s: any) => (
-                          <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-xs font-bold uppercase text-left" onClick={() => { setSiteId(s.id); setSiteName(s.name); setIsSitePopoverOpen(false); }}>
-                            <Check className={cn("mr-2 h-4 w-4 text-primary", siteId === s.id ? "opacity-100" : "opacity-0")} />
-                            {s.name}
+                          <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-auto py-3 px-4 mb-0.5 text-xs text-left group" onClick={() => { setSiteId(s.id); setSiteName(s.name); setIsSitePopoverOpen(false); }}>
+                            <Check className={cn("mr-2 h-4 w-4 text-primary shrink-0", siteId === s.id ? "opacity-100" : "opacity-0")} />
+                            <div className="flex flex-col min-w-0">
+                                <span className={cn("font-bold truncate w-full uppercase tracking-tight transition-colors", siteId === s.id ? "text-primary" : "text-foreground")}>{s.name}</span>
+                                <span className="text-[9px] text-muted-foreground uppercase opacity-60 font-medium">{s.projectCompany}</span>
+                            </div>
                           </Button>
                         ))}
                       </div>
@@ -383,6 +410,23 @@ export default function StartMeetingPage() {
                 </Popover>
               </div>
             </div>
+
+            {siteId && sitePersonnel && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2 duration-500">
+                <div className="p-3 rounded-sm bg-primary/5 border border-primary/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-primary tracking-widest">
+                    <UserCog className="h-3 w-3" /> Site Manager(s)
+                  </div>
+                  <p className="text-xs font-bold text-foreground truncate">{sitePersonnel.managers}</p>
+                </div>
+                <div className="p-3 rounded-sm bg-primary/5 border border-primary/10 space-y-1">
+                  <div className="flex items-center gap-1.5 text-[9px] font-black uppercase text-primary tracking-widest">
+                    <HardHat className="h-3 w-3" /> Site Engineer(s)
+                  </div>
+                  <p className="text-xs font-bold text-foreground truncate">{sitePersonnel.engineers}</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

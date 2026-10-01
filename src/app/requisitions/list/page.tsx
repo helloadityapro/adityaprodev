@@ -273,7 +273,7 @@ export default function RequisitionsListPage() {
       ManagerApproved: { label: "Pending Admin", color: "bg-blue-100 text-blue-800 border-blue-200" },
       Approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200" },
       Rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" },
-      "Approved & Looking Into It": { label: "Looking Into It", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
+      "Approved & Looking Into It": { label: "Not Attended yet", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
       Ordered: { label: "Ordered", color: "bg-purple-100 text-purple-800 border-purple-200" },
       Dispatched: { label: "Dispatched", color: "bg-amber-100 text-amber-800 border-amber-200" },
       Delivered: { label: "Delivered", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },

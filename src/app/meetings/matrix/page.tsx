@@ -93,7 +93,7 @@ const REVIEW_POINTS = [
 
   // TRANSMISSION LINE WORKS
   { id: 'poles_erection_tl', label: 'Poles Erection', category: 'Transmission Line Works' },
-  { id: 'cable_stringing_tl', label: 'Cable Stringing', category: 'Transmission Line Works' },
+  { id: 'cable_stringing_tl', label: 'Conductor Stringing', category: 'Transmission Line Works' },
 
   // SUB-STATION WORKS
   { id: 'equip_foundation_ss', label: 'Equipment Foundation', category: 'Sub-Station Works' },
