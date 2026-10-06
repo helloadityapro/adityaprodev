@@ -43,7 +43,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from '@/lib/utils';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
@@ -135,6 +135,8 @@ export default function RequisitionsListPage() {
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [deletingReq, setDeletingReq] = React.useState<Requisition | null>(null);
 
+  const [actionState, setActionState] = React.useState<{ req: Requisition, targetStatus: string } | null>(null);
+
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
@@ -145,7 +147,6 @@ export default function RequisitionsListPage() {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'material_requisitions');
     
-    // Admin or Purchase Dept see all
     if (isAdmin || isPurchaseDept) return query(colRef, limit(500));
     
     return query(colRef, or(where('userId', '==', user.uid), where('siteManagerId', '==', user.uid), where('assignedToId', '==', user.uid)), limit(500));
@@ -224,25 +225,41 @@ export default function RequisitionsListPage() {
     setExpandedIds(next);
   };
 
-  const handleUpdateStatus = async (req: Requisition, targetStatus: Requisition['status'], remarks: string) => {
-    if (!user || !userProfile) return;
-    
+  const handleAction = async (remarks: string) => {
+    if (!actionState || !user || !userProfile) return;
+    const { req, targetStatus } = actionState;
+    const reqRef = doc(firestore, 'material_requisitions', req.id);
+
     const timelineEntry: TimelineEntry = {
-      action: "Status Updated",
+      action: targetStatus === 'Rejected' ? "Rejected" : 
+              targetStatus === 'ManagerApproved' ? "Manager Approval" : 
+              targetStatus === 'Approved' ? "Admin Approval" : 
+              targetStatus === 'Approved & Looking Into It' ? "Fulfillment Started" : "Status Update",
       status: targetStatus,
-      remarks: remarks || `Requirement moved to ${targetStatus}.`,
-      userName: userProfile.username,
+      remarks: remarks || "Status updated by authority.",
+      userName: userProfile.username || user.email || 'System',
       userId: user.uid,
       timestamp: new Date().toISOString()
     };
 
-    updateDocumentNonBlocking(doc(firestore, 'material_requisitions', req.id), {
+    updateDocumentNonBlocking(reqRef, {
       status: targetStatus,
       updatedAt: serverTimestamp(),
       timeline: arrayUnion(timelineEntry)
     });
 
+    if (req.userId !== user.uid) {
+      sendNotification(firestore, {
+        userId: req.userId,
+        title: `Requisition Update: ${targetStatus}`,
+        description: `Material request for "${req.items[0].itemName}" is now ${targetStatus}.`,
+        link: "/requisitions/list",
+        push: true
+      });
+    }
+
     toast({ title: 'Status Updated', description: `Requisition is now ${targetStatus}.` });
+    setActionState(null);
   };
 
   const handleAssignPerson = async (targetUserId: string) => {
@@ -281,13 +298,9 @@ export default function RequisitionsListPage() {
 
   const handleDelete = async () => {
     if (!deletingReq || !firestore) return;
-    try {
-      deleteDocumentNonBlocking(doc(firestore, 'material_requisitions', deletingReq.id));
-      toast({ title: "Request Removed" });
-      setDeletingReq(null);
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: 'Failed to delete requisition.' });
-    }
+    deleteDocumentNonBlocking(doc(firestore, 'material_requisitions', deletingReq.id));
+    toast({ title: "Request Removed" });
+    setDeletingReq(null);
   };
 
   const clearFilters = () => {
@@ -303,7 +316,7 @@ export default function RequisitionsListPage() {
       ManagerApproved: { label: "Pending Admin", color: "bg-blue-100 text-blue-800 border-blue-200" },
       Approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200" },
       Rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" },
-      "Approved & Looking Into It": { label: "Not Attended yet", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
+      "Approved & Looking Into It": { label: "Looking Into It", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
       Ordered: { label: "Ordered", color: "bg-purple-100 text-purple-800 border-purple-200" },
       Dispatched: { label: "Dispatched", color: "bg-amber-100 text-amber-800 border-amber-200" },
       Delivered: { label: "Delivered", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
@@ -347,7 +360,7 @@ export default function RequisitionsListPage() {
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Search Keywords</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Site, Item or Requester..." className="pl-8 h-10 rounded-sm bg-background border-primary/10 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Input placeholder="Site, Item or Requester..." className="pl-10 h-10 rounded-sm bg-background border-primary/10 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           
@@ -427,6 +440,14 @@ export default function RequisitionsListPage() {
               <FilterX className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          {['all', 'Pending', 'ManagerApproved', 'Approved', 'Rejected', 'Ordered', 'Delivered'].map(s => (
+            <Badge key={s} onClick={() => setStatusFilter(s)} className={cn("cursor-pointer font-bold text-[10px] h-7 px-3 rounded-sm uppercase tracking-tighter transition-all", statusFilter === s ? "bg-primary text-white" : "bg-muted text-muted-foreground")}>
+              {s === 'all' ? 'All Status' : s}
+            </Badge>
+          ))}
         </div>
       </div>
 
@@ -535,21 +556,21 @@ export default function RequisitionsListPage() {
                               <div className="flex justify-end gap-1">
                                 {isMgrOfReq && (
                                   <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'ManagerApproved', 'Approved by Manager.')}><CheckCircle2 className="h-4 w-4" /></Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Rejected by Manager.')}><XCircle className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: 'ManagerApproved' })}><CheckCircle2 className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><XCircle className="h-4 w-4" /></Button>
                                   </div>
                                 )}
                                 {canAdminApprove && (
                                   <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => handleUpdateStatus(req, 'Approved', 'Final Approved by Admin.')}><CheckCircle2 className="h-4 w-4" /></Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => handleUpdateStatus(req, 'Rejected', 'Final Rejected by Admin.')}><XCircle className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: 'Approved' })}><CheckCircle2 className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><XCircle className="h-4 w-4" /></Button>
                                   </div>
                                 )}
                                 {canAssign && (
-                                  <Button size="sm" variant="outline" className="h-8 px-3 rounded-sm font-black text-[9px] uppercase border-primary/20 text-primary" onClick={() => setAssignTarget(req)}><UserPlus className="h-3 w-3 mr-1" /> Assign</Button>
+                                  <Button size="sm" variant="outline" className="h-8 px-3 rounded-sm font-black text-[9px] uppercase border-primary/20 text-primary" onClick={() => setAssignTarget(req)}><UserPlus className="h-3.5 w-3.5 mr-1" /> Assign</Button>
                                 )}
                                 {canUpdateFulfillment && (
-                                  <Select defaultValue={req.status} onValueChange={(val: any) => handleUpdateStatus(req, val, `Status updated during fulfillment phase.`)}>
+                                  <Select value={req.status} onValueChange={(val: any) => setActionState({ req, targetStatus: val })}>
                                     <SelectTrigger className="h-8 w-[130px] text-[10px] font-black uppercase"><SelectValue /></SelectTrigger>
                                     <SelectContent>
                                       {getFulfillmentOptions().map(opt => <SelectItem key={opt} value={opt} className="text-[10px] font-bold uppercase">{opt}</SelectItem>)}
@@ -592,7 +613,7 @@ export default function RequisitionsListPage() {
                                                <div className="flex flex-col gap-0.5">
                                                   <div className="flex justify-between items-center text-[10px] font-black uppercase"><span className="text-primary">{t.action}</span><span className="text-muted-foreground opacity-50">{format(new Date(t.timestamp), 'dd/MM HH:mm')}</span></div>
                                                   <p className="text-xs font-bold text-foreground">{t.userName}</p>
-                                                  <p className="text-xs italic text-muted-foreground leading-relaxed mt-1">"{t.remarks}"</p>
+                                                  {t.remarks && <p className="text-xs italic text-muted-foreground leading-relaxed mt-1">"{t.remarks}"</p>}
                                                </div>
                                             </div>
                                           ))}
@@ -615,6 +636,31 @@ export default function RequisitionsListPage() {
           </div>
         </CardContent>
       </Card>
+
+      <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
+        <DialogContent className="rounded-sm max-md">
+          <DialogHeader>
+            <DialogTitle className="uppercase tracking-tight font-black">Update Request Status</DialogTitle>
+            <DialogDescription>Setting final lifecycle status to: <strong>{actionState?.targetStatus}</strong>.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-3">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Update Remarks</Label>
+            <Textarea id="action-remarks-input" placeholder="Explain the current progress or decision..." className="min-h-[120px] rounded-sm" />
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
+            <Button 
+              className={cn(
+                "rounded-sm font-black uppercase text-[10px]", 
+                actionState?.targetStatus === 'Rejected' ? "bg-red-600" : (['Approved', 'ManagerApproved', 'Delivered'].includes(actionState?.targetStatus || '') ? "bg-green-600" : "bg-primary")
+              )} 
+              onClick={() => handleAction((document.getElementById('action-remarks-input') as HTMLTextAreaElement)?.value || "")}
+            >
+              Confirm Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!assignTarget} onOpenChange={(o) => !o && setAssignTarget(null)}>
         <DialogContent className="max-w-md w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[70vh] sm:h-auto">
@@ -663,4 +709,9 @@ export default function RequisitionsListPage() {
       </AlertDialog>
     </div>
   );
+}
+
+function SortIcon({ column, config }: { column: SortKey, config: { key: SortKey; direction: 'asc' | 'desc' } }) {
+  if (config.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
 }
