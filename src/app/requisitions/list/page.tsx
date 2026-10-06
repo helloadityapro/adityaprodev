@@ -2,7 +2,7 @@
 
 import * as React from 'react';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
-import { collection, doc, query, where, or, orderBy, limit, serverTimestamp, arrayUnion } from 'firebase/firestore';
+import { collection, doc, query, where, or, orderBy, limit, serverTimestamp, arrayUnion, and, getDocs } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
@@ -33,7 +33,8 @@ import {
   Loader2,
   Check,
   ChevronRight,
-  Package
+  Package,
+  ChevronsUpDown
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type RequisitionItem = {
   itemId: string;
@@ -120,6 +122,10 @@ export default function RequisitionsListPage() {
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
+  const [assignedToFilter, setAssignedToFilter] = React.useState("all");
+  const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = React.useState(false);
+  const [assigneeSearchQuery, setAssigneeSearchQuery] = React.useState("");
+  
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
   
@@ -170,7 +176,8 @@ export default function RequisitionsListPage() {
         r.items.some(i => i.itemName.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
-      return matchesSearch && matchesStatus;
+      const matchesAssigned = assignedToFilter === 'all' || r.assignedToId === assignedToFilter;
+      return matchesSearch && matchesStatus && matchesAssigned;
     });
 
     result.sort((a, b) => {
@@ -187,7 +194,7 @@ export default function RequisitionsListPage() {
     });
 
     return result;
-  }, [requisitions, searchTerm, statusFilter, sortConfig]);
+  }, [requisitions, searchTerm, statusFilter, assignedToFilter, sortConfig]);
 
   const toggleExpand = (id: string) => {
     const next = new Set(expandedIds);
@@ -265,6 +272,7 @@ export default function RequisitionsListPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
+    setAssignedToFilter("all");
   };
 
   function StatusBadge({ status, className }: { status: string, className?: string }) {
@@ -311,36 +319,92 @@ export default function RequisitionsListPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
-        <div className="relative w-full md:w-96">
-          <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input 
-            placeholder="Search by site, material or personnel..." 
-            className="pl-10 h-10 text-sm rounded-sm border-primary/20"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px] h-10 text-xs font-bold uppercase rounded-sm border-primary/20">
-              <SelectValue placeholder="All Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
-              <SelectItem value="Pending" className="text-xs font-bold uppercase text-yellow-700">Pending Manager</SelectItem>
-              <SelectItem value="ManagerApproved" className="text-xs font-bold uppercase text-blue-700">Pending Admin</SelectItem>
-              <SelectItem value="Approved" className="text-xs font-bold uppercase text-green-700">Approved</SelectItem>
-              <SelectItem value="Approved & Looking Into It" className="text-xs font-bold uppercase text-indigo-700">Looking Into It</SelectItem>
-              <SelectItem value="Ordered" className="text-xs font-bold uppercase text-purple-700">Ordered</SelectItem>
-              <SelectItem value="Dispatched" className="text-xs font-bold uppercase text-amber-700">Dispatched</SelectItem>
-              <SelectItem value="Delivered" className="text-xs font-bold uppercase text-emerald-700">Delivered</SelectItem>
-              <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-700">Rejected</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="ghost" size="icon" onClick={clearFilters} className="h-10 w-10 text-muted-foreground">
-            <FilterX className="h-4 w-4" />
-          </Button>
+      <div className="flex flex-col gap-4 bg-card p-3 md:p-4 border border-primary/10 rounded-sm shadow-sm no-print">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+          <div className="md:col-span-1 space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Search Keywords</Label>
+            <div className="relative">
+              <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+              <Input placeholder="Site, Item or Requester..." className="pl-8 h-10 rounded-sm bg-background border-primary/10 text-xs" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+            </div>
+          </div>
+          
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Target Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                <SelectValue placeholder="All Status" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all" className="text-xs font-bold uppercase">All Status</SelectItem>
+                <SelectItem value="Pending" className="text-xs font-bold uppercase text-yellow-700">Pending Manager</SelectItem>
+                <SelectItem value="ManagerApproved" className="text-xs font-bold uppercase text-blue-700">Pending Admin</SelectItem>
+                <SelectItem value="Approved" className="text-xs font-bold uppercase text-green-700">Approved</SelectItem>
+                <SelectItem value="Approved & Looking Into It" className="text-xs font-bold uppercase text-indigo-700">Looking Into It</SelectItem>
+                <SelectItem value="Ordered" className="text-xs font-bold uppercase text-purple-700">Ordered</SelectItem>
+                <SelectItem value="Dispatched" className="text-xs font-bold uppercase text-amber-700">Dispatched</SelectItem>
+                <SelectItem value="Delivered" className="text-xs font-bold uppercase text-emerald-700">Delivered</SelectItem>
+                <SelectItem value="Rejected" className="text-xs font-bold uppercase text-red-700">Rejected</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Assigned Personnel</Label>
+            <Popover open={isAssigneePopoverOpen} onOpenChange={setIsAssigneePopoverOpen}>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-full justify-between h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase text-left">
+                  <span className="truncate">{assignedToFilter === 'all' ? "All Personnel" : allUsers?.find(u => u.id === assignedToFilter)?.username || "Select..."}</span>
+                  <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50 shrink-0" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-[--radix-popover-trigger-width] p-0 shadow-2xl rounded-sm" align="start">
+                <div className="flex items-center border-b px-3 bg-muted/20">
+                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                  <Input placeholder="Search name..." className="h-9 w-full border-none focus-visible:ring-0 text-sm bg-transparent" value={assigneeSearchQuery} onChange={e => setAssigneeSearchQuery(e.target.value)} />
+                </div>
+                <ScrollArea className="h-[250px]">
+                  <div className="p-1">
+                    <Button variant="ghost" className="w-full justify-start h-9 text-xs font-bold uppercase" onClick={() => { setAssignedToFilter('all'); setIsAssigneePopoverOpen(false); setAssigneeSearchQuery(""); }}>
+                      <Check className={cn("mr-2 h-3 w-3", assignedToFilter === 'all' ? "opacity-100" : "opacity-0")} />
+                      All Personnel
+                    </Button>
+                    {allUsers?.filter(u => u.username?.toLowerCase().includes(assigneeSearchQuery.toLowerCase())).map(u => (
+                      <Button key={u.id} variant="ghost" className="w-full justify-start h-auto py-2 px-3 text-xs text-left" onClick={() => { setAssignedToFilter(u.id); setIsAssigneePopoverOpen(false); setAssigneeSearchQuery(""); }}>
+                        <Check className={cn("mr-2 h-3 w-3 text-primary", assignedToFilter === u.id ? "opacity-100" : "opacity-0")} />
+                        <div className="flex flex-col min-w-0">
+                          <span className="font-bold truncate">{u.username}</span>
+                          <span className="text-[9px] text-muted-foreground uppercase opacity-60">{u.role}</span>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="flex items-end gap-2">
+            <div className="flex-1 space-y-1.5">
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Time Window</Label>
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+                  <Calendar className="h-4 w-4 mr-2 opacity-50" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="allTime" className="text-xs font-bold uppercase">All Time</SelectItem>
+                  <SelectItem value="today" className="text-xs font-bold uppercase">Today</SelectItem>
+                  <SelectItem value="yesterday" className="text-xs font-bold uppercase">Yesterday</SelectItem>
+                  <SelectItem value="7days" className="text-xs font-bold uppercase">Last 7 Days</SelectItem>
+                  <SelectItem value="lastMonth" className="text-xs font-bold uppercase">Last Month</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+              <FilterX className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       </div>
 
