@@ -36,7 +36,7 @@ import {
   Package,
   ChevronsUpDown
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, subDays, subMonths } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -125,6 +125,7 @@ export default function RequisitionsListPage() {
   const [assignedToFilter, setAssignedToFilter] = React.useState("all");
   const [isAssigneePopoverOpen, setIsAssigneePopoverOpen] = React.useState(false);
   const [assigneeSearchQuery, setAssigneeSearchQuery] = React.useState("");
+  const [dateFilter, setDateFilter] = React.useState<string>("7days");
   
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedIds, setExpandedIds] = React.useState<Set<string>>(new Set());
@@ -155,6 +156,20 @@ export default function RequisitionsListPage() {
   const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers } = useCollection<UserProfile>(allUsersQuery);
 
+  const queryDateRange = React.useMemo(() => {
+    const today = new Date();
+    const todayStr = format(today, 'yyyy-MM-dd');
+    
+    switch (dateFilter) {
+      case 'today': return { start: todayStr, end: todayStr };
+      case 'yesterday': return { start: format(subDays(today, 1), 'yyyy-MM-dd'), end: format(subDays(today, 1), 'yyyy-MM-dd') };
+      case '7days': return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+      case 'lastMonth': return { start: format(subMonths(today, 1), 'yyyy-MM-dd'), end: todayStr };
+      case 'allTime': return { start: '1970-01-01', end: '2099-12-31' };
+      default: return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
+    }
+  }, [dateFilter]);
+
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
       key,
@@ -169,15 +184,21 @@ export default function RequisitionsListPage() {
 
   const filteredReqs = React.useMemo(() => {
     if (!requisitions) return [];
+    const { start, end } = queryDateRange;
     
     let result = requisitions.filter(r => {
+      const rDate = r.createdAt?.toDate?.() || new Date(r.createdAt);
+      const rDateStr = format(rDate, 'yyyy-MM-dd');
+
       const matchesSearch = r.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         r.items.some(i => i.itemName.toLowerCase().includes(searchTerm.toLowerCase()));
       
       const matchesStatus = statusFilter === 'all' || r.status === statusFilter;
       const matchesAssigned = assignedToFilter === 'all' || r.assignedToId === assignedToFilter;
-      return matchesSearch && matchesStatus && matchesAssigned;
+      const matchesDate = rDateStr >= start && rDateStr <= end;
+
+      return matchesSearch && matchesStatus && matchesAssigned && matchesDate;
     });
 
     result.sort((a, b) => {
@@ -194,7 +215,7 @@ export default function RequisitionsListPage() {
     });
 
     return result;
-  }, [requisitions, searchTerm, statusFilter, assignedToFilter, sortConfig]);
+  }, [requisitions, searchTerm, statusFilter, assignedToFilter, sortConfig, queryDateRange]);
 
   const toggleExpand = (id: string) => {
     const next = new Set(expandedIds);
@@ -273,6 +294,7 @@ export default function RequisitionsListPage() {
     setSearchTerm("");
     setStatusFilter("all");
     setAssignedToFilter("all");
+    setDateFilter("7days");
   };
 
   function StatusBadge({ status, className }: { status: string, className?: string }) {
@@ -325,7 +347,7 @@ export default function RequisitionsListPage() {
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Search Keywords</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Site, Item or Requester..." className="pl-8 h-10 rounded-sm bg-background border-primary/10 text-xs" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Input placeholder="Site, Item or Requester..." className="pl-8 h-10 rounded-sm bg-background border-primary/10 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           
@@ -386,7 +408,7 @@ export default function RequisitionsListPage() {
 
           <div className="flex items-end gap-2">
             <div className="flex-1 space-y-1.5">
-              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Time Window</Label>
+              <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Time Window</Label>
               <Select value={dateFilter} onValueChange={setDateFilter}>
                 <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
                   <Calendar className="h-4 w-4 mr-2 opacity-50" />
@@ -401,7 +423,7 @@ export default function RequisitionsListPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="ghost" size="icon" className="h-10 w-10 text-muted-foreground" onClick={clearFilters} title="Clear Filters">
+            <Button variant="ghost" size="icon" className="h-11 w-11 rounded-sm text-muted-foreground" onClick={clearFilters} title="Clear Filters">
               <FilterX className="h-4 w-4" />
             </Button>
           </div>
