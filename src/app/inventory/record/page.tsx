@@ -121,6 +121,9 @@ export default function RecordMovementPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
+  const contractorsQuery = useMemoFirebase(() => collection(firestore, 'contractors'), [firestore]);
+  const { data: allContractors } = useCollection<any>(contractorsQuery);
+
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
@@ -438,14 +441,6 @@ export default function RecordMovementPage() {
     }
   };
 
-  const triggerWhatsApp = () => {
-    if (!submittedData) return;
-    const itemsText = submittedData.items.map((it: any) => `- ${it.itemName}: ${it.quantity} ${it.unit}`).join('\n');
-    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Flow:* ${submittedData.movementType}\n*Src/Dest:* ${submittedData.sourceOrDestination}\n\n*Items:*\n${itemsText}\n\n*Recorded By:* ${userProfile?.username || user?.email}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
-  };
-
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
 
   if (isSubmitted && submittedData) {
@@ -466,7 +461,13 @@ export default function RecordMovementPage() {
           <CardContent className="space-y-4 pb-8 px-8">
             <Button 
               className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
-              onClick={triggerWhatsApp}
+              onClick={() => {
+                if (!submittedData) return;
+                const itemsText = submittedData.items.map((it: any) => `- ${it.itemName}: ${it.quantity} ${it.unit}`).join('\n');
+                const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Flow:* ${submittedData.movementType}\n*Src/Dest:* ${submittedData.sourceOrDestination}\n\n*Items:*\n${itemsText}\n\n*Recorded By:* ${userProfile?.username || user?.email}`;
+                const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                window.open(url, '_blank');
+              }}
             >
               <MessageCircle className="mr-2 h-5 w-5" />
               Share on WhatsApp
@@ -689,9 +690,6 @@ export default function RecordMovementPage() {
                   <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest flex items-center gap-2">
                     <ListPlus className="h-4 w-4 text-primary" /> Materials List
                   </h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="h-8 rounded-sm font-bold border-primary text-primary text-[10px] px-3">
-                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Line
-                  </Button>
                 </div>
                 <div className="space-y-3">
                   {fields.map((field, index) => (
@@ -753,6 +751,9 @@ export default function RecordMovementPage() {
                     </Card>
                   ))}
                 </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="h-10 rounded-sm font-bold border-primary text-primary text-[10px] px-3 w-full border-dashed">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add New Item
+                </Button>
               </div>
 
               <div className="flex justify-end pt-4">

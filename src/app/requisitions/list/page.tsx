@@ -316,7 +316,7 @@ export default function RequisitionsListPage() {
       ManagerApproved: { label: "Pending Admin", color: "bg-blue-100 text-blue-800 border-blue-200" },
       Approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200" },
       Rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" },
-      "Approved & Looking Into It": { label: "Looking Into It", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
+      "Approved & Looking Into It": { label: "Not Attended Yet", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
       Ordered: { label: "Ordered", color: "bg-purple-100 text-purple-800 border-purple-200" },
       Dispatched: { label: "Dispatched", color: "bg-amber-100 text-amber-800 border-amber-200" },
       Delivered: { label: "Delivered", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
@@ -375,7 +375,7 @@ export default function RequisitionsListPage() {
                 <SelectItem value="Pending" className="text-xs font-bold uppercase text-yellow-700">Pending Manager</SelectItem>
                 <SelectItem value="ManagerApproved" className="text-xs font-bold uppercase text-blue-700">Pending Admin</SelectItem>
                 <SelectItem value="Approved" className="text-xs font-bold uppercase text-green-700">Approved</SelectItem>
-                <SelectItem value="Approved & Looking Into It" className="text-xs font-bold uppercase text-indigo-700">Looking Into It</SelectItem>
+                <SelectItem value="Approved & Looking Into It" className="text-xs font-bold uppercase text-indigo-700">Not Attended Yet</SelectItem>
                 <SelectItem value="Ordered" className="text-xs font-bold uppercase text-purple-700">Ordered</SelectItem>
                 <SelectItem value="Dispatched" className="text-xs font-bold uppercase text-amber-700">Dispatched</SelectItem>
                 <SelectItem value="Delivered" className="text-xs font-bold uppercase text-emerald-700">Delivered</SelectItem>
@@ -590,7 +590,7 @@ export default function RequisitionsListPage() {
                                 <div className="p-8 px-20 space-y-8 animate-in slide-in-from-top-1 duration-300 text-left">
                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                                      <div className="space-y-4">
-                                       <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><Layers className="h-4 w-4" /> Detailed Material Breakdown</Label>
+                                       <Label className="text-[10px] font-black uppercase text-primary tracking-widest flex items-center gap-2"><Layers className="h-4 w-4" />Items</Label>
                                        <div className="grid gap-3">
                                          {req.items.map((item, idx) => (
                                            <div key={idx} className="p-3 bg-background border rounded-sm flex items-center justify-between shadow-sm">
