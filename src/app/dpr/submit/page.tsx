@@ -35,6 +35,9 @@ const dprSchema = z.object({
   updates: z.array(z.object({
     value: z.string().min(1, "Paragraph cannot be empty")
   })).min(1, "At least one paragraph is required"),
+}).refine(data => data.reportDate === format(new Date(), 'yyyy-MM-dd'), {
+  message: "DPR can only be submitted for the current day.",
+  path: ["reportDate"]
 });
 
 type Site = {
@@ -84,7 +87,7 @@ export default function SubmitDPRPage() {
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
   const overridesQuery = useMemoFirebase(() => collection(firestore, 'team_mapping_overrides'), [firestore]);
-  const { data: allOverrides } = useCollection<MappingOverride>(overridesQuery);
+  const { data: allOverrides, isLoading: overridesLoading } = useCollection<MappingOverride>(overridesQuery);
 
   const teamQuery = useMemoFirebase(() => {
     if (!isManager || !user) return null;
@@ -124,12 +127,14 @@ export default function SubmitDPRPage() {
   const [localFiles, setLocalFiles] = React.useState<File[]>([]);
   const [uploadProgress, setUploadProgress] = React.useState<Record<string, number>>({});
 
+  const today = React.useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
+
   const form = useForm<z.infer<typeof dprSchema>>({
     resolver: zodResolver(dprSchema),
     defaultValues: { 
       dprType: 'site',
       siteName: "", 
-      reportDate: format(new Date(), 'yyyy-MM-dd'), 
+      reportDate: today, 
       updates: [{ value: "" }] 
     },
   });
@@ -408,10 +413,17 @@ export default function SubmitDPRPage() {
 
                 <FormField control={form.control} name="reportDate" render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Select Date</FormLabel>
+                    <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Report Date</FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <Input type="date" {...field} className="rounded-sm pr-10 h-11" />
+                        <Input 
+                          type="date" 
+                          {...field} 
+                          min={today}
+                          max={today}
+                          readOnly
+                          className="rounded-sm pr-10 h-11 bg-muted/20 cursor-not-allowed font-bold" 
+                        />
                         <Calendar className="absolute right-3 top-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
                       </div>
                     </FormControl>
