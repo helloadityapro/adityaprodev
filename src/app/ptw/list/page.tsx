@@ -57,7 +57,8 @@ import {
   CheckSquare,
   Save,
   CheckCircle2,
-  XCircle
+  XCircle,
+  Download
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, updateDocumentNonBlocking, useFirebaseApp } from "@/firebase";
@@ -152,8 +153,6 @@ type MappingOverride = {
   siteId: string;
   managerId: string;
 };
-
-type SortKey = 'serialNumber' | 'ptwType' | 'siteName' | 'requestDate' | 'status';
 
 function StatusBadge({ permit, className }: { permit: Permit, className?: string }) {
   const firestore = useFirestore();
@@ -394,17 +393,6 @@ export default function PtwListPage() {
         return { start: format(subDays(today, 7), 'yyyy-MM-dd'), end: todayStr };
     }
   }, [dateFilter, customStart, customEnd]);
-
-  // Handle deep link via URL view parameter
-  React.useEffect(() => {
-    const viewId = searchParams.get('view');
-    if (viewId && permits && permits.length > 0) {
-      const found = permits.find(p => p.id === viewId);
-      if (found) {
-        setDetailsPermit(found);
-      }
-    }
-  }, [searchParams, permits]);
 
   const filteredPermits = React.useMemo(() => {
     if (!permits || !userProfile) return [];
@@ -654,6 +642,23 @@ export default function PtwListPage() {
       toast({ variant: 'destructive', title: 'Error', description: e.message });
     } finally {
       setIsProcessingClosure(false);
+    }
+  };
+
+  const handleDownloadFile = async (url: string, name: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = name;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (e) {
+      window.open(url, '_blank');
     }
   };
 
@@ -1265,15 +1270,17 @@ export default function PtwListPage() {
           <div className="absolute top-0 left-0 right-0 z-50 flex items-center justify-between p-4 bg-gradient-to-b from-black/60 to-transparent no-print">
             <div className="flex items-center gap-3">
               <div className="bg-white/10 p-1.5 rounded-sm"><ImageIcon className="h-4 w-4 text-white" /></div>
-              <div className="flex flex-col">
+              <div className="flex flex-col text-left">
                 <span className="text-[10px] font-black text-white uppercase tracking-widest truncate max-w-[150px] sm:max-w-xs">{viewFile?.name}</span>
                 <span className="text-[8px] font-bold text-white/60 uppercase">{currentFileIndex + 1} of {viewFiles.length} </span>
               </div>
             </div>
             <div className="flex items-center gap-1.5">
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))}><ZoomIn className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }}><ZoomOut className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={resetViewer}><RotateCcw className="h-5 w-5" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => setScale(prev => Math.min(prev + 0.5, 4))} title="Zoom In"><ZoomIn className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => { setScale(prev => Math.max(prev - 0.5, 1)); if(scale <= 1) setPosition({x:0,y:0}); }} title="Zoom Out"><ZoomOut className="h-4 w-4" /></Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={resetViewer} title="Reset"><RotateCcw className="h-5 w-5" /></Button>
+              <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
+              <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/5 hover:bg-white/20 text-white border-none" onClick={() => viewFile && handleDownloadFile(viewFile.url, viewFile.name)} title="Download"><Download className="h-4 w-4" /></Button>
               <Separator orientation="vertical" className="h-6 bg-white/20 mx-2" />
               <DialogClose asChild><Button variant="ghost" size="icon" className="h-9 w-9 rounded-full bg-white/10 hover:bg-red-500 text-white border-none transition-colors"><X className="h-6 w-6" /></Button></DialogClose>
             </div>
@@ -1281,10 +1288,15 @@ export default function PtwListPage() {
           {viewFiles.length > 1 && (
             <>
               <div className="absolute left-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); prevFile(); }}><ChevronLeft className="h-8 w-8" /></Button>
               </div>
               <div className="absolute right-4 top-1/2 -translate-y-1/2 z-50 no-print">
-                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
+                <Button variant="secondary" size="icon" className="h-12 w-12 rounded-full bg-white/10 text-white border-none shadow-2xl backdrop-blur-md" onClick={(e) => { e.stopPropagation(); nextFile(); }}><ChevronRight className="h-8 w-8" /></Button>
+              </div>
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-50 no-print">
+                <Badge variant="outline" className="bg-black/40 text-white border-none px-3 py-1 rounded-full font-mono text-xs">
+                  {currentFileIndex + 1} / {viewFiles.length}
+                </Badge>
               </div>
             </>
           )}
