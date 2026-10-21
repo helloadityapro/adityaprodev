@@ -1,6 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import * as z from 'zod';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, deleteDocumentNonBlocking, updateDocumentNonBlocking, writeBatch, useFirebaseApp } from '@/firebase';
 import { collection, doc, query, orderBy, where, serverTimestamp, limit, getDocs, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -55,10 +59,6 @@ import Link from 'next/link';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
 import {
   Dialog,
   DialogContent,
@@ -999,8 +999,6 @@ function DocumentViewerDialog({ file, open, onOpenChange }: { file: VehicleDocum
 }
 
 function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { vehicle: Vehicle | null, assignments: Assignment[], open: boolean, onOpenChange: (o: boolean) => void }) {
-  const [filter, setFilter] = React.useState<string>("all");
-
   const filteredHistory = React.useMemo(() => {
     if (!vehicle || !assignments) return [];
     const list = assignments.filter(a => a.vehicleId === vehicle.id && a.status === 'Completed');
@@ -1039,7 +1037,7 @@ function VehicleHistoryDialog({ vehicle, assignments, open, onOpenChange }: { ve
                   <TableCell className="px-6 py-4">
                     <div className="flex flex-col gap-0.5 whitespace-nowrap">
                       <span className="text-xs font-bold">{a.tripDate}</span>
-                      <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{format(a.startTime.toDate(), 'HH:mm')} - {format(a.endTime.toDate(), 'HH:mm')}</span>
+                      <span className="text-[9px] font-mono font-bold text-muted-foreground uppercase">{a.startTime?.toDate ? format(a.startTime.toDate(), 'HH:mm') : '—'} - {a.endTime?.toDate ? format(a.endTime.toDate(), 'HH:mm') : '—'}</span>
                     </div>
                   </TableCell>
                   <TableCell className="text-xs font-medium uppercase">{a.userName}</TableCell>
