@@ -59,7 +59,7 @@ type Site = {
 
 type AccessConfig = {
   id: string;
-  allowedPageKeys: string[];
+  allowedPageKeys: PageKey[];
   ownDataOnly?: boolean;
 };
 
@@ -105,6 +105,7 @@ export default function ProjectsListPage() {
   const isSuper = isSuperAdmin(user?.email);
   const isAdmin = isSuper || userProfile?.role === "Admin";
   const isManager = userProfile?.role === "Site Manager";
+  const userRoleStr = isAdmin ? 'admin' : (userProfile?.role ? slugifyRole(userProfile.role) : 'site-engineer');
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
@@ -362,7 +363,7 @@ export default function ProjectsListPage() {
                     <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
                   </Button>
                 </PopoverTrigger>
-                <PopoverContent align="end" className="w-64 p-0 rounded-sm border-primary/10 shadow-2xl overflow-hidden">
+                <PopoverContent align="end" className="w-56 p-0 rounded-sm border-primary/10 shadow-2xl overflow-hidden">
                   <div className="bg-primary/5 p-3 border-b">
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Organizational Groups</h3>
                   </div>
@@ -447,6 +448,7 @@ export default function ProjectsListPage() {
                         "text-[8px] h-5 rounded-sm uppercase font-black border-primary/10",
                         site.workStatus === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
                         site.workStatus === 'Cancelled' ? "bg-red-50 text-red-700 border-red-200" :
+                        site.workStatus === 'Yet to Start' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
                         "bg-blue-50 text-blue-700"
                       )}>
                         {site.workStatus || "In Progress"}
@@ -572,6 +574,7 @@ export default function ProjectsListPage() {
                               "text-[8px] h-5 rounded-sm uppercase font-black border-primary/10",
                               site.workStatus === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
                               site.workStatus === 'Cancelled' ? "bg-red-50 text-red-700 border-red-200" :
+                              site.workStatus === 'Yet to Start' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
                               "bg-blue-50 text-blue-700"
                             )}>
                               {site.workStatus || "In Progress"}

@@ -89,7 +89,7 @@ const siteSchema = z.object({
   longitude: z.coerce.number().optional().or(z.literal(0)),
   projectOwnerId: z.string().optional(),
   projectOwnerName: z.string().optional(),
-  workStatus: z.enum(["Work in progress", "Completed", "Cancelled"]).default("Work in progress"),
+  workStatus: z.enum(["Yet to Start", "Work in progress", "Completed", "Cancelled"]).default("Yet to Start"),
   projectStatus: z.enum(["open", "close"]).default("open"),
 });
 
@@ -161,7 +161,7 @@ export default function AddNewProjectPage() {
       longitude: 0,
       projectOwnerId: "",
       projectOwnerName: "",
-      workStatus: "Work in progress",
+      workStatus: "Yet to Start",
       projectStatus: "open"
     },
   });
@@ -178,7 +178,7 @@ export default function AddNewProjectPage() {
         longitude: 0,
         projectOwnerId: "",
         projectOwnerName: "",
-        workStatus: "Work in progress",
+        workStatus: "Yet to Start",
         projectStatus: "open"
       });
     }
@@ -547,6 +547,7 @@ export default function AddNewProjectPage() {
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                           <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent>
+                            <SelectItem value="Yet to Start">Yet to Start</SelectItem>
                             <SelectItem value="Work in progress">Work in progress</SelectItem>
                             <SelectItem value="Completed">Completed</SelectItem>
                             <SelectItem value="Cancelled">Cancelled</SelectItem>
@@ -610,7 +611,7 @@ export default function AddNewProjectPage() {
               disabled={isImporting}
             />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
-              {isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />}
+              {isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="mr-2 h-4 w-4" />}
               Bulk Import
             </Button>
           </div>
@@ -730,6 +731,7 @@ export default function AddNewProjectPage() {
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
+                        <SelectItem value="Yet to Start">Yet to Start</SelectItem>
                         <SelectItem value="Work in progress">Work in progress</SelectItem>
                         <SelectItem value="Completed">Completed</SelectItem>
                         <SelectItem value="Cancelled">Cancelled</SelectItem>
@@ -913,7 +915,7 @@ export default function AddNewProjectPage() {
             {selectedIds.length > 0 && (
               <div className="bg-primary/5 border-b p-3 flex items-center justify-between animate-in slide-in-from-top-2 duration-200">
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-primary h-5 text-[10px] uppercase font-black">{selectedIds.length} Selected</Badge>
+                  <Badge className="bg-primary h-5 text-[8px] uppercase font-black">{selectedIds.length} Selected</Badge>
                   <span className="text-xs font-medium text-muted-foreground">Perform bulk action on selected sites</span>
                 </div>
                 <div className="flex gap-2">
@@ -946,7 +948,7 @@ export default function AddNewProjectPage() {
                     <TableHead className="w-12 text-center">
                       <Checkbox 
                         checked={selectedIds.length === filteredSitesList.length && filteredSitesList.length > 0} 
-                        onCheckedChange={toggleSelectAll}
+                        onCheckedChange={toggleSelectAll} 
                       />
                     </TableHead>
                     <TableHead className="text-[10px] uppercase font-black tracking-widest">Site Name</TableHead>
@@ -988,6 +990,7 @@ export default function AddNewProjectPage() {
                               "text-[8px] font-black uppercase h-5 px-1.5",
                               site.workStatus === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
                               site.workStatus === 'Cancelled' ? "bg-red-50 text-red-700 border-red-200" :
+                              site.workStatus === 'Yet to Start' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
                               "bg-blue-50 text-blue-700 border-blue-200"
                             )}>
                               {site.workStatus || "In Progress"}
