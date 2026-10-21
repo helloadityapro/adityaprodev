@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -23,7 +24,10 @@ import {
   ShieldCheck,
   Check,
   LayoutGrid,
-  UserCog
+  UserCog,
+  User as UserIcon,
+  CircleCheck,
+  Flag
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -47,6 +51,10 @@ type Site = {
   projectType?: 'groundmount' | 'rooftop';
   latitude?: number;
   longitude?: number;
+  projectOwnerId?: string;
+  projectOwnerName?: string;
+  workStatus?: string;
+  projectStatus?: string;
 };
 
 type AccessConfig = {
@@ -91,7 +99,7 @@ export default function ProjectsListPage() {
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const roleConfigsQuery = useMemoFirebase(() => user ? collection(firestore, 'system_settings', 'access', 'roles') : null, [firestore, user]);
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isSuper = isSuperAdmin(user?.email);
@@ -122,17 +130,14 @@ export default function ProjectsListPage() {
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Check if this is a manual page refresh/reload
     const navEntries = window.performance.getEntriesByType('navigation');
     const isReload = navEntries.length > 0 && (navEntries[0] as any).type === 'reload';
     
     if (isReload) {
-      // Clear state on refresh
       sessionStorage.removeItem(STATE_STORAGE_KEY);
       return;
     }
 
-    // Attempt to restore state from session storage
     const saved = sessionStorage.getItem(STATE_STORAGE_KEY);
     if (saved) {
       try {
@@ -142,7 +147,6 @@ export default function ProjectsListPage() {
         if (state.showStarredOnly !== undefined) setShowStarredOnly(state.showStarredOnly);
         if (state.selectedGroupIds) setSelectedGroupIds(state.selectedGroupIds);
         
-        // Restore scroll position after a slight delay to allow content to render
         if (state.scrollPosition) {
           setTimeout(() => {
             window.scrollTo({ top: state.scrollPosition, behavior: 'instant' });
@@ -154,7 +158,6 @@ export default function ProjectsListPage() {
     }
   }, []);
 
-  // Sync current state to session storage
   React.useEffect(() => {
     const saveState = () => {
       const state = {
@@ -170,7 +173,6 @@ export default function ProjectsListPage() {
     saveState();
 
     const handleScroll = () => {
-      // Direct update to prevent heavy re-renders while scrolling
       try {
         const current = JSON.parse(sessionStorage.getItem(STATE_STORAGE_KEY) || '{}');
         current.scrollPosition = window.scrollY;
@@ -209,13 +211,10 @@ export default function ProjectsListPage() {
 
     if (!isOwnDataOnly) return allSites;
 
-    // Sovereignty Logic
     const siteIds = new Set<string>();
 
     if (isManager) {
-      // 1. Explicit Overrides
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
-      // 2. Default Team Inheritance (minus overrides to others)
       if (teamMembers) {
         teamMembers.forEach(member => {
           (member.assignedProjectIds || []).forEach(sid => {
@@ -434,6 +433,27 @@ export default function ProjectsListPage() {
                     </Button>
                   </div>
 
+                  <div className="grid grid-cols-2 gap-3 border rounded-sm p-2 bg-muted/5">
+                    <div className="space-y-1">
+                      <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Project Owner</p>
+                      <div className="flex items-center gap-1.5 font-bold text-xs">
+                        <UserIcon className="h-3 w-3 text-primary/40" />
+                        {site.projectOwnerName || "Unassigned"}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Work Status</p>
+                      <Badge variant="outline" className={cn(
+                        "text-[8px] h-5 rounded-sm uppercase font-black border-primary/10",
+                        site.workStatus === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                        site.workStatus === 'Cancelled' ? "bg-red-50 text-red-700 border-red-200" :
+                        "bg-blue-50 text-blue-700"
+                      )}>
+                        {site.workStatus || "In Progress"}
+                      </Badge>
+                    </div>
+                  </div>
+
                   {site.latitude && site.longitude && (
                     <div className="flex items-center gap-1.5 text-[9px] font-mono font-bold text-muted-foreground/60 px-1">
                       <MapPin className="h-3 w-3" /> {site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}
@@ -476,7 +496,13 @@ export default function ProjectsListPage() {
                     </div>
                   </div>
 
-                  <div className="pt-2 border-t border-primary/5 flex justify-end">
+                  <div className="pt-2 border-t border-primary/5 flex justify-between items-center">
+                    <Badge variant="outline" className={cn(
+                      "text-[8px] h-4 font-black uppercase rounded-sm px-1.5 border-none",
+                      site.projectStatus === 'close' ? "bg-slate-900 text-white" : "bg-primary text-white"
+                    )}>
+                      {site.projectStatus || "open"}
+                    </Badge>
                     <Button variant="ghost" size="sm" className="h-8 rounded-sm text-primary text-[10px] font-bold uppercase tracking-widest">
                       Manage Site <ArrowRight className="ml-1.5 h-3 w-3" />
                     </Button>
@@ -499,10 +525,12 @@ export default function ProjectsListPage() {
                   <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
                     <TableRow>
                       <TableHead className="w-12 text-center"></TableHead>
-                      <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest min-w-[200px]">Project Description</TableHead>
+                      <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest min-w-[180px]">Project Description</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest text-center">Owner</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest text-center">Work Status</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest text-center">Lifecycle</TableHead>
                       <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[140px]">Site Location</TableHead>
-                      <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[160px]">Site Manager</TableHead>
-                      <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[160px]">Site Engineer</TableHead>
+                      <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[160px]">Management Team</TableHead>
                       <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">AC Capacity</TableHead>
                       <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">DC Capacity</TableHead>
                       <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Management</TableHead>
@@ -533,6 +561,30 @@ export default function ProjectsListPage() {
                               </div>
                             </div>
                           </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-foreground">
+                               <UserIcon className="h-3 w-3 text-primary/40" />
+                               {site.projectOwnerName || "—"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className={cn(
+                              "text-[8px] h-5 rounded-sm uppercase font-black border-primary/10",
+                              site.workStatus === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                              site.workStatus === 'Cancelled' ? "bg-red-50 text-red-700 border-red-200" :
+                              "bg-blue-50 text-blue-700"
+                            )}>
+                              {site.workStatus || "In Progress"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                             <Badge variant="outline" className={cn(
+                               "text-[8px] h-5 font-black uppercase rounded-sm px-1.5 border-none shadow-sm",
+                               site.projectStatus === 'close' ? "bg-slate-900 text-white" : "bg-primary text-white"
+                             )}>
+                               {site.projectStatus || "open"}
+                             </Badge>
+                          </TableCell>
                           <TableCell>
                             {site.latitude && site.longitude ? (
                               <div className="flex items-center gap-1.5 text-[10px] font-mono font-black text-muted-foreground/60">
@@ -544,17 +596,17 @@ export default function ProjectsListPage() {
                             )}
                           </TableCell>
                           <TableCell>
-                            <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                {siteManagers.length > 0 ? siteManagers.map(m => (
-                                    <Badge key={m} variant="secondary" className="h-4 px-1 text-[8px] font-black bg-primary/5 text-primary border-none uppercase truncate">{m}</Badge>
-                                )) : <span className="text-[9px] text-muted-foreground/30 italic">Unassigned</span>}
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex flex-wrap gap-1 max-w-[150px]">
-                                {siteEngineers.length > 0 ? siteEngineers.map(e => (
-                                    <Badge key={e} variant="outline" className="h-4 px-1 text-[8px] font-bold text-muted-foreground border-border uppercase truncate">{e}</Badge>
-                                )) : <span className="text-[9px] text-muted-foreground/30 italic">Unassigned</span>}
+                            <div className="flex flex-col gap-1 max-w-[150px]">
+                                <div className="flex flex-wrap gap-1">
+                                    {siteManagers.map(m => (
+                                        <Badge key={m} variant="secondary" className="h-4 px-1 text-[7px] font-black bg-primary/5 text-primary border-none uppercase truncate">{m}</Badge>
+                                    ))}
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                    {siteEngineers.map(e => (
+                                        <Badge key={e} variant="outline" className="h-4 px-1 text-[7px] font-bold text-muted-foreground border-border uppercase truncate">{e}</Badge>
+                                    ))}
+                                </div>
                             </div>
                           </TableCell>
                           <TableCell className="text-center font-mono text-xs font-bold text-primary">{formatCapacity(site.acCapacity)} MW</TableCell>
@@ -562,7 +614,7 @@ export default function ProjectsListPage() {
                           <TableCell className="text-right px-6"><Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary"><Link href={`/projects/${site.id}`}>Manage Site <ArrowRight className="ml-1.5 h-3 w-3" /></Link></Button></TableCell>
                         </TableRow>
                       );
-                    }) : <TableRow><TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell></TableRow>}
+                    }) : <TableRow><TableCell colSpan={10} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell></TableRow>}
                   </TableBody>
                 </Table>
               </div>

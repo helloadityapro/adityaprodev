@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -35,7 +36,9 @@ import {
   Download,
   LayoutGrid,
   Globe,
-  RefreshCcw
+  RefreshCcw,
+  User as UserIcon,
+  ChevronsUpDown
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -84,6 +87,10 @@ const siteSchema = z.object({
   dcCapacity: z.coerce.number({ invalid_type_error: "Must be a valid number" }).min(0, "Capacity cannot be negative"),
   latitude: z.coerce.number().optional().or(z.literal(0)),
   longitude: z.coerce.number().optional().or(z.literal(0)),
+  projectOwnerId: z.string().optional(),
+  projectOwnerName: z.string().optional(),
+  workStatus: z.enum(["Work in progress", "Completed", "Cancelled"]).default("Work in progress"),
+  projectStatus: z.enum(["open", "close"]).default("open"),
 });
 
 type SortOrder = 'name' | 'newest' | 'oldest';
@@ -112,6 +119,8 @@ export default function AddNewProjectPage() {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   
   const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
+  const [isOwnerPopoverOpen, setIsOwnerPopoverOpen] = React.useState(false);
+  const [ownerSearchQuery, setOwnerSearchQuery] = React.useState("");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -123,6 +132,9 @@ export default function AddNewProjectPage() {
 
   const groupsQuery = useMemoFirebase(() => collection(firestore, 'site_groups'), [firestore]);
   const { data: groups, isLoading: groupsLoading } = useCollection<any>(groupsQuery);
+
+  const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
+  const { data: allPersonnel } = useCollection<any>(allUsersQuery);
 
   // Persist active tab
   React.useEffect(() => {
@@ -139,12 +151,36 @@ export default function AddNewProjectPage() {
 
   const siteForm = useForm<z.infer<typeof siteSchema>>({
     resolver: zodResolver(siteSchema),
-    defaultValues: { name: '', projectCompany: '', projectType: 'groundmount', acCapacity: 0, dcCapacity: 0, latitude: 0, longitude: 0 },
+    defaultValues: { 
+      name: '', 
+      projectCompany: '', 
+      projectType: 'groundmount', 
+      acCapacity: 0, 
+      dcCapacity: 0, 
+      latitude: 0, 
+      longitude: 0,
+      projectOwnerId: "",
+      projectOwnerName: "",
+      workStatus: "Work in progress",
+      projectStatus: "open"
+    },
   });
 
   React.useEffect(() => {
     if (isAddDialogOpen) {
-      siteForm.reset({ name: '', projectCompany: '', projectType: 'groundmount', acCapacity: 0, dcCapacity: 0, latitude: 0, longitude: 0 });
+      siteForm.reset({ 
+        name: '', 
+        projectCompany: '', 
+        projectType: 'groundmount', 
+        acCapacity: 0, 
+        dcCapacity: 0, 
+        latitude: 0, 
+        longitude: 0,
+        projectOwnerId: "",
+        projectOwnerName: "",
+        workStatus: "Work in progress",
+        projectStatus: "open"
+      });
     }
   }, [isAddDialogOpen, siteForm]);
 
@@ -158,6 +194,10 @@ export default function AddNewProjectPage() {
         dcCapacity: siteToEdit.dcCapacity,
         latitude: siteToEdit.latitude || 0,
         longitude: siteToEdit.longitude || 0,
+        projectOwnerId: siteToEdit.projectOwnerId || "",
+        projectOwnerName: siteToEdit.projectOwnerName || "",
+        workStatus: siteToEdit.workStatus || "Work in progress",
+        projectStatus: siteToEdit.projectStatus || "open",
       });
     }
   }, [siteToEdit, siteForm]);
@@ -374,6 +414,9 @@ export default function AddNewProjectPage() {
       "DC Capacity (MWp)": s.dcCapacity,
       "Latitude": s.latitude || 0,
       "Longitude": s.longitude || 0,
+      "Project Owner": s.projectOwnerName || "Unassigned",
+      "Work Status": s.workStatus || "N/A",
+      "Project Status": s.projectStatus || "open",
       "Created At": s.createdAt?.toDate?.() ? format(s.createdAt.toDate(), 'dd-MM-yyyy') : '—'
     }));
 
@@ -422,7 +465,7 @@ export default function AddNewProjectPage() {
                 <Plus className="h-4 w-4 mr-2" /> Add New Site
               </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-md rounded-sm">
+            <DialogContent className="sm:max-w-xl rounded-sm">
               <DialogHeader>
                 <DialogTitle>Register New Site</DialogTitle>
                 <DialogDescription>Add a specific project location to the registry.</DialogDescription>
@@ -455,20 +498,87 @@ export default function AddNewProjectPage() {
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={siteForm.control} name="name" render={({ field }) => (
-                    <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="e.g., Shahapur - 194082" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                  )} />
-                  <FormField control={siteForm.control} name="projectCompany" render={({ field }) => (
-                    <FormItem><FormLabel>Project Company</FormLabel><FormControl><Input placeholder="e.g., HTI Energies" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-                  )} />
                   <div className="grid grid-cols-2 gap-4">
-                    <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
-                      <FormItem><FormLabel>AC Capacity (MW)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                    <FormField control={siteForm.control} name="name" render={({ field }) => (
+                      <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="e.g., Shahapur - 194082" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                     )} />
-                    <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
-                      <FormItem><FormLabel>DC Capacity (MWp)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                    <FormField control={siteForm.control} name="projectCompany" render={({ field }) => (
+                      <FormItem><FormLabel>Project Company</FormLabel><FormControl><Input placeholder="e.g., HTI Energies" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                     )} />
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={siteForm.control} name="projectOwnerId" render={({ field }) => (
+                      <FormItem className="flex flex-col">
+                        <FormLabel>Project Owner</FormLabel>
+                        <Popover open={isOwnerPopoverOpen} onOpenChange={setIsOwnerPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <FormControl>
+                              <Button variant="outline" className={cn("w-full justify-between font-normal h-11", !field.value && "text-muted-foreground")}>
+                                {field.value ? allPersonnel?.find(u => u.id === field.value)?.username : "Select Owner..."}
+                                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
+                            </FormControl>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                            <div className="flex items-center border-b px-3">
+                              <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                              <Input placeholder="Search users..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={ownerSearchQuery} onChange={e => setOwnerSearchQuery(e.target.value)} />
+                            </div>
+                            <ScrollArea className="h-[200px]">
+                              {allPersonnel?.filter(u => u.username?.toLowerCase().includes(ownerSearchQuery.toLowerCase())).map(u => (
+                                <Button key={u.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { 
+                                  field.onChange(u.id); 
+                                  siteForm.setValue('projectOwnerName', u.username); 
+                                  setIsOwnerPopoverOpen(false); 
+                                }}>
+                                  <Check className={cn("mr-2 h-3 w-3", field.value === u.id ? "opacity-100" : "opacity-0")} />
+                                  {u.username}
+                                </Button>
+                              ))}
+                            </ScrollArea>
+                          </PopoverContent>
+                        </Popover>
+                      </FormItem>
+                    )} />
+                    <FormField control={siteForm.control} name="workStatus" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Work Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="Work in progress">Work in progress</SelectItem>
+                            <SelectItem value="Completed">Completed</SelectItem>
+                            <SelectItem value="Cancelled">Cancelled</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={siteForm.control} name="projectStatus" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Project Status</FormLabel>
+                        <Select onValueChange={field.onChange} defaultValue={field.value}>
+                          <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
+                          <SelectContent>
+                            <SelectItem value="open">Open</SelectItem>
+                            <SelectItem value="close">Close</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormItem>
+                    )} />
+                    <div className="grid grid-cols-2 gap-2">
+                      <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
+                        <FormItem><FormLabel>AC (MW)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                      )} />
+                      <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
+                        <FormItem><FormLabel>DC (MWp)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                      )} />
+                    </div>
+                  </div>
+                  
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={siteForm.control} name="latitude" render={({ field }) => (
                       <FormItem><FormLabel>Latitude</FormLabel><FormControl><Input type="number" step="0.000001" placeholder="19.0760" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
@@ -518,7 +628,7 @@ export default function AddNewProjectPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="bg-muted/50 border border-primary/10 p-1 h-11 max-w-md mb-6">
+        <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-11 max-w-md mb-6">
           <TabsTrigger value="groundmount" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
             <LayoutGrid className="h-3.5 w-3.5 mr-2" /> Groundmount Projects
           </TabsTrigger>
@@ -538,7 +648,7 @@ export default function AddNewProjectPage() {
 
       {/* Edit Site Dialog */}
       <Dialog open={!!siteToEdit} onOpenChange={(open) => !open && setSiteToEdit(null)}>
-        <DialogContent className="sm:max-w-md rounded-sm">
+        <DialogContent className="sm:max-w-xl rounded-sm">
           <DialogHeader>
             <DialogTitle>Edit Site Details</DialogTitle>
             <DialogDescription>Modify the properties for {siteToEdit?.name}.</DialogDescription>
@@ -571,19 +681,85 @@ export default function AddNewProjectPage() {
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={siteForm.control} name="name" render={({ field }) => (
-                <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="e.g., Shahapur - 194082" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-              )} />
-              <FormField control={siteForm.control} name="projectCompany" render={({ field }) => (
-                <FormItem><FormLabel>Project Company</FormLabel><FormControl><Input placeholder="e.g., HTI Energies" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
-              )} />
               <div className="grid grid-cols-2 gap-4">
-                <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
-                  <FormItem><FormLabel>AC Capacity (MW)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                <FormField control={siteForm.control} name="name" render={({ field }) => (
+                  <FormItem><FormLabel>Site Name</FormLabel><FormControl><Input placeholder="e.g., Shahapur - 194082" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
-                <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
-                  <FormItem><FormLabel>DC Capacity (MWp)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                <FormField control={siteForm.control} name="projectCompany" render={({ field }) => (
+                  <FormItem><FormLabel>Project Company</FormLabel><FormControl><Input placeholder="e.g., HTI Energies" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
                 )} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={siteForm.control} name="projectOwnerId" render={({ field }) => (
+                  <FormItem className="flex flex-col">
+                    <FormLabel>Project Owner</FormLabel>
+                    <Popover open={isOwnerPopoverOpen} onOpenChange={setIsOwnerPopoverOpen}>
+                      <PopoverTrigger asChild>
+                        <FormControl>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11", !field.value && "text-muted-foreground")}>
+                            {field.value ? allPersonnel?.find(u => u.id === field.value)?.username : "Select Owner..."}
+                            <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                          </Button>
+                        </FormControl>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
+                        <div className="flex items-center border-b px-3">
+                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
+                          <Input placeholder="Search users..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={ownerSearchQuery} onChange={e => setOwnerSearchQuery(e.target.value)} />
+                        </div>
+                        <ScrollArea className="h-[200px]">
+                          {allPersonnel?.filter(u => u.username?.toLowerCase().includes(ownerSearchQuery.toLowerCase())).map(u => (
+                            <Button key={u.id} type="button" variant="ghost" className="w-full justify-start h-9 text-xs" onClick={() => { 
+                              field.onChange(u.id); 
+                              siteForm.setValue('projectOwnerName', u.username); 
+                              setIsOwnerPopoverOpen(false); 
+                            }}>
+                              <Check className={cn("mr-2 h-3 w-3", field.value === u.id ? "opacity-100" : "opacity-0")} />
+                              {u.username}
+                            </Button>
+                          ))}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
+                  </FormItem>
+                )} />
+                <FormField control={siteForm.control} name="workStatus" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Work Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="Work in progress">Work in progress</SelectItem>
+                        <SelectItem value="Completed">Completed</SelectItem>
+                        <SelectItem value="Cancelled">Cancelled</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={siteForm.control} name="projectStatus" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Project Status</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value}>
+                      <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="open">Open</SelectItem>
+                        <SelectItem value="close">Close</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormItem>
+                )} />
+                <div className="grid grid-cols-2 gap-2">
+                  <FormField control={siteForm.control} name="acCapacity" render={({ field }) => (
+                    <FormItem><FormLabel>AC (MW)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="4.000" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                  <FormField control={siteForm.control} name="dcCapacity" render={({ field }) => (
+                    <FormItem><FormLabel>DC (MWp)</FormLabel><FormControl><Input type="number" step="0.001" placeholder="5.174" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
+                  )} />
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={siteForm.control} name="latitude" render={({ field }) => (
@@ -774,10 +950,12 @@ export default function AddNewProjectPage() {
                       />
                     </TableHead>
                     <TableHead className="text-[10px] uppercase font-black tracking-widest">Site Name</TableHead>
+                    <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">Owner</TableHead>
+                    <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">Work Status</TableHead>
+                    <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">Lifecycle</TableHead>
                     <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">AC Capacity</TableHead>
                     <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">DC Capacity</TableHead>
-                    <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">GPS Location</TableHead>
-                    <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">Groups</TableHead>
+                    <TableHead className="text-[10px] uppercase font-black tracking-widest text-center">GPS</TableHead>
                     <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Manage</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -799,6 +977,30 @@ export default function AddNewProjectPage() {
                               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter mt-0.5">{site.projectCompany}</span>
                             </div>
                           </TableCell>
+                          <TableCell className="text-center">
+                            <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-foreground">
+                              <UserIcon className="h-3 w-3 text-primary/40" />
+                              {site.projectOwnerName || "—"}
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className={cn(
+                              "text-[8px] font-black uppercase h-5 px-1.5",
+                              site.workStatus === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                              site.workStatus === 'Cancelled' ? "bg-red-50 text-red-700 border-red-200" :
+                              "bg-blue-50 text-blue-700 border-blue-200"
+                            )}>
+                              {site.workStatus || "In Progress"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge variant="outline" className={cn(
+                              "text-[8px] font-black uppercase h-5 px-1.5 border-none",
+                              site.projectStatus === 'close' ? "bg-slate-900 text-white" : "bg-primary text-white"
+                            )}>
+                              {site.projectStatus || "open"}
+                            </Badge>
+                          </TableCell>
                           <TableCell className="text-center font-mono text-[10px] font-black text-primary">
                             {formatCapacity(site.acCapacity)} MW
                           </TableCell>
@@ -807,21 +1009,10 @@ export default function AddNewProjectPage() {
                           </TableCell>
                           <TableCell className="text-center font-mono text-[10px] text-muted-foreground">
                             {site.latitude && site.longitude ? (
-                              <div className="flex flex-col">
-                                <span>{site.latitude.toFixed(4)}</span>
-                                <span>{site.longitude.toFixed(4)}</span>
-                              </div>
+                              <span className="opacity-60">Stamped</span>
                             ) : (
                               <span className="opacity-20 italic">No GPS</span>
                             )}
-                          </TableCell>
-                          <TableCell className="text-center">
-                            <div className="flex flex-wrap justify-center gap-1">
-                              {siteGroups.slice(0, 2).map(g => (
-                                <Badge key={g.id} variant="secondary" className="h-4 px-1.5 text-[7px] font-black uppercase border-none bg-primary/5 text-primary/60">{g.name}</Badge>
-                              ))}
-                              {siteGroups.length > 2 && <span className="text-[8px] font-black text-muted-foreground">+{siteGroups.length - 2}</span>}
-                            </div>
                           </TableCell>
                           <TableCell className="text-right px-6">
                             <div className="flex justify-end gap-1">
@@ -838,7 +1029,7 @@ export default function AddNewProjectPage() {
                     })
                   ) : (
                     <TableRow>
-                      <TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">
+                      <TableCell colSpan={9} className="h-32 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">
                         No {activeTab} records discovered matching your filters.
                       </TableCell>
                     </TableRow>
