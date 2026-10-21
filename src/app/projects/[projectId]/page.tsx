@@ -1,8 +1,7 @@
-
 'use client';
 
 import * as React from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams, usePathname } from 'next/navigation';
 import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { collection, doc, query, where, serverTimestamp, orderBy, or, and, getDoc, increment, arrayUnion } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
@@ -1544,7 +1543,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
           <TabsContent value="wo" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
-              <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search WO or Contractor" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={woSearch} onChange={e => setWoSearch(e.target.value)} /></div>
+              <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search WO or Contractor" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={woSearch} onChange={e => setSearchTerm(e.target.value)} /></div>
               <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/work-orders/create`}><Plus className="h-4 w-4 mr-2" /> Create WO</Link></Button>
             </div>
             <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
