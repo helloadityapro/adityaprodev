@@ -116,6 +116,10 @@ type Project = {
   dcCapacity: number;
   latitude?: number;
   longitude?: number;
+  projectOwnerId?: string;
+  projectOwnerName?: string;
+  workStatus?: string;
+  projectStatus?: string;
 };
 
 type UserProfile = {
@@ -306,6 +310,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { user } = useUser();
   const { toast } = useToast();
   const router = useRouter();
+  const pathname = usePathname();
   const searchParams = useSearchParams();
 
   const tabParam = searchParams.get('tab');
@@ -358,7 +363,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   const isManager = userProfile?.role === 'Site Manager';
 
-  // Permission check helper for BOM management
   const hasPermission = React.useCallback((key: PageKey) => {
     if (isAdmin) return true;
     if (!userProfile) return false;
@@ -370,7 +374,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const canManageBom = isAdmin || isManager || (hasPermission('project-tab-bom') && hasPermission('inventory'));
 
-  // Define All Tabs
   const ALL_TABS = React.useMemo(() => [
     { id: "dashboard", key: "project-tab-dashboard", label: "BOARD", icon: LayoutDashboard },
     { id: "bom", key: "project-tab-bom", label: "BOM", icon: ClipboardList },
@@ -386,7 +389,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     { id: "visits", key: "project-tab-visits", label: "VISITS", icon: Navigation },
   ], []);
 
-  // Filter Authorized Tabs
   const authorizedTabs = React.useMemo(() => {
     if (!user || isProfileLoading || !userProfile) return [];
     if (isSuperAdmin(user.email)) return ALL_TABS;
@@ -576,7 +578,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allUsers, isLoading: teamLoading } = useCollection<UserProfile>(allUsersQuery);
 
-  // Overrides lookup for this specific project
   const overridesQuery = useMemoFirebase(() => 
     query(collection(firestore, 'team_mapping_overrides'), where('siteId', '==', projectId)), 
     [firestore, projectId]
@@ -586,30 +587,23 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const siteTeam = React.useMemo(() => {
     if (!allUsers) return [];
     
-    // 1. Identify users (Engineers, Drivers, etc.) explicitly assigned to this site
-    // excluding Managers and Admins for the primary list
     const assignedEngineersAndOthers = allUsers.filter(u => 
       u.assignedProjectIds?.includes(projectId) && 
       u.role !== 'Admin' && u.role !== 'Site Manager'
     );
     
-    // 2. Identify effective supervisors for each assigned personnel for THIS site
     const effectiveSupervisorIds = new Set<string>();
     assignedEngineersAndOthers.forEach(u => {
-      // Check for site-specific override first
       const override = siteOverrides?.find(o => o.engineerId === u.id);
       if (override) {
         effectiveSupervisorIds.add(override.managerId);
       } else if (u.siteManagerId) {
-        // Fallback to default manager
         effectiveSupervisorIds.add(u.siteManagerId);
       }
     });
 
-    // 3. Find profile details for those effective supervisors
     const effectiveSupervisors = allUsers.filter(u => effectiveSupervisorIds.has(u.id));
     
-    // 4. Combine into a strict site hierarchy
     const combined = [...assignedEngineersAndOthers];
     effectiveSupervisors.forEach(m => { 
         if (!combined.find(u => u.id === m.id)) combined.push(m); 
@@ -682,7 +676,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const POSortIcon = ({ column }: { column: POSortKey }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleWOSort = (key: WOSortKey) => {
@@ -694,7 +688,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const WOSortIcon = ({ column }: { column: SortKey }) => {
     if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleBoMSort = (key: BoMSortKey) => {
@@ -706,7 +700,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const BoMSortIcon = ({ column }: { column: BoMSortKey }) => {
     if (bomSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return bomSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    return bomSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handlePaymentSort = (key: PaymentSortKey) => {
@@ -1109,6 +1103,48 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
 
               <div className="space-y-6">
+                <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
+                  <CardHeader className="py-4 border-b bg-muted/5">
+                    <CardTitle className="text-xs font-bold uppercase tracking-widest">Lifecycle & Ownership</CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-6 space-y-4">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Project Owner</Label>
+                      <div className="flex items-center gap-2 text-sm font-bold">
+                        <User className="h-4 w-4 text-primary/40" />
+                        {project.projectOwnerName || "Unassigned"}
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 pt-2">
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Work Status</Label>
+                        <div>
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                            project.workStatus === 'Completed' ? "bg-green-50 text-green-700 border-green-200" :
+                            project.workStatus === 'Cancelled' ? "bg-red-50 text-red-700 border-red-200" :
+                            project.workStatus === 'Yet to Start' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                            "bg-blue-50 text-blue-700 border-blue-200"
+                          )}>
+                            {project.workStatus || "In Progress"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Registry Status</Label>
+                        <div>
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase rounded-sm px-1.5 h-5 border-none",
+                            project.projectStatus === 'close' ? "bg-slate-900 text-white" : "bg-primary text-white"
+                          )}>
+                            {project.projectStatus || "open"}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
                 <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
                   <CardHeader className="py-4 border-b bg-primary/5">
                     <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2">
@@ -1814,7 +1850,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <PieChart className="h-4 w-4 text-primary" />
                     <CardTitle className="text-sm font-bold uppercase tracking-widest">Material Utilisation Logs</CardTitle>
                   </div>
-                  <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase" asChild><Link href="/inventory/utilisation/record"><Plus className="h-3 w-3 mr-1.5" /> Record Utilisation</Link></Button>
+                  <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase" asChild><Link href="/inventory/utilisation/record"><Plus className="h-3.5 w-3.5 mr-1.5" /> Record Utilisation</Link></Button>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
@@ -1882,7 +1918,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <ArrowLeftRight className="h-4 w-4 text-primary" />
                     <CardTitle className="text-sm font-bold uppercase tracking-widest">Material Movement Logs</CardTitle>
                   </div>
-                  <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase" asChild><Link href="/inventory/record"><Plus className="h-3 w-3 mr-1.5" /> Record Movement</Link></Button>
+                  <Button size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase" asChild><Link href="/inventory/record"><Plus className="h-3.5 w-3.5 mr-1.5" /> Record Movement</Link></Button>
                 </div>
               </CardHeader>
               <CardContent className="p-0">
