@@ -1,4 +1,3 @@
-
 "use client"
 
 import Link from "next/link"
@@ -196,6 +195,16 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
+                    {canShow('project-dates') && (
+                      <SidebarMenuSubItem>
+                        <SidebarMenuSubButton asChild isActive={pathname === '/projects/dates'} onClick={handleMobileClose}>
+                          <Link href="/projects/dates">
+                            <History className="h-4 w-4" />
+                            <span>Project Dates</span>
+                          </Link>
+                        </SidebarMenuSubButton>
+                      </SidebarMenuSubItem>
+                    )}
                   </SidebarMenuSub>
                 </CollapsibleContent>
               </SidebarMenuItem>

@@ -11,6 +11,7 @@ export type PageKey =
   | 'lms' 
   | 'rewards' 
   | 'projects' 
+  | 'project-dates'
   | 'inventory' 
   | 'purchase-orders' 
   | 'work-orders' 
@@ -79,6 +80,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'rewards', label: 'Rewards', category: 'Main Hub', path: '/rewards' },
   
   { id: 'projects', label: 'Projects', category: 'Operations', path: '/projects/list' },
+  { id: 'project-dates', label: 'Project Dates', category: 'Operations', path: '/projects/dates' },
   { id: 'inventory', label: 'Inventory', category: 'Operations', path: '/inventory/global' },
   { id: 'purchase-orders', label: 'Purchase Orders', category: 'Operations', path: '/purchase-orders/manage' },
   { id: 'work-orders', label: 'Work Orders', category: 'Operations', path: '/work-orders/manage' },
@@ -154,7 +156,10 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/dpr')) return 'dpr';
   if (path.startsWith('/tasks')) return 'tasks';
   if (path.startsWith('/inventory')) return 'inventory';
-  if (path.startsWith('/projects')) return 'projects';
+  if (path.startsWith('/projects')) {
+    if (path.includes('/dates')) return 'project-dates';
+    return 'projects';
+  }
   if (path.startsWith('/purchase-orders')) return 'purchase-orders';
   if (path.startsWith('/work-orders')) return 'work-orders';
   if (path.startsWith('/payments')) return 'payments';
@@ -171,9 +176,9 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/liaisoning')) return 'liaisoning';
   if (path.startsWith('/attendance')) return 'attendance';
   if (path.startsWith('/checklists/installation')) return 'checklists-installation';
-  if (path.startsWith('/checklists/ht-line')) return 'checklists-ht-line';
-  if (path.startsWith('/checklists/ht-conductor')) return 'checklists-ht-conductor';
-  if (path.startsWith('/checklists/inverter')) return 'checklists-inverter';
+  if (path.startsWith('/checklists/ht-line')) return 'checklists-installation';
+  if (path.startsWith('/checklists/ht-conductor')) return 'checklists-installation';
+  if (path.startsWith('/checklists/inverter')) return 'checklists-installation';
   if (path.startsWith('/checklists/data')) return 'checklists-data';
   if (path.startsWith('/registries/tables')) {
     if (path.includes('/add')) return 'master-data-tables-add';
