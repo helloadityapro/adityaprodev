@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -27,7 +26,8 @@ import {
   UserCog,
   User as UserIcon,
   CircleCheck,
-  Flag
+  Flag,
+  Filter
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,13 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { slugifyRole } from '@/lib/access-control';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 
 type Site = {
   id: string;
@@ -59,7 +66,7 @@ type Site = {
 
 type AccessConfig = {
   id: string;
-  allowedPageKeys: PageKey[];
+  allowedPageKeys: any[];
   ownDataOnly?: boolean;
 };
 
@@ -95,6 +102,14 @@ export default function ProjectsListPage() {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [showStarredOnly, setShowStarredOnly] = React.useState(false);
   const [selectedGroupIds, setSelectedGroupIds] = React.useState<string[]>([]);
+
+  // Column Filter States
+  const [nameFilter, setNameFilter] = React.useState("");
+  const [companyFilter, setCompanyFilter] = React.useState("");
+  const [ownerFilter, setOwnerFilter] = React.useState("");
+  const [workStatusFilter, setWorkStatusFilter] = React.useState("all");
+  const [projectStatusFilter, setProjectStatusFilter] = React.useState("all");
+  const [teamFilter, setTeamFilter] = React.useState("");
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
@@ -241,7 +256,18 @@ export default function ProjectsListPage() {
       const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            s.projectCompany.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesStarred = !showStarredOnly || starredIds.has(s.id);
-      return matchesSearch && matchesStarred;
+      
+      const matchesNameFilter = s.name.toLowerCase().includes(nameFilter.toLowerCase());
+      const matchesCompanyFilter = s.projectCompany.toLowerCase().includes(companyFilter.toLowerCase());
+      const matchesOwnerFilter = (s.projectOwnerName || '').toLowerCase().includes(ownerFilter.toLowerCase());
+      const matchesWorkStatusFilter = workStatusFilter === 'all' || s.workStatus === workStatusFilter;
+      const matchesProjectStatusFilter = projectStatusFilter === 'all' || s.projectStatus === projectStatusFilter;
+      
+      const team = allUsers?.filter(u => u.assignedProjectIds?.includes(s.id)) || [];
+      const teamNames = team.map(u => u.username.toLowerCase()).join(' ');
+      const matchesTeamFilter = teamNames.includes(teamFilter.toLowerCase());
+
+      return matchesSearch && matchesStarred && matchesNameFilter && matchesCompanyFilter && matchesOwnerFilter && matchesWorkStatusFilter && matchesProjectStatusFilter && matchesTeamFilter;
     });
 
     if (selectedGroupIds.length > 0) {
@@ -253,7 +279,7 @@ export default function ProjectsListPage() {
     }
 
     return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [accessibleSites, searchTerm, showStarredOnly, starredIds, selectedGroupIds, groups, activeTab]);
+  }, [accessibleSites, searchTerm, showStarredOnly, starredIds, selectedGroupIds, groups, activeTab, nameFilter, companyFilter, ownerFilter, workStatusFilter, projectStatusFilter, teamFilter, allUsers]);
 
   const summaryStats = React.useMemo(() => {
     return {
@@ -262,6 +288,18 @@ export default function ProjectsListPage() {
       dc: filteredSites.reduce((sum, s) => sum + (parseFloat(String(s.dcCapacity || 0)) || 0), 0),
     };
   }, [filteredSites]);
+
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setShowStarredOnly(false);
+    setSelectedGroupIds([]);
+    setNameFilter("");
+    setCompanyFilter("");
+    setOwnerFilter("");
+    setWorkStatusFilter("all");
+    setProjectStatusFilter("all");
+    setTeamFilter("");
+  };
 
   if (isProfileLoading || sitesLoading || groupsLoading || overridesLoading) {
     return (
@@ -292,7 +330,7 @@ export default function ProjectsListPage() {
       </div>
 
       <Tabs value={activeTab} onValueChange={handleTabChange} className="w-full">
-        <TabsList className="bg-muted/50 border border-primary/10 p-1 h-11 max-w-md mb-8">
+        <TabsList className="bg-muted/50 border border-primary/10 rounded-sm p-1 h-11 max-w-md mb-8">
           <TabsTrigger value="groundmount" className="rounded-sm font-bold text-[10px] uppercase tracking-widest px-6 h-9 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground transition-all">
             <LayoutGrid className="h-3.5 w-3.5 mr-2" /> Groundmount
           </TabsTrigger>
@@ -367,9 +405,9 @@ export default function ProjectsListPage() {
                   <div className="bg-primary/5 p-3 border-b">
                     <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Organizational Groups</h3>
                   </div>
-                  <ScrollArea className="h-[250px]">
+                  <ScrollArea className="h-[200px]">
                     <div className="p-2 space-y-1">
-                      {groups?.map(group => (
+                      {groups?.map((group: any) => (
                         <div 
                           key={group.id} 
                           className={cn(
@@ -397,7 +435,7 @@ export default function ProjectsListPage() {
                 {showStarredOnly ? "Starred Projects" : "View Starred"}
               </Button>
               
-              <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setShowStarredOnly(false); setSelectedGroupIds([]); }} className="h-11 w-11 text-muted-foreground rounded-sm">
+              <Button variant="ghost" size="icon" onClick={clearAllFilters} className="h-11 w-11 text-muted-foreground rounded-sm">
                 <FilterX className="h-4 w-4" />
               </Button>
             </div>
@@ -527,15 +565,113 @@ export default function ProjectsListPage() {
                   <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
                     <TableRow>
                       <TableHead className="w-12 text-center"></TableHead>
-                      <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest min-w-[180px]">Project Description</TableHead>
-                      <TableHead className="font-black uppercase text-[10px] tracking-widest text-center">Owner</TableHead>
-                      <TableHead className="font-black uppercase text-[10px] tracking-widest text-center">Work Status</TableHead>
-                      <TableHead className="font-black uppercase text-[10px] tracking-widest text-center">Lifecycle</TableHead>
-                      <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[140px]">Site Location</TableHead>
-                      <TableHead className="font-black uppercase text-[10px] tracking-widest min-w-[160px]">Management Team</TableHead>
-                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">AC Capacity</TableHead>
-                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">DC Capacity</TableHead>
-                      <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Management</TableHead>
+                      <TableHead className="px-6 min-w-[200px]">
+                        <div className="flex items-center justify-between gap-2">
+                           <span className="font-black uppercase text-[10px] tracking-widest">Project Name</span>
+                           <Popover>
+                             <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", nameFilter ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
+                             <PopoverContent className="w-64 p-3" align="start">
+                               <div className="space-y-2">
+                                 <Label className="text-[10px] font-black uppercase">Filter Name</Label>
+                                 <Input placeholder="Enter name..." value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="h-8 text-xs" />
+                                 {nameFilter && <Button variant="ghost" size="sm" onClick={() => setNameFilter("")} className="h-7 w-full text-[10px] font-bold uppercase">Clear</Button>}
+                               </div>
+                             </PopoverContent>
+                           </Popover>
+                        </div>
+                      </TableHead>
+                      <TableHead>
+                        <div className="flex items-center justify-between gap-2">
+                           <span className="font-black uppercase text-[10px] tracking-widest">Company</span>
+                           <Popover>
+                             <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", companyFilter ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
+                             <PopoverContent className="w-64 p-3" align="start">
+                               <div className="space-y-2">
+                                 <Label className="text-[10px] font-black uppercase">Filter Company</Label>
+                                 <Input placeholder="Enter company..." value={companyFilter} onChange={e => setCompanyFilter(e.target.value)} className="h-8 text-xs" />
+                                 {companyFilter && <Button variant="ghost" size="sm" onClick={() => setCompanyFilter("")} className="h-7 w-full text-[10px] font-bold uppercase">Clear</Button>}
+                               </div>
+                             </PopoverContent>
+                           </Popover>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                           <span className="font-black uppercase text-[10px] tracking-widest">Owner</span>
+                           <Popover>
+                             <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", ownerFilter ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
+                             <PopoverContent className="w-64 p-3" align="center">
+                               <div className="space-y-2 text-left">
+                                 <Label className="text-[10px] font-black uppercase">Filter Owner</Label>
+                                 <Input placeholder="Enter name..." value={ownerFilter} onChange={e => setOwnerFilter(e.target.value)} className="h-8 text-xs" />
+                                 {ownerFilter && <Button variant="ghost" size="sm" onClick={() => setOwnerFilter("")} className="h-7 w-full text-[10px] font-bold uppercase">Clear</Button>}
+                               </div>
+                             </PopoverContent>
+                           </Popover>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                           <span className="font-black uppercase text-[10px] tracking-widest">Work Status</span>
+                           <Popover>
+                             <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", workStatusFilter !== 'all' ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
+                             <PopoverContent className="w-64 p-3" align="center">
+                               <div className="space-y-2 text-left">
+                                 <Label className="text-[10px] font-black uppercase">Filter Work Status</Label>
+                                 <Select value={workStatusFilter} onValueChange={setWorkStatusFilter}>
+                                    <SelectTrigger className="h-8 text-xs font-bold"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="all" className="text-xs">All Status</SelectItem>
+                                      <SelectItem value="Yet to Start" className="text-xs">Yet to Start</SelectItem>
+                                      <SelectItem value="Work in progress" className="text-xs">Work in Progress</SelectItem>
+                                      <SelectItem value="Completed" className="text-xs">Completed</SelectItem>
+                                      <SelectItem value="Cancelled" className="text-xs">Cancelled</SelectItem>
+                                    </SelectContent>
+                                 </Select>
+                               </div>
+                             </PopoverContent>
+                           </Popover>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center">
+                        <div className="flex items-center justify-center gap-2">
+                           <span className="font-black uppercase text-[10px] tracking-widest">Lifecycle</span>
+                           <Popover>
+                             <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", projectStatusFilter !== 'all' ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
+                             <PopoverContent className="w-64 p-3" align="center">
+                               <div className="space-y-2 text-left">
+                                 <Label className="text-[10px] font-black uppercase">Filter Registry Status</Label>
+                                 <Select value={projectStatusFilter} onValueChange={setProjectStatusFilter}>
+                                    <SelectTrigger className="h-8 text-xs font-bold"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="all" className="text-xs">All Status</SelectItem>
+                                      <SelectItem value="open" className="text-xs">Open</SelectItem>
+                                      <SelectItem value="close" className="text-xs">Close</SelectItem>
+                                    </SelectContent>
+                                 </Select>
+                               </div>
+                             </PopoverContent>
+                           </Popover>
+                        </div>
+                      </TableHead>
+                      <TableHead className="min-w-[160px]">
+                        <div className="flex items-center justify-between gap-2">
+                           <span className="font-black uppercase text-[10px] tracking-widest">Team</span>
+                           <Popover>
+                             <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", teamFilter ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
+                             <PopoverContent className="w-64 p-3" align="start">
+                               <div className="space-y-2">
+                                 <Label className="text-[10px] font-black uppercase">Filter Team Member</Label>
+                                 <Input placeholder="Enter username..." value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className="h-8 text-xs" />
+                                 {teamFilter && <Button variant="ghost" size="sm" onClick={() => setTeamFilter("")} className="h-7 w-full text-[10px] font-bold uppercase">Clear</Button>}
+                               </div>
+                             </PopoverContent>
+                           </Popover>
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">AC (MW)</TableHead>
+                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">DC (MWp)</TableHead>
+                      <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Manage</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -557,11 +693,11 @@ export default function ProjectsListPage() {
                               <div className="p-2 bg-primary/10 rounded-sm text-primary shrink-0">
                                 {activeTab === 'rooftop' ? <Building2 className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
                               </div>
-                              <div className="flex flex-col min-w-0">
-                                <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
-                                <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 truncate">{site.projectCompany}</span>
-                              </div>
+                              <span className="font-bold text-sm text-foreground break-words leading-tight">{site.name}</span>
                             </div>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 truncate block">{site.projectCompany}</span>
                           </TableCell>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center gap-1.5 text-[11px] font-bold text-foreground">
@@ -589,16 +725,6 @@ export default function ProjectsListPage() {
                              </Badge>
                           </TableCell>
                           <TableCell>
-                            {site.latitude && site.longitude ? (
-                              <div className="flex items-center gap-1.5 text-[10px] font-mono font-black text-muted-foreground/60">
-                                <MapPin className="h-3 w-3 text-primary/40" />
-                                <span>{site.latitude.toFixed(4)}, {site.longitude.toFixed(4)}</span>
-                              </div>
-                            ) : (
-                              <span className="text-[9px] text-muted-foreground/20 italic font-black uppercase">No GPS</span>
-                            )}
-                          </TableCell>
-                          <TableCell>
                             <div className="flex flex-col gap-1 max-w-[150px]">
                                 <div className="flex flex-wrap gap-1">
                                     {siteManagers.map(m => (
@@ -612,8 +738,8 @@ export default function ProjectsListPage() {
                                 </div>
                             </div>
                           </TableCell>
-                          <TableCell className="text-center font-mono text-xs font-bold text-primary">{formatCapacity(site.acCapacity)} MW</TableCell>
-                          <TableCell className="text-center font-mono text-xs font-bold text-amber-600">{formatCapacity(site.dcCapacity)} MWp</TableCell>
+                          <TableCell className="text-center font-mono text-xs font-bold text-primary">{formatCapacity(site.acCapacity)}</TableCell>
+                          <TableCell className="text-center font-mono text-xs font-bold text-amber-600">{formatCapacity(site.dcCapacity)}</TableCell>
                           <TableCell className="text-right px-6"><Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary"><Link href={`/projects/${site.id}`}>Manage Site <ArrowRight className="ml-1.5 h-3 w-3" /></Link></Button></TableCell>
                         </TableRow>
                       );
