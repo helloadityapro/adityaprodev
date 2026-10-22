@@ -35,6 +35,7 @@ import {
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -460,7 +461,7 @@ export default function ProjectsListPage() {
                         <div 
                           key={group.id} 
                           className={cn(
-                            "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/50 transition-colors cursor-pointer",
+                            "flex items-center space-x-2 p-2 rounded-sm hover:bg-muted/5 transition-colors cursor-pointer",
                             selectedGroupIds.includes(group.id) && "bg-primary/10"
                           )}
                           onClick={() => setSelectedGroupIds(prev => prev.includes(group.id) ? prev.filter(id => id !== group.id) : [...prev, group.id])}
