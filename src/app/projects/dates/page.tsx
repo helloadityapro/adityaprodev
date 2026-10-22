@@ -217,7 +217,7 @@ export default function ProjectDatesPage() {
                   <TableRow key={site.id} className="hover:bg-muted/5 transition-colors">
                     <TableCell className="px-6 py-4">
                       <div className="flex flex-col">
-                        <span className="font-black text-sm text-foreground uppercase tracking-tight">{site.name}</span>
+                        <span className="font-black text-sm text-foreground capitalize tracking-tight">{site.name}</span>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 mt-0.5">{site.projectCompany}</span>
                       </div>
                     </TableCell>
