@@ -27,19 +27,21 @@ import {
   User as UserIcon,
   CircleCheck,
   Flag,
-  Filter
+  Filter,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import { isSuperAdmin } from '@/lib/auth-constants';
-import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { slugifyRole } from '@/lib/access-control';
+import { cn } from '@/lib/utils';
+import { slugifyRole, type PageKey } from '@/lib/access-control';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { 
   Select, 
@@ -111,6 +113,12 @@ export default function ProjectsListPage() {
   const [projectStatusFilter, setProjectStatusFilter] = React.useState("all");
   const [teamFilter, setTeamFilter] = React.useState("");
 
+  // Sorting State
+  const [sortConfig, setSortConfig] = React.useState<{ key: string | null; direction: 'asc' | 'desc' }>({ 
+    key: 'name', 
+    direction: 'asc' 
+  });
+
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
@@ -162,6 +170,7 @@ export default function ProjectsListPage() {
         if (state.searchTerm) setSearchTerm(state.searchTerm);
         if (state.showStarredOnly !== undefined) setShowStarredOnly(state.showStarredOnly);
         if (state.selectedGroupIds) setSelectedGroupIds(state.selectedGroupIds);
+        if (state.sortConfig) setSortConfig(state.sortConfig);
         
         if (state.scrollPosition) {
           setTimeout(() => {
@@ -181,6 +190,7 @@ export default function ProjectsListPage() {
         searchTerm,
         showStarredOnly,
         selectedGroupIds,
+        sortConfig,
         scrollPosition: window.scrollY
       };
       sessionStorage.setItem(STATE_STORAGE_KEY, JSON.stringify(state));
@@ -198,10 +208,22 @@ export default function ProjectsListPage() {
 
     window.addEventListener('scroll', handleScroll, { passive: true });
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [activeTab, searchTerm, showStarredOnly, selectedGroupIds]);
+  }, [activeTab, searchTerm, showStarredOnly, selectedGroupIds, sortConfig]);
 
   const handleTabChange = (val: string) => {
     setActiveTab(val);
+  };
+
+  const handleSort = (key: string) => {
+    setSortConfig(prev => ({
+      key,
+      direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
+
+  const SortIcon = ({ column }: { column: string }) => {
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-1 h-3 w-3 text-primary" /> : <ArrowDown className="ml-1 h-3 w-3 text-primary" />;
   };
 
   const toggleStar = (e: React.MouseEvent, siteId: string) => {
@@ -278,8 +300,34 @@ export default function ProjectsListPage() {
       result = result.filter(s => allowedSiteIds.has(s.id));
     }
 
-    return result.sort((a, b) => a.name.localeCompare(b.name));
-  }, [accessibleSites, searchTerm, showStarredOnly, starredIds, selectedGroupIds, groups, activeTab, nameFilter, companyFilter, ownerFilter, workStatusFilter, projectStatusFilter, teamFilter, allUsers]);
+    // Advanced Sorting Logic
+    result.sort((a, b) => {
+      const { key, direction } = sortConfig;
+      if (!key) return 0;
+
+      let valA: any = '';
+      let valB: any = '';
+
+      if (key === 'team') {
+        const teamA = allUsers?.filter(u => u.assignedProjectIds?.includes(a.id)) || [];
+        const teamB = allUsers?.filter(u => u.assignedProjectIds?.includes(b.id)) || [];
+        valA = teamA.length;
+        valB = teamB.length;
+      } else {
+        valA = a[key as keyof Site] ?? '';
+        valB = b[key as keyof Site] ?? '';
+      }
+
+      if (typeof valA === 'string') valA = valA.toLowerCase();
+      if (typeof valB === 'string') valB = valB.toLowerCase();
+
+      if (valA < valB) return direction === 'asc' ? -1 : 1;
+      if (valA > valB) return direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return result;
+  }, [accessibleSites, searchTerm, showStarredOnly, starredIds, selectedGroupIds, groups, activeTab, nameFilter, companyFilter, ownerFilter, workStatusFilter, projectStatusFilter, teamFilter, allUsers, sortConfig]);
 
   const summaryStats = React.useMemo(() => {
     return {
@@ -299,6 +347,7 @@ export default function ProjectsListPage() {
     setWorkStatusFilter("all");
     setProjectStatusFilter("all");
     setTeamFilter("");
+    setSortConfig({ key: 'name', direction: 'asc' });
   };
 
   if (isProfileLoading || sitesLoading || groupsLoading || overridesLoading) {
@@ -522,7 +571,7 @@ export default function ProjectsListPage() {
                       <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Site Management</span>
                       <div className="flex flex-wrap gap-1">
                         {siteManagers.length > 0 ? siteManagers.map(m => (
-                          <Badge key={m} variant="secondary" className="h-4 px-1 text-[7px] font-black bg-primary/5 text-primary border-none">{m}</Badge>
+                          <Badge key={m} variant="secondary" className="h-4 px-1 text-[7px] font-black bg-primary/5 text-primary border-none uppercase truncate">{m}</Badge>
                         )) : <span className="text-[9px] text-muted-foreground/30 italic">No Manager Assigned</span>}
                       </div>
                     </div>
@@ -530,7 +579,7 @@ export default function ProjectsListPage() {
                       <span className="text-[8px] font-black uppercase text-muted-foreground tracking-widest">Engineering Team</span>
                       <div className="flex flex-wrap gap-1">
                         {siteEngineers.length > 0 ? siteEngineers.map(e => (
-                          <Badge key={e} variant="outline" className="h-4 px-1 text-[7px] font-bold text-muted-foreground/80 border-border">{e}</Badge>
+                          <Badge key={e} variant="outline" className="h-4 px-1 text-[7px] font-bold text-muted-foreground/80 border-border uppercase truncate">{e}</Badge>
                         )) : <span className="text-[9px] text-muted-foreground/30 italic">No Engineers Assigned</span>}
                       </div>
                     </div>
@@ -565,13 +614,16 @@ export default function ProjectsListPage() {
                   <TableHeader className="bg-muted/30 sticky top-0 z-10 shadow-sm">
                     <TableRow>
                       <TableHead className="w-12 text-center"></TableHead>
-                      <TableHead className="px-6 min-w-[200px]">
+                      <TableHead className="px-6 min-w-[220px]">
                         <div className="flex items-center justify-between gap-2">
-                           <span className="font-black uppercase text-[10px] tracking-widest">Project Name</span>
+                           <div className="flex items-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('name')}>
+                             <span className="font-black uppercase text-[10px] tracking-widest">Project Name</span>
+                             <SortIcon column="name" />
+                           </div>
                            <Popover>
                              <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", nameFilter ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
                              <PopoverContent className="w-64 p-3" align="start">
-                               <div className="space-y-2">
+                               <div className="space-y-2 text-left">
                                  <Label className="text-[10px] font-black uppercase">Filter Name</Label>
                                  <Input placeholder="Enter name..." value={nameFilter} onChange={e => setNameFilter(e.target.value)} className="h-8 text-xs" />
                                  {nameFilter && <Button variant="ghost" size="sm" onClick={() => setNameFilter("")} className="h-7 w-full text-[10px] font-bold uppercase">Clear</Button>}
@@ -582,11 +634,14 @@ export default function ProjectsListPage() {
                       </TableHead>
                       <TableHead>
                         <div className="flex items-center justify-between gap-2">
-                           <span className="font-black uppercase text-[10px] tracking-widest">Company</span>
+                           <div className="flex items-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('projectCompany')}>
+                             <span className="font-black uppercase text-[10px] tracking-widest">Company</span>
+                             <SortIcon column="projectCompany" />
+                           </div>
                            <Popover>
                              <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", companyFilter ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
                              <PopoverContent className="w-64 p-3" align="start">
-                               <div className="space-y-2">
+                               <div className="space-y-2 text-left">
                                  <Label className="text-[10px] font-black uppercase">Filter Company</Label>
                                  <Input placeholder="Enter company..." value={companyFilter} onChange={e => setCompanyFilter(e.target.value)} className="h-8 text-xs" />
                                  {companyFilter && <Button variant="ghost" size="sm" onClick={() => setCompanyFilter("")} className="h-7 w-full text-[10px] font-bold uppercase">Clear</Button>}
@@ -597,7 +652,10 @@ export default function ProjectsListPage() {
                       </TableHead>
                       <TableHead className="text-center">
                         <div className="flex items-center justify-center gap-2">
-                           <span className="font-black uppercase text-[10px] tracking-widest">Owner</span>
+                           <div className="flex items-center justify-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('projectOwnerName')}>
+                             <span className="font-black uppercase text-[10px] tracking-widest">Owner</span>
+                             <SortIcon column="projectOwnerName" />
+                           </div>
                            <Popover>
                              <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", ownerFilter ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
                              <PopoverContent className="w-64 p-3" align="center">
@@ -612,7 +670,10 @@ export default function ProjectsListPage() {
                       </TableHead>
                       <TableHead className="text-center">
                         <div className="flex items-center justify-center gap-2">
-                           <span className="font-black uppercase text-[10px] tracking-widest">Work Status</span>
+                           <div className="flex items-center justify-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('workStatus')}>
+                             <span className="font-black uppercase text-[10px] tracking-widest">Work Status</span>
+                             <SortIcon column="workStatus" />
+                           </div>
                            <Popover>
                              <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", workStatusFilter !== 'all' ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
                              <PopoverContent className="w-64 p-3" align="center">
@@ -635,7 +696,10 @@ export default function ProjectsListPage() {
                       </TableHead>
                       <TableHead className="text-center">
                         <div className="flex items-center justify-center gap-2">
-                           <span className="font-black uppercase text-[10px] tracking-widest">Lifecycle</span>
+                           <div className="flex items-center justify-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('projectStatus')}>
+                             <span className="font-black uppercase text-[10px] tracking-widest">Lifecycle</span>
+                             <SortIcon column="projectStatus" />
+                           </div>
                            <Popover>
                              <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", projectStatusFilter !== 'all' ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
                              <PopoverContent className="w-64 p-3" align="center">
@@ -656,11 +720,14 @@ export default function ProjectsListPage() {
                       </TableHead>
                       <TableHead className="min-w-[160px]">
                         <div className="flex items-center justify-between gap-2">
-                           <span className="font-black uppercase text-[10px] tracking-widest">Team</span>
+                           <div className="flex items-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('team')}>
+                             <span className="font-black uppercase text-[10px] tracking-widest">Team</span>
+                             <SortIcon column="team" />
+                           </div>
                            <Popover>
                              <PopoverTrigger asChild><Button variant="ghost" size="icon" className="h-6 w-6"><Filter className={cn("h-3 w-3", teamFilter ? "text-primary" : "text-muted-foreground/40")} /></Button></PopoverTrigger>
                              <PopoverContent className="w-64 p-3" align="start">
-                               <div className="space-y-2">
+                               <div className="space-y-2 text-left">
                                  <Label className="text-[10px] font-black uppercase">Filter Team Member</Label>
                                  <Input placeholder="Enter username..." value={teamFilter} onChange={e => setTeamFilter(e.target.value)} className="h-8 text-xs" />
                                  {teamFilter && <Button variant="ghost" size="sm" onClick={() => setTeamFilter("")} className="h-7 w-full text-[10px] font-bold uppercase">Clear</Button>}
@@ -669,8 +736,16 @@ export default function ProjectsListPage() {
                            </Popover>
                         </div>
                       </TableHead>
-                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">AC (MW)</TableHead>
-                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">DC (MWp)</TableHead>
+                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">
+                        <div className="flex items-center justify-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('acCapacity')}>
+                          AC (MW) <SortIcon column="acCapacity" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">
+                        <div className="flex items-center justify-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('dcCapacity')}>
+                          DC (MWp) <SortIcon column="dcCapacity" />
+                        </div>
+                      </TableHead>
                       <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Manage</TableHead>
                     </TableRow>
                   </TableHeader>
