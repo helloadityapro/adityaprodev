@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -60,6 +61,13 @@ type ExpenseItem = {
   proofUrl?: string;
 };
 
+type ApprovalEntry = {
+  adminId: string;
+  adminName: string;
+  timestamp: string;
+  remarks: string;
+};
+
 type ExpenseReport = {
   id: string;
   userId: string;
@@ -68,10 +76,11 @@ type ExpenseReport = {
   type: 'Site' | 'General';
   siteName: string;
   totalAmount: number;
-  status: 'Pending' | 'Approved' | 'Rejected' | 'Paid';
+  status: 'Pending' | 'FirstApproved' | 'Approved' | 'Rejected' | 'Paid';
   items: ExpenseItem[];
   remarks?: string;
   createdAt: any;
+  approvals?: ApprovalEntry[];
   paymentDetails?: {
     transactionId: string;
     paymentDate: any;
@@ -96,7 +105,6 @@ export default function ManageExpensesPage() {
   
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-  // Simplified query: Removed 'orderBy' to prevent index requirement issues in prototypes
   const expensesQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'expenses');
@@ -109,7 +117,6 @@ export default function ManageExpensesPage() {
 
   const { data: rawExpenses, isLoading: isExpensesLoading } = useCollection<ExpenseReport>(expensesQuery);
 
-  // In-memory sorting for robust results without manual composite index setup
   const expenses = React.useMemo(() => {
     if (!rawExpenses) return [];
     return [...rawExpenses].sort((a, b) => {
@@ -120,29 +127,69 @@ export default function ManageExpensesPage() {
   }, [rawExpenses]);
 
   const handleDecision = async (remarks: string) => {
-    if (!decisionState || !user) return;
+    if (!decisionState || !user || !userProfile) return;
     setIsProcessing(true);
 
     try {
       const reportRef = doc(firestore, 'expenses', decisionState.report.id);
-      updateDocumentNonBlocking(reportRef, {
-        status: decisionState.targetStatus,
-        remarks: remarks,
-        processedAt: serverTimestamp(),
-        processedBy: user.uid,
-        processedByName: userProfile.username || user.email
-      });
+      
+      if (decisionState.targetStatus === 'Rejected') {
+        updateDocumentNonBlocking(reportRef, {
+          status: 'Rejected',
+          remarks: remarks,
+          processedAt: serverTimestamp(),
+          processedBy: user.uid,
+          processedByName: userProfile.username || user.email
+        });
 
-      // Notify User
-      sendNotification(firestore, {
-        userId: decisionState.report.userId,
-        title: `Expense Status: ${decisionStatusToTitle(decisionState.targetStatus)}`,
-        description: `Your report "${decisionState.report.title}" has been ${decisionState.targetStatus.toLowerCase()}. Remarks: ${remarks}`,
-        link: `/expenses/manage`,
-        push: true,
-      });
+        sendNotification(firestore, {
+          userId: decisionState.report.userId,
+          title: `Expense Rejected`,
+          description: `Your report "${decisionState.report.title}" has been rejected. Remarks: ${remarks}`,
+          link: `/expenses/list?view=${decisionState.report.id}`,
+          push: true,
+        });
+      } else {
+        // Dual Approval Logic
+        const currentApprovals = decisionState.report.approvals || [];
+        
+        if (currentApprovals.some(a => a.adminId === user.uid)) {
+          toast({ variant: 'destructive', title: 'Already Approved', description: 'You have already authorized this request.' });
+          setIsProcessing(false);
+          return;
+        }
 
-      toast({ title: 'Success', description: `Report updated to ${decisionState.targetStatus}.` });
+        const newApproval: ApprovalEntry = {
+          adminId: user.uid,
+          adminName: userProfile.username || user.email || 'Admin',
+          timestamp: new Date().toISOString(),
+          remarks: remarks
+        };
+
+        const nextApprovals = [...currentApprovals, newApproval];
+        const isFullyApproved = nextApprovals.length >= 2;
+
+        updateDocumentNonBlocking(reportRef, {
+          status: isFullyApproved ? 'Approved' : 'FirstApproved',
+          approvals: nextApprovals,
+          remarks: remarks,
+          processedAt: serverTimestamp(),
+          processedBy: user.uid,
+          processedByName: userProfile.username || user.email
+        });
+
+        sendNotification(firestore, {
+          userId: decisionState.report.userId,
+          title: isFullyApproved ? 'Expense Fully Approved' : 'Expense Level 1 Approved',
+          description: isFullyApproved 
+            ? `Your report "${decisionState.report.title}" has received final approval.` 
+            : `Level 1 approval received for "${decisionState.report.title}". Awaiting second administrator audit.`,
+          link: `/expenses/list?view=${decisionState.report.id}`,
+          push: true,
+        });
+      }
+
+      toast({ title: 'Success', description: `Audit decision recorded.` });
       setDecisionState(null);
       setSelectedReport(null);
     } catch (e: any) {
@@ -150,12 +197,6 @@ export default function ManageExpensesPage() {
     } finally {
       setIsProcessing(false);
     }
-  };
-
-  const decisionStatusToTitle = (status: string) => {
-    if (status === 'Approved') return 'Authorized';
-    if (status === 'Rejected') return 'Returned';
-    return status;
   };
 
   const filteredExpenses = React.useMemo(() => {
@@ -187,7 +228,7 @@ export default function ManageExpensesPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
@@ -205,6 +246,7 @@ export default function ManageExpensesPage() {
             <SelectContent>
               <SelectItem value="all" className="text-xs font-bold">All Status</SelectItem>
               <SelectItem value="Pending" className="text-xs font-bold">Pending</SelectItem>
+              <SelectItem value="FirstApproved" className="text-xs font-bold text-indigo-600">1/2 Approved</SelectItem>
               <SelectItem value="Approved" className="text-xs font-bold text-green-600">Approved</SelectItem>
               <SelectItem value="Rejected" className="text-xs font-bold text-red-600">Rejected</SelectItem>
               <SelectItem value="Paid" className="text-xs font-bold text-emerald-600">Paid</SelectItem>
@@ -230,47 +272,64 @@ export default function ManageExpensesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredExpenses.length > 0 ? filteredExpenses.map((expense) => (
-                  <TableRow key={expense.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setSelectedReport(expense)}>
-                    <TableCell className="px-6 py-4">
-                      <div className="flex flex-col gap-1">
-                        <div className="flex items-center gap-2 text-xs font-bold text-foreground">
-                          <UserIcon className="h-3.5 w-3.5 text-primary" />
-                          {expense.userName}
+                {filteredExpenses.length > 0 ? filteredExpenses.map((expense) => {
+                  const hasApproved = expense.approvals?.some(a => a.adminId === user?.uid);
+                  
+                  return (
+                    <TableRow key={expense.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setSelectedReport(expense)}>
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col gap-1">
+                          <div className="flex items-center gap-2 text-xs font-bold text-foreground">
+                            <UserIcon className="h-3.5 w-3.5 text-primary" />
+                            {expense.userName}
+                          </div>
+                          <div className="text-[9px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1.5">
+                            <Calendar className="h-3 w-3" />
+                            {expense.createdAt ? format(expense.createdAt.toDate(), 'dd MMM yyyy') : '—'}
+                          </div>
                         </div>
-                        <div className="text-[9px] font-mono font-bold text-muted-foreground uppercase flex items-center gap-1.5">
-                          <Calendar className="h-3 w-3" />
-                          {expense.createdAt ? format(expense.createdAt.toDate(), 'dd MMM yyyy') : '—'}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col gap-0.5">
+                          <span className="font-bold text-sm text-foreground truncate max-w-[200px]">{expense.title}</span>
+                          <div className="flex items-center gap-1 text-[9px] font-black uppercase text-muted-foreground">
+                            <Building2 className="h-3 w-3" /> {expense.siteName}
+                          </div>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex flex-col gap-0.5">
-                        <span className="font-bold text-sm text-foreground truncate max-w-[200px]">{expense.title}</span>
-                        <div className="flex items-center gap-1 text-[9px] font-black uppercase text-muted-foreground">
-                          <Building2 className="h-3 w-3" /> {expense.siteName}
+                      </TableCell>
+                      <TableCell className="font-black text-primary text-sm font-mono">
+                        ₹{expense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant="outline" className={cn(
+                          "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
+                          expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                          expense.status === 'FirstApproved' ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
+                          expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
+                          expense.status === 'Paid' ? "bg-emerald-500 text-white border-none" :
+                          "bg-red-50 text-red-700 border-red-200"
+                        )}>
+                          {expense.status === 'FirstApproved' ? '1/2 Approved' : expense.status}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right px-6">
+                        <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
+                          {isAdmin && (expense.status === 'Pending' || (expense.status === 'FirstApproved' && !hasApproved)) && (
+                            <div className="flex gap-1 mr-2">
+                               <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3" onClick={() => setDecisionState({ report: expense, targetStatus: 'Approved' })}>
+                                  {expense.status === 'FirstApproved' ? 'Final Approve' : 'Approve'}
+                               </Button>
+                               <Button size="sm" variant="destructive" className="h-8 rounded-sm font-bold px-3" onClick={() => setDecisionState({ report: expense, targetStatus: 'Rejected' })}>
+                                  Reject
+                               </Button>
+                            </div>
+                          )}
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm"><Eye className="h-4 w-4" /></Button>
                         </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="font-black text-primary text-sm font-mono">
-                      ₹{expense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="outline" className={cn(
-                        "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
-                        expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
-                        expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
-                        expense.status === 'Paid' ? "bg-emerald-500 text-white border-none" :
-                        "bg-red-50 text-red-700 border-red-200"
-                      )}>
-                        {expense.status}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right px-6">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm"><Eye className="h-4 w-4" /></Button>
-                    </TableCell>
-                  </TableRow>
-                )) : (
+                      </TableCell>
+                    </TableRow>
+                  );
+                }) : (
                   <TableRow><TableCell colSpan={5} className="h-32 text-center text-muted-foreground italic">No expense reports found.</TableCell></TableRow>
                 )}
               </TableBody>
@@ -295,7 +354,7 @@ export default function ManageExpensesPage() {
                 "text-[9px] font-black uppercase rounded-sm px-2 h-6",
                 selectedReport.status === 'Paid' ? "bg-emerald-500 text-white border-none" : "border-primary/20"
               )}>
-                {selectedReport.status}
+                {selectedReport.status === 'FirstApproved' ? '1/2 Approved' : selectedReport.status}
               </Badge>
             )}
           </DialogHeader>
@@ -322,6 +381,33 @@ export default function ManageExpensesPage() {
                     <span className="text-4xl font-black tabular-nums text-primary">₹{selectedReport.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
+
+                {/* Approval Trail */}
+                {selectedReport.approvals && selectedReport.approvals.length > 0 && (
+                  <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-primary" /> Approval Trail
+                    </Label>
+                    <div className="space-y-3">
+                      {selectedReport.approvals.map((approval, idx) => (
+                        <div key={idx} className="p-4 rounded-sm border-2 bg-green-50 border-green-100 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black uppercase text-green-700">Audit Level {idx + 1}</span>
+                              <span className="text-sm font-bold text-green-900">{approval.adminName}</span>
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-green-600/60 uppercase">
+                              {format(new Date(approval.timestamp), 'dd MMM yyyy, HH:mm')}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium italic text-green-800 leading-relaxed">
+                            "{approval.remarks || 'No remarks provided.'}"
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
@@ -383,9 +469,9 @@ export default function ManageExpensesPage() {
                   </div>
                 )}
 
-                {selectedReport.remarks && (
+                {selectedReport.remarks && selectedReport.status === 'Rejected' && (
                   <div className="p-6 bg-red-50 border-2 border-red-100 rounded-sm space-y-2">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-red-700">Audit Remarks</Label>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-red-700">Rejection Remarks</Label>
                     <p className="text-sm font-medium italic leading-relaxed text-red-900">"{selectedReport.remarks}"</p>
                   </div>
                 )}
@@ -394,10 +480,16 @@ export default function ManageExpensesPage() {
           </ScrollArea>
 
           <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0">
-            {isAdmin && selectedReport?.status === 'Pending' && (
+            {isAdmin && (selectedReport?.status === 'Pending' || selectedReport?.status === 'FirstApproved') && (
               <div className="flex gap-2 w-full justify-end">
-                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => setDecisionState({ report: selectedReport, targetStatus: 'Approved' })}>Approve</Button>
-                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => setDecisionState({ report: selectedReport, targetStatus: 'Rejected' })}>Reject</Button>
+                <Button 
+                  className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" 
+                  onClick={() => { setDecisionState({ report: selectedReport!, targetStatus: 'Approved' }); setSelectedReport(null); }}
+                  disabled={selectedReport.approvals?.some(a => a.adminId === user?.uid)}
+                >
+                  {selectedReport.status === 'FirstApproved' ? 'Final Approve' : 'Approve'}
+                </Button>
+                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setDecisionState({ report: selectedReport!, targetStatus: 'Rejected' }); setSelectedReport(null); }}>Reject</Button>
               </div>
             )}
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
@@ -409,7 +501,7 @@ export default function ManageExpensesPage() {
       <Dialog open={!!decisionState} onOpenChange={() => setDecisionState(null)}>
         <DialogContent className="rounded-sm max-md">
           <DialogHeader>
-            <DialogTitle className="uppercase tracking-tight font-black">Confirm {decisionState?.targetStatus}</DialogTitle>
+            <DialogTitle className="uppercase tracking-tight font-black">Confirm {decisionState?.targetStatus === 'Approved' ? (decisionState.report.status === 'FirstApproved' ? 'Final Approval' : 'Level 1 Approval') : 'Rejection'}</DialogTitle>
             <DialogDescription>Provide feedback for this organizational expenditure audit.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
@@ -419,7 +511,7 @@ export default function ManageExpensesPage() {
             </div>
           </div>
           <DialogFooter className="gap-2">
-            <DialogClose asChild><Button variant="ghost" className="rounded-sm font-bold h-11 px-6 uppercase text-[10px]">Cancel</Button></DialogClose>
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-11 px-6 uppercase text-[10px]">Cancel</Button></DialogClose>
             <Button 
               disabled={isProcessing} 
               className={cn("rounded-sm font-black h-11 px-8 uppercase text-[10px] tracking-widest", decisionState?.targetStatus === 'Rejected' ? "bg-red-600 hover:bg-red-700" : "bg-primary hover:bg-primary/90")}
@@ -434,5 +526,26 @@ export default function ManageExpensesPage() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number, icon: any, color: 'primary' | 'emerald' | 'blue' | 'amber' }) {
+  const colors = {
+    primary: "bg-primary/5 border-primary/10 text-primary",
+    emerald: "bg-emerald-500/5 border-emerald-500/10 text-emerald-600",
+    blue: "bg-blue-500/5 border-blue-500/10 text-blue-600",
+    amber: "bg-amber-500/5 border-amber-500/10 text-amber-600",
+  };
+
+  return (
+    <Card className={cn("rounded-sm border shadow-sm", colors[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3.5 sm:h-4 sm:w-4" />
+      </CardHeader>
+      <CardContent className="p-3 sm:p-4 pt-0">
+        <div className="text-xl sm:text-2xl font-black">{value}</div>
+      </CardContent>
+    </Card>
   );
 }

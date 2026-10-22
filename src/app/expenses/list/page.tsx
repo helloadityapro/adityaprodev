@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -38,7 +39,8 @@ import {
   FileUp,
   Save,
   ChevronsUpDown,
-  Check
+  Check,
+  ShieldCheck
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -83,6 +85,13 @@ const editExpenseSchema = z.object({
 
 type ExpenseItem = z.infer<typeof expenseItemSchema>;
 
+type ApprovalEntry = {
+  adminId: string;
+  adminName: string;
+  timestamp: string;
+  remarks: string;
+};
+
 type ExpenseSubmission = {
   id: string;
   userId: string;
@@ -90,11 +99,12 @@ type ExpenseSubmission = {
   title: string;
   siteName: string;
   totalAmount: number;
-  status: 'Pending' | 'Approved' | 'Rejected';
+  status: 'Pending' | 'FirstApproved' | 'Approved' | 'Rejected' | 'Paid';
   items: ExpenseItem[];
   createdAt: any;
   adminRemarks?: string;
   processedAt?: any;
+  approvals?: ApprovalEntry[];
 };
 
 type UserProfile = {
@@ -194,27 +204,69 @@ export default function ExpensesListPage() {
   };
 
   const handleAction = async (remarks: string) => {
-    if (!actionState) return;
+    if (!actionState || !user || !userProfile) return;
     setIsProcessing(true);
 
     try {
       const expenseRef = doc(firestore, 'expenses', actionState.expense.id);
-      updateDocumentNonBlocking(expenseRef, {
-        status: actionState.type,
-        adminRemarks: remarks,
-        processedAt: serverTimestamp(),
-        adminId: user?.uid,
-      });
+      
+      if (actionState.type === 'Rejected') {
+        updateDocumentNonBlocking(expenseRef, {
+          status: 'Rejected',
+          adminRemarks: remarks,
+          processedAt: serverTimestamp(),
+          processedById: user.uid,
+          processedByName: userProfile.username
+        });
 
-      sendNotification(firestore, {
-        userId: actionState.expense.userId,
-        title: `Expense ${actionState.type}`,
-        description: `Your submission "${actionState.expense.title}" was ${actionState.type.toLowerCase()}. Remarks: ${remarks}`,
-        link: `/expenses/list?view=${actionState.expense.id}`,
-        push: true,
-      });
+        sendNotification(firestore, {
+          userId: actionState.expense.userId,
+          title: `Expense Rejected`,
+          description: `Your submission "${actionState.expense.title}" was rejected. Remarks: ${remarks}`,
+          link: `/expenses/list?view=${actionState.expense.id}`,
+          push: true,
+        });
+      } else {
+        // Dual Approval Logic
+        const currentApprovals = actionState.expense.approvals || [];
+        
+        if (currentApprovals.some(a => a.adminId === user.uid)) {
+          toast({ variant: 'destructive', title: 'Already Approved', description: 'You have already authorized this request.' });
+          setIsProcessing(false);
+          return;
+        }
 
-      toast({ title: `Expense ${actionState.type}`, description: 'Record updated successfully.' });
+        const newApproval: ApprovalEntry = {
+          adminId: user.uid,
+          adminName: userProfile.username || user.email || 'Admin',
+          timestamp: new Date().toISOString(),
+          remarks: remarks
+        };
+
+        const nextApprovals = [...currentApprovals, newApproval];
+        const isFullyApproved = nextApprovals.length >= 2;
+
+        updateDocumentNonBlocking(expenseRef, {
+          status: isFullyApproved ? 'Approved' : 'FirstApproved',
+          approvals: nextApprovals,
+          adminRemarks: remarks,
+          processedAt: serverTimestamp(),
+          processedById: user.uid,
+          processedByName: userProfile.username,
+        });
+
+        sendNotification(firestore, {
+          userId: actionState.expense.userId,
+          title: isFullyApproved ? 'Expense Fully Approved' : 'Expense Level 1 Approved',
+          description: isFullyApproved 
+            ? `Your submission "${actionState.expense.title}" has received final approval.` 
+            : `Level 1 approval received for "${actionState.expense.title}". Awaiting second administrator audit.`,
+          link: `/expenses/list?view=${actionState.expense.id}`,
+          push: true,
+        });
+      }
+
+      toast({ title: 'Success', description: 'Action recorded in the audit trail.' });
       setActionState(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
@@ -361,7 +413,8 @@ export default function ExpensesListPage() {
             <SelectContent>
               <SelectItem value="all" className="text-xs font-bold">All Submissions</SelectItem>
               <SelectItem value="Pending" className="text-xs font-bold">Pending</SelectItem>
-              <SelectItem value="Approved" className="text-xs font-bold text-green-600">Approved</SelectItem>
+              <SelectItem value="FirstApproved" className="text-xs font-bold text-indigo-600">1/2 Approved</SelectItem>
+              <SelectItem value="Approved" className="text-xs font-bold text-green-600">Final Approved</SelectItem>
               <SelectItem value="Rejected" className="text-xs font-bold text-red-600">Rejected</SelectItem>
             </SelectContent>
           </Select>
@@ -388,10 +441,11 @@ export default function ExpensesListPage() {
                   <Badge variant="outline" className={cn(
                     "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                     expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                    expense.status === 'FirstApproved' ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
                     expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
                     "bg-red-50 text-red-700 border-red-200"
                   )}>
-                    {expense.status}
+                    {expense.status === 'FirstApproved' ? '1/2 Approved' : expense.status}
                   </Badge>
                 </div>
 
@@ -457,6 +511,7 @@ export default function ExpensesListPage() {
                   {filteredExpenses.map((expense) => {
                     const canDelete = isAdmin || expense.userId === user?.uid;
                     const canEdit = expense.userId === user?.uid && expense.status === 'Pending';
+                    const hasApproved = expense.approvals?.some(a => a.adminId === user?.uid);
 
                     return (
                       <TableRow key={expense.id} className="hover:bg-muted/5 transition-colors cursor-pointer" onClick={() => setSelectedExpense(expense)}>
@@ -491,10 +546,11 @@ export default function ExpensesListPage() {
                           <Badge variant="outline" className={cn(
                             "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                             expense.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
+                            expense.status === 'FirstApproved' ? "bg-indigo-50 text-indigo-700 border-indigo-200" :
                             expense.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" :
                             "bg-red-50 text-red-700 border-red-200"
                           )}>
-                            {expense.status}
+                            {expense.status === 'FirstApproved' ? '1/2 Approved' : expense.status}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right px-6">
@@ -502,7 +558,7 @@ export default function ExpensesListPage() {
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-green-600 hover:bg-green-50 rounded-sm" onClick={() => triggerWhatsApp(expense)} title="Push to WhatsApp">
                               <MessageCircle className="h-4 w-4" />
                             </Button>
-                            {isAdmin && expense.status === 'Pending' && (
+                            {isAdmin && (expense.status === 'Pending' || (expense.status === 'FirstApproved' && !hasApproved)) && (
                               <div className="flex gap-1">
                                 <Button size="sm" className="h-8 rounded-sm bg-green-600 hover:bg-green-700 font-bold px-3" onClick={() => setActionState({ expense, type: 'Approved' })}>
                                   Approve
@@ -552,9 +608,10 @@ export default function ExpensesListPage() {
               <Badge variant="outline" className={cn(
                 "text-[9px] font-black uppercase rounded-sm px-2 h-6",
                 selectedExpense.status === 'Approved' ? "bg-green-100 text-green-800" : 
-                selectedExpense.status === 'Pending' ? "bg-yellow-100 text-yellow-800" : "bg-red-100 text-red-800"
+                selectedExpense.status === 'Pending' ? "bg-yellow-100 text-yellow-800" : 
+                selectedExpense.status === 'FirstApproved' ? "bg-indigo-100 text-indigo-800" : "bg-red-100 text-red-800"
               )}>
-                {selectedExpense.status}
+                {selectedExpense.status === 'FirstApproved' ? '1/2 Approved' : selectedExpense.status}
               </Badge>
             )}
           </DialogHeader>
@@ -582,6 +639,39 @@ export default function ExpensesListPage() {
                     <span className="text-4xl font-black tabular-nums text-primary">₹{selectedExpense.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
+
+                {/* Approval Trail */}
+                {selectedExpense.approvals && selectedExpense.approvals.length > 0 && (
+                  <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                      <ShieldCheck className="h-4 w-4 text-primary" /> Approval Trail
+                    </Label>
+                    <div className="space-y-3">
+                      {selectedExpense.approvals.map((approval, idx) => (
+                        <div key={idx} className="p-4 rounded-sm border-2 bg-green-50 border-green-100 space-y-2">
+                          <div className="flex justify-between items-start">
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black uppercase text-green-700">Audit Level {idx + 1}</span>
+                              <span className="text-sm font-bold text-green-900">{approval.adminName}</span>
+                            </div>
+                            <span className="text-[9px] font-mono font-bold text-green-600/60 uppercase">
+                              {format(new Date(approval.timestamp), 'dd MMM yyyy, HH:mm')}
+                            </span>
+                          </div>
+                          <p className="text-xs font-medium italic text-green-800 leading-relaxed">
+                            "{approval.remarks || 'No remarks provided.'}"
+                          </p>
+                        </div>
+                      ))}
+                      {selectedExpense.status === 'FirstApproved' && (
+                        <div className="p-4 border-2 border-dashed border-indigo-200 rounded-sm flex items-center gap-3 bg-indigo-50/30">
+                          <Clock className="h-5 w-5 text-indigo-600" />
+                          <p className="text-[10px] font-black uppercase text-indigo-700">Awaiting Second Administrator Authorization</p>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-4">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
@@ -623,17 +713,11 @@ export default function ExpensesListPage() {
                   </div>
                 </div>
 
-                {(selectedExpense.adminRemarks || selectedExpense.status !== 'Pending') && (
-                  <div className={cn(
-                    "p-6 rounded-sm border-2 space-y-2",
-                    selectedExpense.status === 'Approved' ? "bg-green-50 border-green-100" : "bg-red-50 border-red-100"
-                  )}>
-                    <Label className={cn(
-                      "text-[10px] font-black uppercase tracking-widest",
-                      selectedExpense.status === 'Approved' ? "text-green-700" : "text-red-700"
-                    )}>Decision Remarks</Label>
+                {selectedExpense.status === 'Rejected' && selectedExpense.adminRemarks && (
+                  <div className="p-6 rounded-sm border-2 bg-red-50 border-red-100 space-y-2">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-red-700">Rejection Remarks</Label>
                     <p className="text-sm font-medium italic leading-relaxed text-foreground/80">
-                      "{selectedExpense.adminRemarks || 'Processed without additional remarks.'}"
+                      "{selectedExpense.adminRemarks}"
                     </p>
                     {selectedExpense.processedAt && (
                       <p className="text-[9px] font-bold opacity-40 uppercase pt-2">
@@ -656,9 +740,15 @@ export default function ExpensesListPage() {
                 <MessageCircle className="h-4 w-4 mr-1.5" /> Share WA
               </Button>
             )}
-            {isAdmin && selectedExpense?.status === 'Pending' && (
+            {isAdmin && (selectedExpense?.status === 'Pending' || selectedExpense?.status === 'FirstApproved') && (
               <div className="flex gap-2">
-                <Button className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" onClick={() => { setActionState({ expense: selectedExpense!, type: 'Approved' }); setSelectedExpense(null); }}>Approve</Button>
+                <Button 
+                  className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" 
+                  onClick={() => { setActionState({ expense: selectedExpense!, type: 'Approved' }); setSelectedExpense(null); }}
+                  disabled={selectedExpense.approvals?.some(a => a.adminId === user?.uid)}
+                >
+                  {selectedExpense.status === 'FirstApproved' ? 'Final Approve' : 'Approve'}
+                </Button>
                 <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setActionState({ expense: selectedExpense!, type: 'Rejected' }); setSelectedExpense(null); }}>Reject</Button>
               </div>
             )}
@@ -671,12 +761,12 @@ export default function ExpensesListPage() {
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent className="rounded-sm max-md">
           <DialogHeader>
-            <DialogTitle className="uppercase tracking-tight font-black">{actionState?.type} Submission</DialogTitle>
+            <DialogTitle className="uppercase tracking-tight font-black">{actionState?.type === 'Approved' ? (actionState.expense.status === 'FirstApproved' ? 'Final Approval' : 'Level 1 Approval') : 'Reject Submission'}</DialogTitle>
             <DialogDescription>Setting status for "{actionState?.expense.title}"</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
             <div className="space-y-2">
-              <Label className="text-xs font-bold uppercase text-muted-foreground">Admin Feedback</Label>
+              <Label className="text-xs font-bold uppercase text-muted-foreground">Admin Feedback / Audit Remarks</Label>
               <Textarea 
                 id="admin-remarks" 
                 placeholder="Explain decision for personnel records..." 
