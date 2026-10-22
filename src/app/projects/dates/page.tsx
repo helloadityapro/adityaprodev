@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -23,7 +22,8 @@ import {
   FilterX,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  ArrowRight
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 
 type Site = {
   id: string;
@@ -165,7 +166,7 @@ export default function ProjectDatesPage() {
         <p className="text-muted-foreground text-sm font-medium">Tracking contractual and internal SCOD timelines for utility scale projects.</p>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
