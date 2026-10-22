@@ -18,7 +18,8 @@ import {
   UserCircle2,
   Fuel,
   ClipboardList,
-  NotebookPen
+  NotebookPen,
+  Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
@@ -89,6 +90,13 @@ export function BottomNav({ canShow }: BottomNavProps) {
       href: '/requisitions/submit',
       description: 'Request master catalog items',
       key: 'requisitions' as PageKey
+    },
+    {
+      label: 'Submit Expense',
+      icon: <Wallet className="h-4 w-4 text-indigo-600" />,
+      href: '/expenses/submit',
+      description: 'Request reimbursement',
+      key: 'expenses' as PageKey
     },
     {
       label: 'Request PtW',

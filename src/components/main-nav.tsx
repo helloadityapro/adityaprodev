@@ -61,7 +61,9 @@ import {
   Cpu,
   GlassWater,
   NotebookPen,
-  PlugZap
+  PlugZap,
+  Wallet,
+  Receipt
 } from "lucide-react"
 import {
   SidebarMenu,
@@ -500,6 +502,41 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                         <Link href="/payments/contractor-wise">
                           <HardHat className="h-4 w-4" />
                           <span>Contractor-wise</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                  </SidebarMenuSub>
+                </CollapsibleContent>
+              </SidebarMenuItem>
+            </Collapsible>
+          )}
+
+          {/* Expenses Sub-Section */}
+          {canShow('expenses') && (
+            <Collapsible asChild defaultOpen={pathname.startsWith('/expenses')} className="group/collapsible">
+              <SidebarMenuItem>
+                <CollapsibleTrigger asChild>
+                  <SidebarMenuButton tooltip="Expenses" isActive={pathname.startsWith('/expenses')} className="rounded-sm">
+                    <Wallet className="h-4 w-4 text-primary" />
+                    <span className="font-medium">Expenses</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 group-data-[state=open]/collapsible:rotate-180" />
+                  </SidebarMenuButton>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <SidebarMenuSub>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/expenses/submit'} onClick={handleMobileClose}>
+                        <Link href="/expenses/submit">
+                          <Plus className="h-4 w-4" />
+                          <span>Submit Expense</span>
+                        </Link>
+                      </SidebarMenuSubButton>
+                    </SidebarMenuSubItem>
+                    <SidebarMenuSubItem>
+                      <SidebarMenuSubButton asChild isActive={pathname === '/expenses/list'} onClick={handleMobileClose}>
+                        <Link href="/expenses/list">
+                          <List className="h-4 w-4" />
+                          <span>My Expenses</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>
@@ -1009,6 +1046,26 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                 <Link href="/vehicles/manage">
                   <Car className="h-4 w-4 text-primary" />
                   <span className="font-medium">Manage Vehicles</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-expenses') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Manage Expenses" isActive={pathname === '/expenses/manage'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/expenses/manage">
+                  <ShieldCheck className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Manage Expenses</span>
+                </Link>
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+          )}
+          {canShow('admin-disbursements') && (
+            <SidebarMenuItem>
+              <SidebarMenuButton asChild tooltip="Disbursements" isActive={pathname === '/expenses/payments'} className="rounded-sm" onClick={handleMobileClose}>
+                <Link href="/expenses/payments">
+                  <IndianRupee className="h-4 w-4 text-emerald-600" />
+                  <span className="font-bold text-emerald-700">Disbursements</span>
                 </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>

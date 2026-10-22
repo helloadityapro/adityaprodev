@@ -22,7 +22,8 @@ import {
   Navigation,
   Fuel,
   ClipboardList,
-  NotebookPen
+  NotebookPen,
+  Wallet
 } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { motion } from 'framer-motion';
@@ -63,6 +64,13 @@ export function QuickActions({ canShow }: QuickActionsProps) {
       href: '/requisitions/submit',
       description: 'Formal request from catalog',
       key: 'requisitions' as PageKey
+    },
+    {
+      label: 'Submit Expense',
+      icon: <Wallet className="mr-2 h-4 w-4 text-indigo-600" />,
+      href: '/expenses/submit',
+      description: 'Request reimbursement',
+      key: 'expenses' as PageKey
     },
     {
       label: 'Request PtW',

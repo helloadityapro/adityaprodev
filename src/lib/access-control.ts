@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview Definition of all available sidebar pages and their keys.
  * This acts as the source of truth for the User Access Management system.
@@ -16,6 +15,9 @@ export type PageKey =
   | 'purchase-orders' 
   | 'work-orders' 
   | 'payments' 
+  | 'expenses'
+  | 'admin-expenses'
+  | 'admin-disbursements'
   | 'requirements'
   | 'requisitions'
   | 'dpr' 
@@ -85,6 +87,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'purchase-orders', label: 'Purchase Orders', category: 'Operations', path: '/purchase-orders/manage' },
   { id: 'work-orders', label: 'Work Orders', category: 'Operations', path: '/work-orders/manage' },
   { id: 'payments', label: 'Payments', category: 'Operations', path: '/payments/record' },
+  { id: 'expenses', label: 'Expenses', category: 'Operations', path: '/expenses/list' },
   { id: 'requirements', label: 'Requirements', category: 'Operations', path: '/requirements/submit' },
   { id: 'requisitions', label: 'Material Requisition', category: 'Operations', path: '/requisitions/list' },
   { id: 'dpr', label: 'Daily Progress Reports (DPR)', category: 'Operations', path: '/dpr/submit' },
@@ -119,6 +122,8 @@ export const APP_PAGES: AppPage[] = [
   { id: 'admin-dashboard', label: 'Legacy Admin Dashboard', category: 'Administration', path: '/admin/dashboard' },
   { id: 'admin-permits', label: 'Permit Cleanup & Mgt', category: 'Administration', path: '/settings/permits' },
   { id: 'admin-vehicles', label: 'Fleet Registry', category: 'Administration', path: '/vehicles/manage' },
+  { id: 'admin-expenses', label: 'Expense Management', category: 'Administration', path: '/expenses/manage' },
+  { id: 'admin-disbursements', label: 'Disbursement Hub', category: 'Administration', path: '/expenses/payments' },
   { id: 'admin-rewards', label: 'Rewards & Rates Setup', category: 'Administration', path: '/settings/rewards' },
   { id: 'admin-users', label: 'Personnel Directory', category: 'Administration', path: '/settings/users' },
   { id: 'admin-teams', label: 'Reporting & Teams', category: 'Administration', path: '/settings/teams' },
@@ -163,6 +168,11 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/purchase-orders')) return 'purchase-orders';
   if (path.startsWith('/work-orders')) return 'work-orders';
   if (path.startsWith('/payments')) return 'payments';
+  if (path.startsWith('/expenses')) {
+    if (path.includes('/manage')) return 'admin-expenses';
+    if (path.includes('/payments')) return 'admin-disbursements';
+    return 'expenses';
+  }
   if (path.startsWith('/requirements')) return 'requirements';
   if (path.startsWith('/requisitions')) return 'requisitions';
   if (path.startsWith('/site-visits')) {
