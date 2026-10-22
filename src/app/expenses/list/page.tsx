@@ -60,11 +60,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from "@/hooks/use-toast";
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { sendNotification } from '@/lib/notifications';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Progress } from '@/components/ui/progress';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 
 const expenseItemSchema = z.object({
   category: z.string().min(1, 'Category is required.'),
@@ -154,6 +155,11 @@ export default function ExpensesListPage() {
     control: editForm.control,
     name: "items"
   });
+
+  const watchedItems = useWatch({
+    control: editForm.control,
+    name: "items",
+  }) || [];
 
   React.useEffect(() => {
     if (editingExpense) {
@@ -264,7 +270,7 @@ export default function ExpensesListPage() {
       const processedItems = await Promise.all(values.items.map(async (item, idx) => {
         let finalUrl = item.receiptUrl || "";
         if (item.localFile instanceof File) {
-          const uploadedUrl = await uploadProof(item.localFile, user.uid, idx);
+          const uploadedUrl = await uploadFile(item.localFile, user.uid, idx);
           if (uploadedUrl) finalUrl = uploadedUrl;
         }
         const { localFile, ...rest } = item;
@@ -342,7 +348,7 @@ export default function ExpensesListPage() {
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
             placeholder="Search personnel or site..." 
-            className="pl-10 h-10 text-sm rounded-sm border-primary/20"
+            className="pl-10 h-10 text-sm rounded-sm border-primary/20 bg-background"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -534,7 +540,7 @@ export default function ExpensesListPage() {
       {/* Detail Modal */}
       <Dialog open={!!selectedExpense} onOpenChange={(o) => !o && handleCloseDetail()}>
         <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Wallet className="h-5 w-5 text-primary" /></div>
               <div>
@@ -723,7 +729,7 @@ export default function ExpensesListPage() {
       {/* Edit Dialog */}
       <Dialog open={!!editingExpense} onOpenChange={(o) => !o && setEditingExpense(null)}>
         <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Pencil className="h-5 w-5 text-primary" /></div>
               <div>
@@ -761,9 +767,9 @@ export default function ExpensesListPage() {
                             <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
                               <PopoverTrigger asChild>
                                 <FormControl>
-                                  <Button variant="outline" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
+                                  <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                                     {field.value || "Select site..."}
-                                    <ChevronsUpDown className="ml-2 h-4 w-4 opacity-50" />
+                                    <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
                                 </FormControl>
                               </PopoverTrigger>
@@ -860,7 +866,7 @@ export default function ExpensesListPage() {
             </ScrollArea>
           </div>
 
-          <DialogFooter className="p-6 bg-muted/5 border-t gap-3 shrink-0">
+          <DialogFooter className="p-6 bg-muted/10 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold h-12 uppercase text-[10px] tracking-widest px-8">Discard</Button></DialogClose>
             <Button onClick={editForm.handleSubmit(onEditSubmit)} disabled={isProcessing} className="rounded-sm font-black uppercase text-[10px] h-12 px-12 tracking-widest shadow-xl">
               {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
