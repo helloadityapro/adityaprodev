@@ -41,7 +41,7 @@ service cloud.firestore {
       allow create, delete: if isAdmin();
       allow update: if isAdmin() || (
         isSignedIn() && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['drawingUrl', 'drawingName', 'updatedAt', 'moduleBreakageCount'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['drawingUrl', 'drawingName', 'updatedAt', 'moduleBreakageCount', 'ppaDate', 'financialClosureDate', 'ppaScodDate', 'plannedScodDate'])
       );
     }
 
@@ -83,7 +83,7 @@ service cloud.firestore {
     match /vehicles/{vehicleId} {
       allow read: if isSignedIn();
       allow create, delete: if isAdmin();
-      allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentReading', 'updatedAt']));
+      allow update: if isAdmin() || (isSignedIn() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'currentReading', 'updatedAt', 'rcDocs', 'insuranceDocs']));
     }
 
     match /project_boms/{bomId} {
@@ -118,8 +118,12 @@ service cloud.firestore {
         getUserData().get('role', '') == 'Manager - Human Resources'
       );
       allow create: if isSignedIn();
-      allow update: if isSignedIn() && (isAdmin() || getUserData().get('department', '') == 'Account');
-      allow delete: if isAdmin();
+      allow update: if isSignedIn() && (
+        isAdmin() || 
+        getUserData().get('department', '') == 'Account' ||
+        request.auth.uid == resource.data.userId
+      );
+      allow delete: if isAdmin() || (isSignedIn() && request.auth.uid == resource.data.userId);
     }
 
     match /expense_categories/{catId} {
@@ -321,7 +325,6 @@ service cloud.firestore {
         resource.data.siteManagerId == request.auth.uid ||
         resource.data.assignedToId == request.auth.uid
       );
-      // Fixed: Allow owners to delete their own pending requests
       allow delete: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid && resource.data.status == 'Pending');
     }
 
