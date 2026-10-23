@@ -23,7 +23,8 @@ import {
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
-  ArrowRight
+  ArrowRight,
+  RotateCcw
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -32,6 +33,16 @@ import { useToast } from '@/hooks/use-toast';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 
@@ -55,6 +66,7 @@ export default function ProjectDatesPage() {
   
   const [searchTerm, setSearchTerm] = React.useState("");
   const [editingSite, setEditingSite] = React.useState<Site | null>(null);
+  const [siteToClear, setSiteToClear] = React.useState<Site | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
 
@@ -155,6 +167,26 @@ export default function ProjectDatesPage() {
     }
   };
 
+  const handleClearDates = async () => {
+    if (!siteToClear) return;
+    setIsSaving(true);
+    try {
+      await updateDocumentNonBlocking(doc(firestore, 'sites', siteToClear.id), {
+        ppaDate: "",
+        financialClosureDate: "",
+        ppaScodDate: "",
+        plannedScodDate: "",
+        updatedAt: serverTimestamp()
+      });
+      toast({ title: 'Dates Cleared', description: `Milestones reset for ${siteToClear.name}.` });
+      setSiteToClear(null);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: 'Action Failed', description: err.message });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (isProfileLoading || sitesLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
@@ -240,9 +272,14 @@ export default function ProjectDatesPage() {
                       {renderDaysBadge(getDaysRemaining(site.plannedScodDate))}
                     </TableCell>
                     <TableCell className="text-right px-6">
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10 transition-all" onClick={() => setEditingSite(site)}>
-                        <Pencil className="h-4 w-4" />
-                      </Button>
+                        <div className="flex justify-end gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10 transition-all" onClick={() => setEditingSite(site)} title="Edit Milestones">
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm hover:bg-red-50 transition-all" onClick={() => setSiteToClear(site)} title="Clear Dates">
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        </div>
                     </TableCell>
                   </TableRow>
                 )) : (
@@ -307,7 +344,7 @@ export default function ProjectDatesPage() {
               <DialogFooter className="pt-4 gap-3 flex flex-col sm:flex-row">
                 <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Discard</Button></DialogClose>
                 <Button type="submit" disabled={isSaving} className="rounded-sm font-black uppercase text-[10px] h-11 shadow-lg flex-1">
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
                   Finalize Dates
                 </Button>
               </DialogFooter>
@@ -315,6 +352,31 @@ export default function ProjectDatesPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Clear Dates Confirmation */}
+      <AlertDialog open={!!siteToClear} onOpenChange={(o) => !o && setSiteToClear(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive font-black uppercase tracking-tight">
+              <RotateCcw className="h-5 w-5" /> Reset Site Milestones?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+              You are about to clear all contractual and internal dates for <strong>{siteToClear?.name}</strong>. This will reset the countdown trackers and cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleClearDates} 
+              disabled={isSaving}
+              className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px]"
+            >
+              {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
+              Confirm Reset
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
