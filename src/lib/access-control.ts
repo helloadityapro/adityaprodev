@@ -65,7 +65,8 @@ export type PageKey =
   | 'project-tab-ptw'
   | 'project-tab-dpr'
   | 'project-tab-tasks'
-  | 'project-tab-visits';
+  | 'project-tab-visits'
+  | 'project-tab-liaisoning';
 
 export interface AppPage {
   id: PageKey;
@@ -143,6 +144,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'project-tab-dpr', label: 'Project: DPR', category: 'Project Detail Tabs', path: '' },
   { id: 'project-tab-tasks', label: 'Project: Tasks', category: 'Project Detail Tabs', path: '' },
   { id: 'project-tab-visits', label: 'Project: Visits', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-liaisoning', label: 'Project: Liaisoning', category: 'Project Detail Tabs', path: '' },
 ];
 
 /**
