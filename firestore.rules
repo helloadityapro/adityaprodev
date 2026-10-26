@@ -287,6 +287,12 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isSignedIn() && resource.data.uploadedById == request.auth.uid);
     }
 
+    match /site_folders/{folderId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn();
+      allow delete: if isAdmin() || (isSignedIn() && resource.data.createdById == request.auth.uid);
+    }
+
     match /lms_courses/{courseId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /lms_modules/{moduleId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
     match /lms_quizzes/{quizId} { allow read: if isSignedIn(); allow write: if isAdmin(); }

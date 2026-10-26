@@ -44,6 +44,40 @@
       },
       "required": ["id", "username", "email", "mobile", "role"]
     },
+    "SiteFolder": {
+      "title": "Site Folder",
+      "type": "object",
+      "description": "A directory for organizing site documents.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "name": { "type": "string" },
+        "parentFolderId": { "type": ["string", "null"] },
+        "createdById": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["siteId", "name", "createdById"]
+    },
+    "SiteDocument": {
+      "title": "Site Document",
+      "type": "object",
+      "description": "A document or media file attached to a project site.",
+      "properties": {
+        "id": { "type": "string" },
+        "siteId": { "type": "string" },
+        "siteName": { "type": "string" },
+        "fileName": { "type": "string" },
+        "fileUrl": { "type": "string" },
+        "fileType": { "type": "string" },
+        "fileSize": { "type": "number" },
+        "uploadedById": { "type": "string" },
+        "uploadedByName": { "type": "string" },
+        "parentFolderId": { "type": ["string", "null"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "storagePath": { "type": "string" }
+      },
+      "required": ["siteId", "fileName", "fileUrl", "uploadedById"]
+    },
     "LiaisoningRecord": {
       "title": "Liaisoning Progress Record",
       "type": "object",
@@ -697,7 +731,6 @@
         "siteName": { "type": "string" },
         "projectCompany": { "type": "string" },
         "inverterMake": { "type": "string" },
-        "inverterMake": { "type": "string" },
         "inverterRating": { "type": "string" },
         "inverterNumber": { "type": "string" },
         "inverterSerialNumber": { "type": "string" },
@@ -960,6 +993,14 @@
     "/liaisoning_records/{siteId}": {
       "schema": { "$ref": "#/backend/entities/LiaisoningRecord" },
       "description": "Liaisoning progress tracker for grid connectivity."
+    },
+    "/site_documents/{docId}": {
+      "schema": { "$ref": "#/backend/entities/SiteDocument" },
+      "description": "Shared site files."
+    },
+    "/site_folders/{folderId}": {
+      "schema": { "$ref": "#/backend/entities/SiteFolder" },
+      "description": "Folders for document organization."
     }
   }
 }

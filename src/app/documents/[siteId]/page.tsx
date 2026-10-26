@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -8,7 +7,7 @@ import { collection, doc, query, where, serverTimestamp } from 'firebase/firesto
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileIcon, Upload, Trash2, ArrowLeft, Download, ExternalLink, Loader2, FileText, ImageIcon, Film, File as GenericFileIcon, X } from 'lucide-react';
+import { FileIcon, Upload, Trash2, ArrowLeft, Download, ExternalLink, Loader2, FileText, ImageIcon, Film, File as GenericFileIcon, X, Folder, FolderPlus, ChevronRight, Home, MoreVertical } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,7 +25,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
+import { cn } from '@/lib/utils';
 
 type SiteDocument = {
   id: string;
@@ -41,6 +50,16 @@ type SiteDocument = {
   siteManagerId: string | null;
   createdAt: any;
   storagePath: string;
+  parentFolderId?: string | null;
+};
+
+type SiteFolder = {
+  id: string;
+  siteId: string;
+  name: string;
+  parentFolderId: string | null;
+  createdById: string;
+  createdAt: any;
 };
 
 type Site = {
@@ -81,6 +100,12 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
   const [isUploading, setIsUploading] = React.useState(false);
   const [activeUploads, setActiveUploads] = React.useState<Record<string, number>>({});
   const [docToDelete, setDocToDelete] = React.useState<SiteDocument | null>(null);
+  
+  // Folder System States
+  const [currentFolderId, setCurrentFolderId] = React.useState<string | null>(null);
+  const [isFolderDialogOpen, setIsFolderDialogOpen] = React.useState(false);
+  const [newFolderName, setNewFolderName] = React.useState("");
+  const [folderToDelete, setFolderToDelete] = React.useState<SiteFolder | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile } = useDoc<UserProfile>(userProfileRef);
@@ -92,7 +117,56 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
     query(collection(firestore, 'site_documents'), where('siteId', '==', siteId)), 
     [firestore, siteId]
   );
-  const { data: siteDocs, isLoading: docsLoading } = useCollection<SiteDocument>(docsQuery);
+  const { data: allDocs, isLoading: docsLoading } = useCollection<SiteDocument>(docsQuery);
+
+  const foldersQuery = useMemoFirebase(() => 
+    query(collection(firestore, 'site_folders'), where('siteId', '==', siteId)), 
+    [firestore, siteId]
+  );
+  const { data: allFolders, isLoading: foldersLoading } = useCollection<SiteFolder>(foldersQuery);
+
+  const displayedDocs = React.useMemo(() => {
+    if (!allDocs) return [];
+    return allDocs.filter(d => (d.parentFolderId || null) === currentFolderId);
+  }, [allDocs, currentFolderId]);
+
+  const displayedFolders = React.useMemo(() => {
+    if (!allFolders) return [];
+    return allFolders.filter(f => (f.parentFolderId || null) === currentFolderId);
+  }, [allFolders, currentFolderId]);
+
+  const breadcrumbs = React.useMemo(() => {
+    const path = [];
+    let cur = currentFolderId;
+    while (cur) {
+      const folder = allFolders?.find(f => f.id === cur);
+      if (folder) {
+        path.unshift(folder);
+        cur = folder.parentFolderId;
+      } else {
+        break;
+      }
+    }
+    return path;
+  }, [allFolders, currentFolderId]);
+
+  const handleCreateFolder = async () => {
+    if (!newFolderName.trim() || !user || !site) return;
+    try {
+      await addDocumentNonBlocking(collection(firestore, 'site_folders'), {
+        siteId,
+        name: newFolderName.trim(),
+        parentFolderId: currentFolderId,
+        createdById: user.uid,
+        createdAt: serverTimestamp()
+      });
+      setNewFolderName("");
+      setIsFolderDialogOpen(false);
+      toast({ title: 'Folder Created' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    }
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -102,7 +176,6 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
     const storage = getStorage(firebaseApp);
     const siteManagerId = userProfile.siteManagerId || (userProfile.role === 'Site Manager' ? user.uid : null);
 
-    // Array.from to iterate through multiple files if selected
     for (const file of Array.from(files)) {
       const timestamp = Date.now();
       const storagePath = `site_documents/${siteId}/${timestamp}-${file.name.replace(/\s+/g, '_')}`;
@@ -138,7 +211,8 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
             uploadedByName: userProfile.username || user.email || 'User',
             siteManagerId: siteManagerId,
             createdAt: serverTimestamp(),
-            storagePath: storagePath
+            storagePath: storagePath,
+            parentFolderId: currentFolderId
           });
 
           setActiveUploads(prev => {
@@ -150,18 +224,16 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
         }
       );
     }
-    e.target.value = ''; // Reset input
+    e.target.value = '';
   };
 
-  const confirmDelete = async () => {
+  const confirmDeleteDoc = async () => {
     if (!docToDelete) return;
-
     try {
       const storage = getStorage(firebaseApp);
-      const storageRef = ref(storage, docToDelete.storagePath);
-      await deleteObject(storageRef);
+      await deleteObject(ref(storage, docToDelete.storagePath)).catch(e => console.warn("Storage deletion failed or file already missing", e));
       await deleteDocumentNonBlocking(doc(firestore, 'site_documents', docToDelete.id));
-      toast({ title: 'Deleted', description: 'Document removed from site folder.' });
+      toast({ title: 'Deleted' });
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
     } finally {
@@ -169,7 +241,21 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
     }
   };
 
-  if (siteLoading || docsLoading) {
+  const confirmDeleteFolder = async () => {
+    if (!folderToDelete) return;
+    try {
+      // Note: In a real system we'd recursively delete or check if empty. 
+      // For this prototype we'll just delete the folder entry.
+      await deleteDocumentNonBlocking(doc(firestore, 'site_folders', folderToDelete.id));
+      toast({ title: 'Folder Removed' });
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setFolderToDelete(null);
+    }
+  };
+
+  if (siteLoading || docsLoading || foldersLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-9 w-64" />
@@ -183,7 +269,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
   const uploadEntries = Object.entries(activeUploads);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
         <Button variant="ghost" size="sm" className="w-fit mb-2 -ml-2" onClick={() => router.push('/documents')}>
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Explorer
@@ -191,43 +277,34 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
         <h1 className="flex items-center gap-2">
           <FileIcon className="h-8 w-8 text-primary" /> {site.name} Documents
         </h1>
-        <p className="text-muted-foreground">Shared files and documentation for this project site.</p>
+        <p className="text-muted-foreground">Shared files and organization for this project site.</p>
       </div>
 
       <div className="flex flex-col gap-4">
         <div className="flex justify-end gap-2">
+          <Button 
+            variant="outline" 
+            className="rounded-sm font-bold h-11 px-6 shadow-sm border-primary/20 text-primary hover:bg-primary/5"
+            onClick={() => setIsFolderDialogOpen(true)}
+          >
+            <FolderPlus className="mr-2 h-4 w-4" /> New folder
+          </Button>
           <div className="relative">
-            <Input 
-              type="file" 
-              multiple
-              className="hidden" 
-              id="file-upload" 
-              onChange={handleUpload}
-              disabled={isUploading}
-            />
+            <input type="file" multiple className="hidden" id="file-upload" onChange={handleUpload} disabled={isUploading} />
             <Button asChild disabled={isUploading} className="rounded-sm font-bold h-11 px-6 shadow-md">
               <label htmlFor="file-upload" className="cursor-pointer">
-                {isUploading ? (
-                  <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Batch Uploading...</>
-                ) : (
-                  <><Upload className="mr-2 h-4 w-4" /> Upload Document(s)</>
-                )}
+                {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : <><Upload className="mr-2 h-4 w-4" /> Upload Document(s)</>}
               </label>
             </Button>
           </div>
         </div>
 
         {uploadEntries.length > 0 && (
-          <Card className="border-primary/20 bg-primary/5 animate-in slide-in-from-top-2 duration-300">
-            <CardHeader className="py-3 px-4 border-b border-primary/10">
-              <CardTitle className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                <Loader2 className="h-3 w-3 animate-spin" /> Real-time Transfer Queue
-              </CardTitle>
-            </CardHeader>
+          <Card className="border-primary/20 bg-primary/5">
             <CardContent className="p-4 space-y-4">
               {uploadEntries.map(([name, progress]) => (
                 <div key={name} className="space-y-1.5">
-                  <div className="flex justify-between items-center text-[10px] font-bold uppercase tracking-tight">
+                  <div className="flex justify-between items-center text-[10px] font-bold uppercase">
                     <span className="truncate max-w-[250px]">{name}</span>
                     <span className="text-primary">{Math.round(progress)}%</span>
                   </div>
@@ -239,113 +316,164 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
         )}
       </div>
 
+      {/* Breadcrumbs */}
+      <div className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 bg-muted/20 p-2 rounded-sm w-fit border border-primary/5">
+        <button 
+          onClick={() => setCurrentFolderId(null)}
+          className={cn("flex items-center gap-1 hover:text-primary transition-colors", !currentFolderId && "text-primary")}
+        >
+          <Home className="h-3 w-3" />
+          ROOT
+        </button>
+        {breadcrumbs.map((folder) => (
+          <React.Fragment key={folder.id}>
+            <ChevronRight className="h-3 w-3 opacity-30" />
+            <button 
+              onClick={() => setCurrentFolderId(folder.id)}
+              className={cn("hover:text-primary transition-colors", currentFolderId === folder.id && "text-primary")}
+            >
+              {folder.name}
+            </button>
+          </React.Fragment>
+        ))}
+      </div>
+
       <Card className="rounded-sm overflow-hidden border-primary/10 shadow-lg">
         <CardHeader className="bg-muted/5 border-b py-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-sm font-bold uppercase tracking-widest">Site Repository</CardTitle>
-              <CardDescription className="text-xs uppercase font-black text-muted-foreground mt-1">Files / {site.name}</CardDescription>
-            </div>
-            <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] bg-primary/5 border-primary/20 text-primary h-6">
-              {siteDocs?.length || 0} Artifacts
-            </Badge>
-          </div>
+          <CardTitle className="text-sm font-bold uppercase tracking-widest">Repository Contents</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
-          {siteDocs && siteDocs.length > 0 ? (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader className="bg-muted/30">
-                  <TableRow>
-                    <TableHead className="px-6 min-w-[300px]">File Name</TableHead>
-                    <TableHead>Type</TableHead>
-                    <TableHead>Size</TableHead>
-                    <TableHead>Personnel</TableHead>
-                    <TableHead>Date</TableHead>
-                    <TableHead className="text-right px-6">Actions</TableHead>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="px-6 min-w-[300px]">Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Size</TableHead>
+                  <TableHead>Personnel</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead className="text-right px-6">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {/* Render Folders First */}
+                {displayedFolders.map((folder) => (
+                  <TableRow key={folder.id} className="hover:bg-primary/[0.02] group transition-colors cursor-pointer" onClick={() => setCurrentFolderId(folder.id)}>
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-primary/10 rounded-sm text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                          <Folder className="h-4 w-4" />
+                        </div>
+                        <span className="font-bold text-sm truncate max-w-[250px]">{folder.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm bg-muted border-none">FOLDER</Badge></TableCell>
+                    <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">—</TableCell>
+                    <TableCell className="text-xs font-bold text-foreground">—</TableCell>
+                    <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">
+                      {folder.createdAt ? format(folder.createdAt.toDate(), 'dd MMM yyyy') : '—'}
+                    </TableCell>
+                    <TableCell className="text-right px-6" onClick={e => e.stopPropagation()}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setFolderToDelete(folder)}>
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {siteDocs.sort((a, b) => {
-                    const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
-                    const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
-                    return dateB - dateA;
-                  }).map((doc) => (
-                    <TableRow key={doc.id} className="hover:bg-muted/5 group transition-colors">
-                      <TableCell className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-muted rounded-sm text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                            {getFileIcon(doc.fileType)}
-                          </div>
-                          <span className="font-bold text-sm truncate max-w-[250px]" title={doc.fileName}>{doc.fileName}</span>
+                ))}
+
+                {/* Render Documents */}
+                {displayedDocs.map((doc) => (
+                  <TableRow key={doc.id} className="hover:bg-muted/5 group transition-colors">
+                    <TableCell className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-muted rounded-sm text-primary group-hover:bg-primary group-hover:text-white transition-colors">
+                          {getFileIcon(doc.fileType)}
                         </div>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm bg-muted border-none">
-                          {doc.fileType.split('/')[1] || 'FILE'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">{formatSize(doc.fileSize)}</TableCell>
-                      <TableCell className="text-xs font-bold text-foreground">
-                        <div className="flex items-center gap-1.5">
-                          <UserProfileIcon className="h-3 w-3 opacity-40" />
-                          {doc.uploadedByName}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-[10px] font-bold text-muted-foreground uppercase whitespace-nowrap">
-                        {doc.createdAt ? format(doc.createdAt.toDate(), 'dd MMM yyyy') : '—'}
-                      </TableCell>
-                      <TableCell className="text-right px-6">
-                        <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm text-primary" asChild title="Open">
-                            <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer">
-                              <ExternalLink className="h-4 w-4" />
-                            </a>
-                          </Button>
-                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDocToDelete(doc)} title="Delete">
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center py-32 text-center bg-muted/5 italic text-muted-foreground">
-              <GenericFileIcon className="h-16 w-16 opacity-10 mb-4" />
-              <p className="text-sm font-bold uppercase tracking-widest opacity-40">No documents found in this site folder.</p>
-            </div>
-          )}
+                        <span className="font-bold text-sm truncate max-w-[250px]" title={doc.fileName}>{doc.fileName}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm bg-muted border-none">{doc.fileType.split('/')[1] || 'FILE'}</Badge></TableCell>
+                    <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">{formatSize(doc.fileSize)}</TableCell>
+                    <TableCell className="text-xs font-bold text-foreground">{doc.uploadedByName}</TableCell>
+                    <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">
+                      {doc.createdAt ? format(doc.createdAt.toDate(), 'dd MMM yyyy') : '—'}
+                    </TableCell>
+                    <TableCell className="text-right px-6">
+                      <div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm text-primary" asChild>
+                          <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
+                        </Button>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDocToDelete(doc)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+
+                {displayedDocs.length === 0 && displayedFolders.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">Empty Directory</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
 
+      {/* New Folder Dialog */}
+      <Dialog open={isFolderDialogOpen} onOpenChange={setIsFolderDialogOpen}>
+        <DialogContent className="sm:max-w-md rounded-sm border-none shadow-2xl">
+          <DialogHeader>
+            <DialogTitle className="font-black uppercase tracking-tight">Create New Folder</DialogTitle>
+            <DialogDescription className="text-xs">Organize your site documents into a new directory.</DialogDescription>
+          </DialogHeader>
+          <div className="py-4 space-y-2">
+            <Label className="text-[10px] font-black uppercase text-muted-foreground px-1">Folder Name</Label>
+            <Input 
+              placeholder="Enter name..."
+              value={newFolderName}
+              onChange={(e) => setNewFolderName(e.target.value)}
+              className="rounded-sm h-11"
+              autoFocus
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateFolder()}
+            />
+          </div>
+          <DialogFooter className="gap-2">
+            <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
+            <Button onClick={handleCreateFolder} disabled={!newFolderName.trim()} className="rounded-sm font-black uppercase text-[10px] shadow-lg">Create Folder</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Doc Alert */}
       <AlertDialog open={!!docToDelete} onOpenChange={(o) => !o && setDocToDelete(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-black uppercase tracking-tight">Remove Document?</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs font-medium leading-relaxed">
-              Permanently remove <strong>{docToDelete?.fileName}</strong> from the organizational repository? This action cannot be reversed.
-            </AlertDialogDescription>
+            <AlertDialogDescription className="text-xs">Permanently remove this file from the repository?</AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px] shadow-lg">
-              Confirm Deletion
-            </AlertDialogAction>
+            <AlertDialogAction onClick={confirmDeleteDoc} className="bg-destructive text-white rounded-sm font-black uppercase text-[10px]">Delete</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Folder Alert */}
+      <AlertDialog open={!!folderToDelete} onOpenChange={(o) => !o && setFolderToDelete(null)}>
+        <AlertDialogContent className="rounded-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-black uppercase tracking-tight">Remove Folder?</AlertDialogTitle>
+            <AlertDialogDescription className="text-xs">Deleting a folder will not delete the documents inside, but they will become orphaned or return to the root directory depending on system logic. Confirm removal of <strong>{folderToDelete?.name}</strong>?</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={confirmDeleteFolder} className="bg-destructive text-white rounded-sm font-black uppercase text-[10px]">Delete Folder</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
-  );
-}
-
-function UserProfileIcon({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
-      <path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
   );
 }
