@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -370,6 +369,55 @@ const MAIN_STAGES = [
   { id: 'commissioning_certificate', label: '13. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
 ];
 
+const formatCapacity = (val: any) => {
+  const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
+  return isNaN(num) ? "0.000" : num.toFixed(3);
+};
+
+const getDaysRemaining = (dateStr?: string) => {
+  if (!dateStr) return null;
+  const date = parseISO(dateStr);
+  if (!isValid(date)) return null;
+  const today = startOfDay(new Date());
+  return differenceInDays(date, today);
+};
+
+const renderDaysBadge = (days: number | null) => {
+  if (days === null) return null;
+  const isOverdue = days < 0;
+  const isCritical = days <= 30;
+  return (
+    <Badge variant="outline" className={cn(
+      "font-mono font-black text-[9px] h-4 px-1 rounded-sm border-none shadow-sm block w-fit",
+      isOverdue ? "bg-red-500 text-white" : isCritical ? "bg-amber-500 text-white" : "bg-emerald-100 text-emerald-800"
+    )}>
+      {isOverdue ? `Overdue ${Math.abs(days)}d` : `${days}d Left`}
+    </Badge>
+  );
+};
+
+const formatTimestamp = (ts: any) => {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd MMM yy HH:mm');
+};
+
+const StatRow = ({ label, value, unit = "", color }: { label: string, value: number | string, unit?: string, color: string }) => {
+  const colors = {
+    green: "text-green-600 bg-green-50 border-green-100",
+    amber: "text-amber-600 bg-amber-50 border-amber-100",
+    blue: "text-blue-600 bg-blue-50 border-blue-100",
+    primary: "text-primary bg-primary/5 border-primary/10",
+    emerald: "text-emerald-600 bg-emerald-50 border-emerald-100"
+  };
+  return (
+    <div className={cn("flex items-center justify-between p-3 rounded-sm border", (colors as any)[color])}>
+      <span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
+      <span className="text-lg font-black">{value}{unit}</span>
+    </div>
+  );
+};
+
 export default function ProjectCommandCenterPage({ params }: { params: Promise<{ projectId: string }> }) {
   const resolvedParams = React.use(params);
   const projectId = resolvedParams.projectId;
@@ -435,7 +483,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const { data: roleConfigs } = useCollection<AccessConfig>(roleConfigsQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
-  const userRole = isAdmin ? "Admin" : userProfile?.role || "Site Engineer";
   const isManager = userProfile?.role === 'Site Manager';
 
   const hasPermission = React.useCallback((key: PageKey) => {
@@ -826,32 +873,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     } catch (e: any) { toast({ variant: 'destructive', title: 'Assignment Failed', description: e.message }); }
   };
 
-  // Helper functions for SCOD
-  const getDaysRemaining = (dateStr?: string) => {
-    if (!dateStr) return null;
-    const date = parseISO(dateStr);
-    if (!isValid(date)) return null;
-    const today = startOfDay(new Date());
-    return differenceInDays(date, today);
-  };
-
-  const renderDaysBadge = (days: number | null) => {
-    if (days === null) return null;
-    const isOverdue = days < 0;
-    const isCritical = days <= 30;
-    return (
-      <Badge variant="outline" className={cn(
-        "font-mono font-black text-[9px] h-4 px-1 rounded-sm border-none shadow-sm block w-fit",
-        isOverdue ? "bg-red-500 text-white" : isCritical ? "bg-amber-500 text-white" : "bg-emerald-100 text-emerald-800"
-      )}>
-        {isOverdue ? `Overdue ${Math.abs(days)}d` : `${days}d Left`}
-      </Badge>
-    );
-  };
-
   // Other Tab Handlers
   const handlePOSort = (key: POSortKey) => {
-    setPoSortConfig(prev => ({
+    setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
@@ -859,7 +883,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const POSortIcon = ({ column }: { column: POSortKey }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleWOSort = (key: WOSortKey) => {
@@ -1130,7 +1154,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   return (
     <>
       <div className="flex flex-col flex-1 h-full -mt-4 lg:-mt-6">
-        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-sm -mx-4 lg:-mx-6 px-4 lg:px-6 py-4 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-sm -mx-4 lg:-mx-6 px-4 lg:px-6 py-4 animate-in fade-in duration-300">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="space-y-1 min-w-0">
               <Button variant="ghost" size="sm" onClick={() => router.push('/projects/list')} className="h-7 mb-1 -ml-2 text-muted-foreground hover:text-primary transition-colors">
@@ -1215,7 +1239,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               <ScrollBar orientation="horizontal" />
             </ScrollArea>
 
-            <TabsContent value="dashboard" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
+            <TabsContent value="dashboard" className="space-y-8 mt-6 animate-in fade-in duration-300">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
                   <CardHeader className="bg-muted/5 border-b py-4">
@@ -1390,7 +1414,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </div>
             </TabsContent>
 
-            <TabsContent value="liaisoning" className="mt-6 animate-in fade-in-50 duration-300">
+            <TabsContent value="liaisoning" className="mt-6 animate-in fade-in duration-300">
               {!liaisonRecord ? (
                 <div className="flex flex-col items-center justify-center py-20 text-center space-y-6">
                   <PlugZap className="h-16 w-16 text-primary/20" />
@@ -1421,7 +1445,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 onClick={() => setActiveStageId(s.id)}
                                 className={cn("w-full flex items-start gap-4 p-4 text-left transition-all group", isActive ? "bg-primary/5 ring-1 ring-inset ring-primary/10" : "hover:bg-muted/5")}
                               >
-                                <div className={cn("h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-2 mt-0.5 transition-colors", isDone ? "bg-green-500 border-green-500 text-white" : isActive ? "border-primary text-primary bg-primary/10 animate-pulse" : "border-muted text-muted-foreground")}>
+                                <div className={cn("h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-2 mt-0.5 transition-colors", isDone ? "bg-green-50 border-green-500 text-white" : isActive ? "border-primary text-primary bg-primary/10 animate-pulse" : "border-muted text-muted-foreground")}>
                                   {isDone ? <Check className="h-3.5 w-3.5" /> : <span className="text-[10px] font-black">{idx + 1}</span>}
                                 </div>
                                 <div className="flex-1 min-w-0">
@@ -1524,7 +1548,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               )}
             </TabsContent>
 
-            <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
+            <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in duration-300">
               {canManageBom && (
                 <Card className="rounded-sm border-primary/10 bg-primary/5 shadow-sm">
                   <CardHeader className="py-2 border-b bg-muted/10">
@@ -1537,12 +1561,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Material Item</Label>
                           <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
                             <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/20", !selectedMasterItem && "text-muted-foreground")}>
-                                  <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
-                                  <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </FormControl>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/20", !selectedMasterItem && "text-muted-foreground")}>
+                                <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
+                                <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                               <div className="flex items-center border-b px-3">
@@ -1766,14 +1788,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             {expandedBomRows.has(item.id) && item.subItems && (
                               <TableRow className="bg-primary/[0.02]">
                                 <TableCell colSpan={7} className="p-0 border-b">
-                                  <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200">
-                                    <div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Component Breakdown for {item.itemName}</span></div>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                                      {item.subItems.map((sub, sIdx) => (
-                                        <div key={sIdx} className="p-3 bg-background border border-primary/5 rounded-sm flex flex-col gap-1"><span className="text-xs font-bold">{sub.name}</span><div className="flex items-center justify-between text-[10px]"><span className="text-muted-foreground uppercase font-medium">Per Set: {sub.quantityPerSet} {sub.unit}</span><span className="text-primary font-black uppercase">Total: {(sub.quantityPerSet * (item.approvedQuantity || item.plannedQuantity)).toFixed(2)} {sub.unit}</span></div></div>
-                                      ))}
-                                    </div>
-                                  </div>
+                                  <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Component Breakdown for {item.itemName}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{item.subItems.map((sub, sIdx) => (<div key={sIdx} className="p-3 bg-background border border-primary/5 rounded-sm flex flex-col gap-1"><span className="text-xs font-bold">{sub.name}</span><div className="flex items-center justify-between text-[10px]"><span className="text-muted-foreground uppercase font-medium">Per Set: {sub.quantityPerSet} {sub.unit}</span><span className="text-primary font-black uppercase">Total: {(sub.quantityPerSet * (item.approvedQuantity || item.plannedQuantity)).toFixed(2)} {sub.unit}</span></div></div>))}</div></div>
                                 </TableCell>
                               </TableRow>
                             )}
@@ -1788,7 +1803,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="po" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
+            <TabsContent value="po" className="mt-6 animate-in fade-in duration-300 transition-all space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
                 <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search PO or Supplier" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={poSearch} onChange={e => setPoSearch(e.target.value)} /></div>
                 <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/purchase-orders/create?siteId=${projectId}`}><Plus className="h-4 w-4 mr-2" /> Create PO</Link></Button>
@@ -1799,11 +1814,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <Table>
                       <TableHeader className="bg-muted/30">
                         <TableRow>
-                          <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('poNumber')}><div className="flex items-center">PO Number <POSortIcon column="poNumber" /></div></TableHead>
-                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('supplier')}><div className="flex items-center">Supplier <POSortIcon column="supplier" /></div></TableHead>
-                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}><div className="flex items-center">Date <POSortIcon column="date" /></div></TableHead>
-                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}><div className="flex items-center">Status <POSortIcon column="status" /></div></TableHead>
-                          <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}><div className="flex items-center justify-end">Total Value <POSortIcon column="total" /></div></TableHead>
+                          <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('poNumber')}><div className="flex items-center">PO Number <POSortIcon column="poNumber" config={sortConfig} /></div></TableHead>
+                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('supplier')}><div className="flex items-center">Supplier <POSortIcon column="supplier" config={sortConfig} /></div></TableHead>
+                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}><div className="flex items-center">Date <POSortIcon column="date" config={sortConfig} /></div></TableHead>
+                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}><div className="flex items-center">Status <POSortIcon column="status" config={sortConfig} /></div></TableHead>
+                          <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}><div className="flex items-center justify-end">Total Value <POSortIcon column="total" config={sortConfig} /></div></TableHead>
                           <TableHead>Recorded By</TableHead>
                           <TableHead className="text-right px-6">Actions</TableHead>
                         </TableRow>
@@ -1812,7 +1827,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         {filteredSortedPOs.length > 0 ? filteredSortedPOs.map(po => (
                           <React.Fragment key={po.id}>
                             <TableRow className="hover:bg-muted/5 transition-colors">
-                              <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => togglePORow(po.id)}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
+                              <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); togglePORow(po.id); }}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
                               <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
                               <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                               <TableCell>
@@ -1870,7 +1885,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="wo" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
+            <TabsContent value="wo" className="mt-6 animate-in fade-in duration-300 transition-all space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
                 <div className="relative w-full md:w-80"><Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" /><Input placeholder="Search WO or Contractor" className="pl-8 h-9 rounded-sm border-primary/20 text-xs" value={woSearch} onChange={e => setWoSearch(e.target.value)} /></div>
                 <Button asChild className="rounded-sm font-bold shadow-md h-9"><Link href={`/projects/${projectId}/work-orders/create`}><Plus className="h-4 w-4 mr-2" /> Create WO</Link></Button>
@@ -1952,7 +1967,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="payments" className="mt-6 animate-in fade-in-50 duration-300 transition-all space-y-6">
+            <TabsContent value="payments" className="mt-6 animate-in fade-in duration-300 transition-all space-y-6">
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
                 <div className="relative w-full md:w-80">
                   <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -2024,7 +2039,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="inventory" className="space-y-8 mt-6 animate-in fade-in-50 duration-300">
+            <TabsContent value="inventory" className="space-y-8 mt-6 animate-in fade-in duration-300">
               <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
                 <CardHeader className="bg-muted/5 border-b py-4">
                   <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> On-Site Inventory Registry</CardTitle>
@@ -2045,8 +2060,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableBody>
                         {inventory && inventory.length > 0 ? inventory.map(invRecord => {
                           const bomItem = bomItems?.find(i => i.itemName === invRecord.itemName && i.status === 'Approved');
-                          const itemMovements = movements?.filter(m => m.itemName === invRecord.itemName) || [];
-                          const itemUtilisations = utilisations?.filter(u => u.itemName === invRecord.itemName) || [];
+                          const itemMovements = movements?.filter((m: any) => m.itemName === invRecord.itemName) || [];
+                          const itemUtilisations = utilisations?.filter((u: any) => u.itemName === invRecord.itemName) || [];
                           const utilised = invRecord.utilisedQuantity || 0;
                           const available = invRecord.stockLevel;
                           const total = utilised + available;
@@ -2170,7 +2185,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="utilisation" className="mt-6 animate-in fade-in-50 duration-300">
+            <TabsContent value="utilisation" className="mt-6 animate-in fade-in duration-300">
               <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
                 <CardHeader className="bg-muted/5 border-b py-4">
                   <div className="flex items-center justify-between">
@@ -2238,7 +2253,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="movements" className="mt-6 animate-in fade-in-50 duration-300">
+            <TabsContent value="movements" className="mt-6 animate-in fade-in duration-300">
               <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
                 <CardHeader className="bg-muted/5 border-b py-4">
                   <div className="flex items-center justify-between">
@@ -2284,7 +2299,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="ptw" className="mt-6 animate-in fade-in-50 duration-300 transition-all">
+            <TabsContent value="ptw" className="mt-6 animate-in fade-in duration-300 transition-all">
               <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
                 <CardContent className="p-0">
                   {permits && permits.length > 0 ? (
@@ -2319,7 +2334,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="dpr" className="mt-6 animate-in fade-in-50 duration-300 transition-all">
+            <TabsContent value="dpr" className="mt-6 animate-in fade-in duration-300 transition-all">
               <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
                 <CardContent className="p-0">
                   {dprs && dprs.length > 0 ? (
@@ -2344,7 +2359,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="tasks" className="mt-6 animate-in fade-in-50 duration-300 transition-all">
+            <TabsContent value="tasks" className="mt-6 animate-in fade-in duration-300 transition-all">
               <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
                 <CardContent className="p-0">
                   {tasks && tasks.length > 0 ? (
@@ -2375,7 +2390,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               </Card>
             </TabsContent>
 
-            <TabsContent value="visits" className="mt-6 animate-in fade-in-50 duration-300 transition-all">
+            <TabsContent value="visits" className="mt-6 animate-in fade-in duration-300 transition-all">
               <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
                 <CardContent className="p-0">
                   {visits && visits.length > 0 ? (
@@ -2467,7 +2482,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                   handleProcessPO(remarks);
                 }}
               >
-                {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : `Confirm ${poActionState?.type}`}
+                {isActionProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : `Confirm ${poActionState?.type}`}
               </Button>
             </DialogFooter>
           </DialogContent>
@@ -2624,7 +2639,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 </div>
               )}
             </ScrollArea>
-            <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close</Button></DialogClose></DialogFooter>
+            <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose></DialogFooter>
           </DialogContent>
         </Dialog>
 
@@ -2646,7 +2661,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   );
 }
 
-function StatRow({ label, value, unit = "", color }: { label: string, value: number | string, unit?: string, color: string }) {
+function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number | string, icon: any, color: string }) {
   const colors = {
     green: "text-green-600 bg-green-50 border-green-100",
     amber: "text-amber-600 bg-amber-50 border-amber-100",
@@ -2655,9 +2670,14 @@ function StatRow({ label, value, unit = "", color }: { label: string, value: num
     emerald: "text-emerald-600 bg-emerald-50 border-emerald-100"
   };
   return (
-    <div className={cn("flex items-center justify-between p-3 rounded-sm border", (colors as any)[color])}>
-      <span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
-      <span className="text-lg font-black">{value}{unit}</span>
-    </div>
+    <Card className={cn("rounded-sm border shadow-sm", (colors as any)[color])}>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 p-3 sm:p-4">
+        <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
+        <Icon className="h-3.5 sm:h-4 sm:w-4" />
+      </CardHeader>
+      <CardContent className="p-3 sm:p-4 pt-0">
+        <div className="text-xl sm:text-2xl font-black">{value}</div>
+      </CardContent>
+    </Card>
   );
 }
