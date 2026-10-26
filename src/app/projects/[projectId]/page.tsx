@@ -66,7 +66,7 @@ import {
   Cpu,
   FilterX
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, parseISO, differenceInMinutes, endOfDay, isValid, differenceInDays, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -119,6 +119,10 @@ type Project = {
   projectOwnerName?: string;
   workStatus?: string;
   projectStatus?: string;
+  ppaDate?: string;
+  financialClosureDate?: string;
+  ppaScodDate?: string;
+  plannedScodDate?: string;
 };
 
 type UserProfile = {
@@ -453,8 +457,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
     result.sort((a, b) => {
       const { key, direction } = bomSortConfig;
-      let valA: any = a[key] ?? '';
-      let valB: any = b[key] ?? '';
+      let valA: any = a[key as keyof BoMItem] ?? '';
+      let valB: any = b[key as keyof BoMItem] ?? '';
       
       if (typeof valA === 'string') valA = valA.toLowerCase();
       if (typeof valB === 'string') valB = valB.toLowerCase();
@@ -675,7 +679,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const POSortIcon = ({ column }: { column: POSortKey }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-4 w-4 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleWOSort = (key: WOSortKey) => {
@@ -686,7 +690,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const WOSortIcon = ({ column }: { column: SortKey }) => {
-    if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
@@ -698,7 +702,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const BoMSortIcon = ({ column }: { column: BoMSortKey }) => {
-    if (bomSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    if (bomSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return bomSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
@@ -928,6 +932,28 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
+  const getDaysRemaining = (dateStr?: string) => {
+    if (!dateStr) return null;
+    const date = parseISO(dateStr);
+    if (!isValid(date)) return null;
+    const today = startOfDay(new Date());
+    return differenceInDays(date, today);
+  };
+
+  const renderDaysBadge = (days: number | null) => {
+    if (days === null) return null;
+    const isOverdue = days < 0;
+    const isCritical = days <= 30;
+    return (
+      <Badge variant="outline" className={cn(
+        "font-mono font-black text-[9px] h-4 px-1 rounded-sm border-none shadow-sm block w-fit",
+        isOverdue ? "bg-red-500 text-white" : isCritical ? "bg-amber-500 text-white" : "bg-emerald-100 text-emerald-800"
+      )}>
+        {isOverdue ? `Overdue ${Math.abs(days)}d` : `${days}d Left`}
+      </Badge>
+    );
+  };
+
   if (projectLoading || isProfileLoading) return (
     <div className="space-y-8 p-6 animate-pulse">
       <Skeleton className="h-12 w-1/3" />
@@ -1041,7 +1067,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <CardContent className="p-0">
                   {teamLoading ? (
                     <div className="p-8 space-y-2"><Skeleton className="h-10 w-full" /><Skeleton className="h-10 w-full" /></div>
-                  ) : siteTeam.length > 0 ? (
+                  ) : (
                     <Table>
                       <TableHeader className="bg-muted/30">
                         <TableRow>
@@ -1051,8 +1077,32 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {siteTeam.map(member => (
-                          <TableRow key={member.id} className="hover:bg-muted/5 group">
+                        {/* Project Owner Row */}
+                        {project.projectOwnerName && (
+                          <TableRow className="bg-primary/[0.03] hover:bg-primary/[0.05] transition-colors border-b-2">
+                            <TableCell className="px-6 py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 bg-background rounded-full border shadow-sm shrink-0">
+                                  <User className="h-4 w-4 text-primary" />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="font-black text-sm text-primary uppercase">{project.projectOwnerName}</span>
+                                  <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Authority Holder</span>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <Badge className="rounded-sm text-[9px] font-black uppercase bg-primary text-white border-none h-5 px-2">
+                                Project Owner
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-center">
+                              <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">—</Badge>
+                            </TableCell>
+                          </TableRow>
+                        )}
+                        {siteTeam.length > 0 ? siteTeam.map(member => (
+                          <TableRow key={member.id} className="hover:bg-muted/5 group transition-colors">
                             <TableCell className="px-6 py-4">
                               <div className="flex flex-col">
                                 <span className="font-bold text-sm text-foreground">{member.username}</span>
@@ -1092,11 +1142,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               </Badge>
                             </TableCell>
                           </TableRow>
-                        ))}
+                        )) : !project.projectOwnerName && (
+                          <TableRow>
+                            <TableCell colSpan={3} className="p-20 text-center text-muted-foreground italic text-sm">No personnel currently mapped to this site.</TableCell>
+                          </TableRow>
+                        )}
                       </TableBody>
                     </Table>
-                  ) : (
-                    <div className="p-20 text-center text-muted-foreground italic text-sm">No personnel currently mapped to this site.</div>
                   )}
                 </CardContent>
               </Card>
@@ -1104,17 +1156,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               <div className="space-y-6">
                 <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
                   <CardHeader className="py-4 border-b bg-muted/5">
-                    <CardTitle className="text-xs font-bold uppercase tracking-widest">Lifecycle & Ownership</CardTitle>
+                    <CardTitle className="text-xs font-bold uppercase tracking-widest">LIFECYCLE AND SHOW ALL PROJECT DATES</CardTitle>
                   </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
-                    <div className="space-y-1">
-                      <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Project Owner</Label>
-                      <div className="flex items-center gap-2 text-sm font-bold">
-                        <User className="h-4 w-4 text-primary/40" />
-                        {project.projectOwnerName || "Unassigned"}
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4 pt-2">
+                  <CardContent className="pt-6 space-y-6">
+                    <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Work Status</Label>
                         <div>
@@ -1130,14 +1175,41 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         </div>
                       </div>
                       <div className="space-y-1">
-                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Registry Status</Label>
+                        <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Project Status</Label>
                         <div>
                           <Badge variant="outline" className={cn(
-                            "text-[8px] font-black uppercase rounded-sm px-1.5 h-5 border-none",
+                            "text-[8px] font-black uppercase h-5 px-1.5 border-none",
                             project.projectStatus === 'close' ? "bg-slate-900 text-white" : "bg-primary text-white"
                           )}>
                             {project.projectStatus || "open"}
                           </Badge>
+                        </div>
+                      </div>
+                    </div>
+
+                    <Separator className="opacity-10" />
+
+                    <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">PPA Date</Label>
+                        <p className="text-xs font-bold font-mono">{project.ppaDate ? format(parseISO(project.ppaDate), 'dd MMM yyyy') : '—'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground tracking-widest px-1">Fin. Closure</Label>
+                        <p className="text-xs font-bold font-mono">{project.financialClosureDate ? format(parseISO(project.financialClosureDate), 'dd MMM yyyy') : '—'}</p>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase text-primary tracking-widest px-1">PPA SCOD</Label>
+                        <div className="space-y-1">
+                          <p className="text-xs font-black font-mono text-primary">{project.ppaScodDate ? format(parseISO(project.ppaScodDate), 'dd MMM yyyy') : '—'}</p>
+                          {renderDaysBadge(getDaysRemaining(project.ppaScodDate))}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase text-foreground tracking-widest px-1">Planned SCOD</Label>
+                        <div className="space-y-1">
+                          <p className="text-xs font-black font-mono text-foreground">{project.plannedScodDate ? format(parseISO(project.plannedScodDate), 'dd MMM yyyy') : '—'}</p>
+                          {renderDaysBadge(getDaysRemaining(project.plannedScodDate))}
                         </div>
                       </div>
                     </div>
@@ -1489,7 +1561,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell>
                               <div className="flex flex-col gap-1">
                                 <Badge variant="outline" className={cn(
-                                  "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
+                                  "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                                   po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
                                   po.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
                                   po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
@@ -1571,7 +1643,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <TableCell>
                               <div className="flex flex-col gap-1">
                                 <Badge variant="outline" className={cn(
-                                  "text-[9px] font-black uppercase rounded-sm px-1.5 h-5",
+                                  "text-[8px] font-black uppercase rounded-sm px-1.5 h-5",
                                   wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" :
                                   wo.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" :
                                   wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
@@ -2087,7 +2159,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <DialogDescription>Set status for {bomActionState?.item.itemName}.</DialogDescription>
           </DialogHeader>
           <div className="py-6 space-y-4">
-            <div className="space-y-2">
+            <div className="space-y-2 text-left">
               <Label className="text-xs font-bold">Planned Qty: {bomActionState?.item.plannedQuantity} {bomActionState?.item.unit}</Label>
               {bomActionState?.type === 'Approved' && (
                 <div className="space-y-2 pt-2">
@@ -2176,7 +2248,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         <DialogContent className="rounded-sm max-lg w-full">
           <DialogHeader><DialogTitle>Edit BoM Entry</DialogTitle></DialogHeader>
           {editingBomItem && (
-            <form onSubmit={handleUpdateBoM} className="space-y-4 py-4">
+            <form onSubmit={handleUpdateBoM} className="space-y-4 py-4 text-left">
               <div className="grid gap-2"><Label>Item Name</Label><Input name="itemName" defaultValue={editingBomItem.itemName} /></div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="grid gap-2"><Label>Planned Qty</Label><Input name="plannedQty" type="number" defaultValue={editingBomItem.plannedQuantity} /></div>
@@ -2213,14 +2285,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </Dialog>
 
       <Dialog open={!!viewingPO} onOpenChange={(o) => !o && handleCloseDetail()}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><ShoppingBag className="h-5 w-5 text-primary" /></div>
               <div><DialogTitle className="text-xl font-black uppercase tracking-tight">PO Detail Audit</DialogTitle><DialogDescription className="text-xs font-bold text-muted-foreground">{viewingPO?.poNumber}</DialogDescription></div>
             </div>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
+          <ScrollArea className="flex-1">
             {viewingPO && (
               <div className="p-8 space-y-10 text-left">
                 <div className="grid grid-cols-2 gap-8">
@@ -2230,7 +2302,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <Separator />
                 <div className="space-y-4">
                   <Label className="text-[10px] font-black uppercase text-muted-foreground">Material Breakdown</Label>
-                  <div className="border rounded-sm overflow-hidden"><Table><TableHeader className="bg-muted/30"><TableRow><TableHead className="text-[10px] font-black uppercase">Item</TableHead><TableHead className="text-[10px] font-black uppercase">Qty</TableHead><TableHead className="text-[10px] font-black uppercase">Rate</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Total</TableHead></TableRow></TableHeader><TableBody>{viewingPO.items.map((item, idx) => (<TableRow key={idx}><TableCell className="text-xs font-bold">{item.itemName}</TableCell><TableCell className="text-xs font-mono">{item.quantity}</TableCell><TableCell className="text-xs font-mono">₹{item.rate.toLocaleString()}</TableCell><TableCell className="text-right font-mono font-black text-xs text-primary">₹{item.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></div>
+                  <div className="border rounded-sm overflow-hidden"><Table><TableHeader className="bg-muted/30"><TableRow><TableHead className="text-[10px] font-black uppercase">Item</TableHead><TableHead className="text-[10px] font-black uppercase text-center">Qty</TableHead><TableHead className="text-[10px] font-black uppercase text-center">Rate</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Total</TableHead></TableRow></TableHeader><TableBody>{viewingPO.items.map((item, idx) => (<TableRow key={idx}><TableCell className="text-xs font-bold">{item.itemName}</TableCell><TableCell className="text-xs font-mono text-center">{item.quantity}</TableCell><TableCell className="text-xs font-mono text-center">₹{item.rate.toLocaleString()}</TableCell><TableCell className="text-right font-mono font-black text-xs text-primary">₹{item.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></div>
                 </div>
                 <div className="bg-primary/5 p-6 rounded-sm border-2 border-primary/10 flex flex-col items-center gap-2"><span className="text-[10px] font-black uppercase text-primary tracking-widest">Aggregate PO Value</span><span className="text-4xl font-black text-primary">₹{viewingPO.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
               </div>
@@ -2241,16 +2313,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </Dialog>
 
       <Dialog open={!!viewingWO} onOpenChange={(o) => !o && handleCloseDetail()}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Gavel className="h-5 w-5 text-primary" /></div>
               <div><DialogTitle className="text-xl font-black uppercase tracking-tight">WO Detail Audit</DialogTitle><DialogDescription className="text-xs font-bold text-muted-foreground">{viewingWO?.woNumber}</DialogDescription></div>
             </div>
           </DialogHeader>
-          <ScrollArea className="max-h-[70vh]">
+          <ScrollArea className="flex-1 p-8 space-y-10 text-left">
             {viewingWO && (
-              <div className="p-8 space-y-10 text-left">
+              <>
                 <div className="grid grid-cols-2 gap-8">
                   <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Contractor</Label><p className="text-sm font-bold">{viewingWO.contractorName}</p></div>
                   <div className="space-y-1"><Label className="text-[10px] font-black uppercase text-muted-foreground">Date</Label><p className="text-sm font-bold">{viewingWO.orderDate}</p></div>
@@ -2259,11 +2331,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 {viewingWO.items && viewingWO.items.length > 0 && (
                   <div className="space-y-4">
                     <Label className="text-[10px] font-black uppercase text-muted-foreground">Service Breakdown</Label>
-                    <div className="border rounded-sm overflow-hidden"><Table><TableHeader className="bg-muted/30"><TableRow><TableHead className="text-[10px] font-black uppercase">Service</TableHead><TableHead className="text-[10px] font-black uppercase">Qty</TableHead><TableHead className="text-[10px] font-black uppercase">Rate</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Total</TableHead></TableRow></TableHeader><TableBody>{viewingWO.items.map((item, idx) => (<TableRow key={idx}><TableCell className="text-xs font-bold">{item.description}</TableCell><TableCell className="text-xs font-mono">{item.quantity}</TableCell><TableCell className="text-xs font-mono">₹{item.rate.toLocaleString()}</TableCell><TableCell className="text-right font-mono font-black text-xs text-primary">₹{item.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></div>
+                    <div className="border rounded-sm overflow-hidden"><Table><TableHeader className="bg-muted/30"><TableRow><TableHead className="text-[10px] font-black uppercase">Service</TableHead><TableHead className="text-[10px] font-black uppercase text-center">Qty</TableHead><TableHead className="text-[10px] font-black uppercase text-center">Rate</TableHead><TableHead className="text-right text-[10px] font-black uppercase">Total</TableHead></TableRow></TableHeader><TableBody>{viewingWO.items.map((item, idx) => (<TableRow key={idx}><TableCell className="text-xs font-bold">{item.description}</TableCell><TableCell className="text-xs font-mono text-center">{item.quantity}</TableCell><TableCell className="text-xs font-mono text-center">₹{item.rate.toLocaleString()}</TableCell><TableCell className="text-right font-mono font-black text-xs text-primary">₹{item.amount.toLocaleString()}</TableCell></TableRow>))}</TableBody></Table></div>
                   </div>
                 )}
                 <div className="bg-primary/5 p-6 rounded-sm border-2 border-primary/10 flex flex-col items-center gap-2"><span className="text-[10px] font-black uppercase text-primary tracking-widest">Total Contract Value</span><span className="text-4xl font-black text-primary">₹{viewingWO.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div>
-              </div>
+              </>
             )}
           </ScrollArea>
           <DialogFooter className="p-4 bg-muted/5 border-t"><DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8">Close Audit</Button></DialogClose></DialogFooter>
@@ -2271,7 +2343,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       </Dialog>
 
       <Dialog open={!!viewingPayment} onOpenChange={(o) => !o && setViewingPayment(null)}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col">
+        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><IndianRupee className="h-5 w-5 text-primary" /></div>
