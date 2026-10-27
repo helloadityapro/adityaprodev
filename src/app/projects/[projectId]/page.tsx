@@ -1,10 +1,34 @@
-
 'use client';
 
 import * as React from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCollection, useDoc, useMemoFirebase, useUser, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking, useFirebaseApp } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, orderBy, or, and, getDoc, increment, arrayUnion, updateDoc, getDocs } from 'firebase/firestore';
+import { 
+  useCollection, 
+  useDoc, 
+  useMemoFirebase, 
+  useUser, 
+  updateDocumentNonBlocking, 
+  addDocumentNonBlocking, 
+  deleteDocumentNonBlocking, 
+  setDocumentNonBlocking, 
+  useFirebaseApp, 
+  useFirestore 
+} from '@/firebase';
+import { 
+  collection, 
+  doc, 
+  query, 
+  where, 
+  serverTimestamp, 
+  orderBy, 
+  or, 
+  and, 
+  getDoc, 
+  increment, 
+  arrayUnion, 
+  updateDoc, 
+  getDocs 
+} from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -328,6 +352,47 @@ type LiaisoningRecord = {
 };
 
 const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Pairs", "Drums"];
+
+const MAIN_STAGES = [
+  { id: 'grid_connectivity', label: '1. Grid Connectivity' },
+  { 
+    id: 'estimate_approval', 
+    label: '2. Estimate – Approval Stages', 
+    subStages: [
+      { id: 'ae_je', label: 'Approved from AE/JE' },
+      { id: 'dyee', label: 'Approved from DYEE' },
+      { id: 'ee', label: 'Approved from Executive Engineer' },
+      { id: 'circle_office', label: 'Approved from Circle Office' }
+    ] 
+  },
+  { id: 'estimate_sanction', label: '3. Estimate Sanction' },
+  { id: 'supervision_testing', label: '4. Supervision & Testing Charges' },
+  { id: 'material_inspection', label: '5. Material Inspection' },
+  { 
+    id: 'work_progress', 
+    label: '6. Work Progress',
+    flags: [
+      { id: 'started', label: 'Started' },
+      { id: 'not_started', label: 'Not Started Yet' },
+      { id: 'row', label: 'ROW' }
+    ]
+  },
+  { id: 'wcr', label: '7. Work Completion Report (WCR)' },
+  { id: 'pre_commissioning', label: '8. Pre-Commissioning' },
+  { 
+    id: 'format_ii_approval', 
+    label: '9. Format II – Approval Stages',
+    subStages: [
+      { id: 'eet', label: 'EE Testing (EET)' },
+      { id: 'om', label: 'Superintending Engineer (O&M)' },
+      { id: 'setqa', label: 'SE TQA Approved' }
+    ]
+  },
+  { id: 'ptc', label: '10. Permission to Commission (PTC)' },
+  { id: 'clearance', label: '11. Clearance Certificate / Release Order' },
+  { id: 'commissioning', label: '12. Commissioning' },
+  { id: 'commissioning_certificate', label: '13. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
+];
 
 const formatCapacity = (val: any) => {
   const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
@@ -1091,6 +1156,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     router.replace(`${pathname}${params.toString() ? `?${params.toString()}` : ''}`);
   };
 
+  const handleDeletePOInTab = (e: React.MouseEvent, po: PurchaseOrder) => {
+    e.stopPropagation();
+    setPoToDelete(po);
+  };
+
+  const handleDeleteWOInTab = (e: React.MouseEvent, wo: WorkOrder) => {
+    e.stopPropagation();
+    setWoToDelete(wo);
+  };
+
   if (projectLoading || isProfileLoading) return (
     <div className="space-y-8 p-6 animate-pulse">
       <Skeleton className="h-12 w-1/3" />
@@ -1513,7 +1588,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Material Item</Label>
                           <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
                             <PopoverTrigger asChild>
-                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/20", !selectedMasterItem && "text-muted-foreground")}>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/10", !selectedMasterItem && "text-muted-foreground")}>
                                 <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
                                 <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -1771,7 +1846,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}><div className="flex items-center">Date <POSortIcon column="date" config={poSortConfig} /></div></TableHead>
                           <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}><div className="flex items-center">Status <POSortIcon column="status" config={poSortConfig} /></div></TableHead>
                           <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}><div className="flex items-center justify-end">Total Value <POSortIcon column="total" config={poSortConfig} /></div></TableHead>
-                          <TableHead>Recorded By</TableHead>
                           <TableHead className="text-right px-6">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1791,25 +1865,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                     po.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
                                     "bg-muted text-muted-foreground"
                                   )}>{po.status || 'Pending'}</Badge>
-                                  {po.processedByName && (po.status === 'Accepted' || po.status === 'Rejected') && (
-                                    <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
-                                      {po.status === 'Accepted' ? 'Approved' : 'Rejected'} by {po.processedByName}
-                                    </span>
-                                  )}
-                                  {po.updatedAt && po.updatedByName && (
-                                    <span className="text-[8px] font-medium text-muted-foreground/60 leading-tight text-left">
-                                      Last Edited: {formatTimestamp(po.updatedAt)} by {po.updatedByName}
-                                    </span>
-                                  )}
                                 </div>
                               </TableCell>
                               <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1.5">
-                                  <User className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight truncate max-w-[100px]">{po.createdByName || '—'}</span>
-                                </div>
-                              </TableCell>
                               <TableCell className="text-right px-6"><div className="flex justify-end gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button>
                                 {isAdmin && po.status === 'Pending' && (
@@ -1853,7 +1911,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('date')}><div className="flex items-center">Date <WOSortIcon column="date" /></div></TableHead>
                           <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('status')}><div className="flex items-center">Status <WOSortIcon column="status" /></div></TableHead>
                           <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('total')}><div className="flex items-center justify-end">Contract Value <WOSortIcon column="total" /></div></TableHead>
-                          <TableHead>Recorded By</TableHead>
                           <TableHead className="text-right px-6">Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -1873,25 +1930,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                     wo.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" :
                                     "bg-muted text-muted-foreground"
                                   )}>{wo.status || 'Pending'}</Badge>
-                                  {wo.processedByName && (wo.status === 'Accepted' || wo.status === 'Rejected') && (
-                                    <span className="text-[8px] font-bold text-muted-foreground uppercase leading-tight">
-                                      {wo.status === 'Accepted' ? 'Approved' : 'Rejected'} by {wo.processedByName}
-                                    </span>
-                                  )}
-                                  {wo.updatedAt && wo.updatedByName && (
-                                    <span className="text-[8px] font-medium text-muted-foreground/60 leading-tight text-left">
-                                      Last Edited: {formatTimestamp(wo.updatedAt)} by {wo.updatedByName}
-                                    </span>
-                                  )}
                                 </div>
                               </TableCell>
                               <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1.5">
-                                  <User className="h-3 w-3 text-muted-foreground" />
-                                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-tight truncate max-w-[100px]">{wo.createdByName || '—'}</span>
-                                </div>
-                              </TableCell>
                               <TableCell className="text-right px-6"><div className="flex justify-end gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button>
                                 {isAdmin && wo.status === 'Pending' && (
@@ -2633,7 +2674,7 @@ function SummaryCard({ title, value, icon: Icon, color, description, isLoading }
         <Icon className="h-3.5 sm:h-4 sm:w-4" />
       </CardHeader>
       <CardContent className="p-3 sm:p-4 pt-0 text-left">
-        <div className="text-xl sm:text-2xl font-black">{value}</div>
+        {isLoading ? <Skeleton className="h-8 w-12 bg-muted" /> : <div className="text-xl sm:text-2xl font-black">{value}</div>}
       </CardContent>
     </Card>
   );
