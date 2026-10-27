@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import * as React from "react"
 import { useSearchParams } from "next/navigation"
@@ -120,7 +119,7 @@ export default function RaisePtwPage() {
   const accessibleSites = React.useMemo(() => {
     if (!allSites || !userProfile) return [];
     if (isAdmin) {
-      return Array.from(new Map(allSites.map(site => [site.name, site])).values());
+        return Array.from(new Map(allSites.filter(s => s.name).map(site => [site.name, site])).values());
     }
     
     const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
@@ -140,7 +139,7 @@ export default function RaisePtwPage() {
       }
     }
 
-    const filtered = allSites.filter(s => siteIds.has(s.id));
+    const filtered = allSites.filter(s => s.name && siteIds.has(s.id));
     return Array.from(new Map(filtered.map(site => [site.name, site])).values());
   }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
@@ -158,12 +157,12 @@ export default function RaisePtwPage() {
   const [ptwTypeSearchQuery, setPtwTypeSearchQuery] = React.useState("");
 
   const filteredAccessibleSites = React.useMemo(() => {
-    return accessibleSites.filter(site => site.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+    return accessibleSites.filter(site => (site.name || "").toLowerCase().includes(siteSearchQuery.toLowerCase()));
   }, [accessibleSites, siteSearchQuery]);
 
   const filteredPtwTypesList = React.useMemo(() => {
     if (!ptwTypes) return [];
-    return ptwTypes.filter(type => type.name.toLowerCase().includes(ptwTypeSearchQuery.toLowerCase()));
+    return ptwTypes.filter(type => (type.name || "").toLowerCase().includes(ptwTypeSearchQuery.toLowerCase()));
   }, [ptwTypes, ptwTypeSearchQuery]);
 
   const form = useForm<z.infer<typeof raisePtwSchema>>({
