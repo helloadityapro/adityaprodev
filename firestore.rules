@@ -45,6 +45,10 @@ service cloud.firestore {
       );
     }
 
+    match /deleted_projects/{projectId} {
+      allow read, write: if isAdmin();
+    }
+
     match /module_breakages/{breakageId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn();

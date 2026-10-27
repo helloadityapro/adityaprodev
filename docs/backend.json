@@ -881,6 +881,10 @@
       "schema": { "$ref": "#/backend/entities/Site" },
       "description": "Project site locations and capacities."
     },
+    "/deleted_projects/{projectId}": {
+      "schema": { "$ref": "#/backend/entities/Site" },
+      "description": "Archived project sites pending permanent removal or restoration."
+    },
     "/site_groups/{groupId}": {
       "schema": { "$ref": "#/backend/entities/SiteGroup" },
       "description": "Categorization of sites for filtering."

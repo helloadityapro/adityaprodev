@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -23,7 +24,8 @@ import {
   Lock,
   Mail,
   User,
-  Tag
+  Tag,
+  RotateCcw
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -38,7 +40,7 @@ export default function SettingsPage() {
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
   React.useEffect(() => {
-    const syncState = () => {
+    const syncThemeState = () => {
       const isDark = document.documentElement.classList.contains('dark');
       setIsDarkMode(isDark);
     };
@@ -47,11 +49,6 @@ export default function SettingsPage() {
     window.addEventListener('theme-change', syncThemeState);
     return () => window.removeEventListener('theme-change', syncThemeState);
   }, []);
-
-  const syncThemeState = () => {
-    const isDark = document.documentElement.classList.contains('dark');
-    setIsDarkMode(isDark);
-  };
 
   const handleThemeChange = (checked: boolean) => {
     setIsDarkMode(checked);
@@ -74,6 +71,7 @@ export default function SettingsPage() {
     { label: 'Supplier Registry', href: '/registries/suppliers', icon: Truck, color: 'text-indigo-600' },
     { label: 'Contractor Registry', href: '/registries/contractors', icon: HardHat, color: 'text-orange-600' },
     { label: 'Makes Registry', href: '/registries/makes', icon: Tag, color: 'text-slate-600' },
+    { label: 'Restore Projects', href: '/settings/restore', icon: RotateCcw, color: 'text-orange-500' },
     { label: 'Permit Management', href: '/settings/permits', icon: FileCheck, color: 'text-primary' },
     { label: 'Dropdown Config', href: '/settings/dropdown-management', icon: Settings2, color: 'text-slate-600' },
   ];
@@ -145,7 +143,7 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center gap-4">
                 <div className="bg-background p-3 rounded-full border shadow-sm shrink-0">
-                  <User className="h-6 w-6 text-primary" />
+                  <UserIcon className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">For Support</span>
@@ -169,7 +167,7 @@ export default function SettingsPage() {
             <CardContent className="p-6 space-y-4">
               <div className="flex items-center gap-4">
                 <div className="bg-background p-3 rounded-full border shadow-sm shrink-0">
-                  <User className="h-6 w-6 text-primary" />
+                  <UserIcon className="h-6 w-6 text-primary" />
                 </div>
                 <div className="flex flex-col min-w-0">
                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest leading-none mb-1">For Support</span>

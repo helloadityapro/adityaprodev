@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
+import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
 import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { 
@@ -240,8 +241,15 @@ export default function AddNewProjectPage() {
       await reauthenticateWithCredential(user, credential);
 
       if (siteToDelete) {
-        deleteDocumentNonBlocking(doc(firestore, 'sites', siteToDelete.id));
-        toast({ title: 'Site Removed', description: `${siteToDelete.name} deleted from registry.` });
+        const { id, ...data } = siteToDelete;
+        setDocumentNonBlocking(doc(firestore, 'deleted_projects', id), {
+          ...data,
+          deletedAt: serverTimestamp(),
+          deletedBy: user.uid,
+          deletedByName: userProfile?.username || user.email
+        }, { merge: true });
+        deleteDocumentNonBlocking(doc(firestore, 'sites', id));
+        toast({ title: 'Site Archived', description: `${siteToDelete.name} moved to bin.` });
         setSelectedIds(prev => prev.filter(id => id !== siteToDelete.id));
       } else if (selectedIds.length > 0) {
         const batchSize = 400;
@@ -249,11 +257,21 @@ export default function AddNewProjectPage() {
           const batch = writeBatch(firestore);
           const chunk = selectedIds.slice(i, i + batchSize);
           chunk.forEach(id => {
+            const siteData = sites?.find(s => s.id === id);
+            if (siteData) {
+              const { id: _, ...data } = siteData;
+              batch.set(doc(firestore, 'deleted_projects', id), {
+                ...data,
+                deletedAt: serverTimestamp(),
+                deletedBy: user.uid,
+                deletedByName: userProfile?.username || user.email
+              });
+            }
             batch.delete(doc(firestore, 'sites', id));
           });
           await batch.commit();
         }
-        toast({ title: 'Bulk Removal Complete', description: `Successfully removed ${selectedIds.length} projects.` });
+        toast({ title: 'Bulk Archive Complete', description: `Successfully moved ${selectedIds.length} projects to bin.` });
         setSelectedIds([]);
       }
 
@@ -721,7 +739,7 @@ export default function AddNewProjectPage() {
                     <Popover open={isOwnerPopoverOpen} onOpenChange={setIsOwnerPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             {field.value ? allPersonnel?.find(u => u.id === field.value)?.username : "Select Owner..."}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -751,7 +769,7 @@ export default function AddNewProjectPage() {
                 <FormField control={siteForm.control} name="workStatus" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Work Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="Yet to Start">Yet to Start</SelectItem>
@@ -768,7 +786,7 @@ export default function AddNewProjectPage() {
                 <FormField control={siteForm.control} name="projectStatus" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Project Status</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl><SelectTrigger className="h-11"><SelectValue /></SelectTrigger></FormControl>
                       <SelectContent>
                         <SelectItem value="open">Open</SelectItem>
@@ -814,12 +832,12 @@ export default function AddNewProjectPage() {
             </div>
             <DialogDescription className="text-xs font-medium leading-relaxed">
               {siteToDelete ? (
-                <>You are about to permanently remove <strong className="text-foreground">{siteToDelete.name}</strong> from the organizational registry.</>
+                <>You are about to permanently remove <strong className="text-foreground">{siteToDelete.name}</strong> from the organizational registry. It will be stored in the Restore bin for 30 days.</>
               ) : (
-                <>You are about to permanently remove <strong className="text-foreground">{selectedIds.length} project sites</strong> from the organizational registry.</>
+                <>You are about to permanently remove <strong className="text-foreground">{selectedIds.length} project sites</strong> from the organizational registry. They will be stored in the Restore bin for 30 days.</>
               )}
               <br/><br/>
-              <span className="text-red-600 font-bold uppercase">This action cannot be undone.</span>
+              <span className="text-red-600 font-bold uppercase">This action cannot be undone immediately.</span>
             </DialogDescription>
           </DialogHeader>
 
@@ -1103,4 +1121,3 @@ export default function AddNewProjectPage() {
     );
   }
 }
-
