@@ -1,9 +1,10 @@
+
 'use client';
 
 import * as React from 'react';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
-import { useCollection, useDoc, useFirestore, useMemoFirebase, useUser, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking, useFirebaseApp } from '@/firebase';
-import { collection, doc, query, where, serverTimestamp, orderBy, or, and, getDoc, increment, arrayUnion, updateDoc } from 'firebase/firestore';
+import { useCollection, useDoc, useMemoFirebase, useUser, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking, setDocumentNonBlocking, useFirebaseApp } from '@/firebase';
+import { collection, doc, query, where, serverTimestamp, orderBy, or, and, getDoc, increment, arrayUnion, updateDoc, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -328,47 +329,6 @@ type LiaisoningRecord = {
 
 const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Pairs", "Drums"];
 
-const MAIN_STAGES = [
-  { id: 'grid_connectivity', label: '1. Grid Connectivity' },
-  { 
-    id: 'estimate_approval', 
-    label: '2. Estimate – Approval Stages', 
-    subStages: [
-      { id: 'ae_je', label: 'Approved from AE/JE' },
-      { id: 'dyee', label: 'Approved from DYEE' },
-      { id: 'ee', label: 'Approved from Executive Engineer' },
-      { id: 'circle_office', label: 'Approved from Circle Office' }
-    ] 
-  },
-  { id: 'estimate_sanction', label: '3. Estimate Sanction' },
-  { id: 'supervision_testing', label: '4. Supervision & Testing Charges' },
-  { id: 'material_inspection', label: '5. Material Inspection' },
-  { 
-    id: 'work_progress', 
-    label: '6. Work Progress',
-    flags: [
-      { id: 'started', label: 'Started' },
-      { id: 'not_started', label: 'Not Started Yet' },
-      { id: 'row', label: 'ROW' }
-    ]
-  },
-  { id: 'wcr', label: '7. Work Completion Report (WCR)' },
-  { id: 'pre_commissioning', label: '8. Pre-Commissioning' },
-  { 
-    id: 'format_ii_approval', 
-    label: '9. Format II – Approval Stages',
-    subStages: [
-      { id: 'eet', label: 'EE Testing (EET)' },
-      { id: 'om', label: 'Superintending Engineer (O&M)' },
-      { id: 'setqa', label: 'SE TQA Approved' }
-    ]
-  },
-  { id: 'ptc', label: '10. Permission to Commission (PTC)' },
-  { id: 'clearance', label: '11. Clearance Certificate / Release Order' },
-  { id: 'commissioning', label: '12. Commissioning' },
-  { id: 'commissioning_certificate', label: '13. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
-];
-
 const formatCapacity = (val: any) => {
   const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
   return isNaN(num) ? "0.000" : num.toFixed(3);
@@ -383,7 +343,7 @@ const getDaysRemaining = (dateStr?: string) => {
 };
 
 const renderDaysBadge = (days: number | null) => {
-  if (days === null) return null;
+  if (days === null) return <span className="text-muted-foreground/30 font-bold">—</span>;
   const isOverdue = days < 0;
   const isCritical = days <= 30;
   return (
@@ -871,15 +831,15 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const handlePOSort = (key: POSortKey) => {
-    setSortConfig(prev => ({
+    setPoSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
   };
 
   const POSortIcon = ({ column, config }: { column: POSortKey, config: any }) => {
-    if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    if (config.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleWOSort = (key: WOSortKey) => {
@@ -890,7 +850,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const WOSortIcon = ({ column }: { column: WOSortKey }) => {
-    if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
     return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
@@ -935,7 +895,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     const item = {
       siteId: projectId,
       siteName: siteName,
-      itemName: itemName,
       make: selectedMasterItem.make || "Standard",
       category: selectedMasterItem.category,
       specification: selectedMasterItem.description || "",
@@ -1152,7 +1111,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       <div className="flex flex-col flex-1 h-full -mt-4 lg:-mt-6">
         <div className="sticky top-0 z-30 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 border-b shadow-sm -mx-4 lg:-mx-6 px-4 lg:px-6 py-4 animate-in fade-in duration-300">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div className="space-y-1 min-w-0">
+            <div className="space-y-1 min-w-0 text-left">
               <Button variant="ghost" size="sm" onClick={() => router.push('/projects/list')} className="h-7 mb-1 -ml-2 text-muted-foreground hover:text-primary transition-colors">
                 <ArrowLeft className="mr-2 h-3.5 w-3.5" /> Back to Projects Management
               </Button>
@@ -1238,7 +1197,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <TabsContent value="dashboard" className="space-y-8 mt-6 animate-in fade-in duration-300">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
-                  <CardHeader className="bg-muted/5 border-b py-4">
+                  <CardHeader className="bg-muted/5 border-b py-4 text-left">
                     <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
                       <Users className="h-4 w-4 text-primary" /> Site Personnel Hierarchy
                     </CardTitle>
@@ -1263,7 +1222,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                   <div className="p-2 bg-background rounded-full border shadow-sm shrink-0">
                                     <User className="h-4 w-4 text-primary" />
                                   </div>
-                                  <div className="flex flex-col">
+                                  <div className="flex flex-col text-left">
                                     <span className="font-black text-sm text-primary uppercase">{project.projectOwnerName}</span>
                                     <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Authority Holder</span>
                                   </div>
@@ -1279,48 +1238,46 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               </TableCell>
                             </TableRow>
                           )}
-                          {siteTeam.length > 0 ? siteTeam.map(member => (
-                            <TableRow key={member.id} className="hover:bg-muted/5 group transition-colors">
-                              <TableCell className="px-6 py-4">
-                                <div className="flex flex-col">
-                                  <span className="font-bold text-sm text-foreground">{member.username}</span>
-                                  <span className="text-[10px] text-muted-foreground uppercase">{member.email}</span>
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                  {(() => {
-                                      const override = siteOverrides?.find(o => o.engineerId === member.id);
-                                      const effectiveManagerId = override ? override.managerId : member.siteManagerId;
-                                      const manager = allUsers?.find(m => m.id === effectiveManagerId);
-                                      
-                                      return (
-                                          <div className="flex flex-col gap-1">
-                                              <Badge variant="outline" className={cn(
-                                                  "rounded-sm text-[9px] font-black uppercase border-primary/20",
-                                                  member.role === 'Site Manager' ? "bg-primary text-white border-none" : "text-primary bg-primary/5"
-                                              )}>
-                                                  {member.role === 'Site Manager' && <UserCog className="h-2.5 w-2.5 mr-1" />}
-                                                  {member.role}
-                                              </Badge>
-                                              <div className="flex flex-col pl-1">
-                                                  <span className="text-[10px] font-bold text-foreground">
-                                                      {manager?.username || (member.role === 'Site Engineer' ? 'Unassigned' : '—')}
-                                                  </span>
-                                                  {override && (
-                                                      <Badge variant="outline" className="w-fit text-[7px] h-3 px-1 mt-0.5 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site Override</Badge>
-                                                  )}
-                                              </div>
-                                          </div>
-                                      );
-                                  })()}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
-                                  {member.assignedProjectIds?.length || 0}
-                                </Badge>
-                              </TableCell>
-                            </TableRow>
-                          )) : !project.projectOwnerName && (
+                          {siteTeam.length > 0 ? siteTeam.map(member => {
+                            const override = siteOverrides?.find(o => o.engineerId === member.id);
+                            const effectiveManagerId = override ? override.managerId : member.siteManagerId;
+                            const manager = allUsers?.find(m => m.id === effectiveManagerId);
+                            
+                            return (
+                              <TableRow key={member.id} className="hover:bg-muted/5 group transition-colors">
+                                <TableCell className="px-6 py-4">
+                                  <div className="flex flex-col text-left">
+                                    <span className="font-bold text-sm text-foreground">{member.username}</span>
+                                    <span className="text-[10px] text-muted-foreground uppercase">{member.email}</span>
+                                  </div>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="flex flex-col gap-1 text-left">
+                                        <Badge variant="outline" className={cn(
+                                            "w-fit rounded-sm text-[9px] font-black uppercase border-primary/20",
+                                            member.role === 'Site Manager' ? "bg-primary text-white border-none" : "text-primary bg-primary/5"
+                                        )}>
+                                            {member.role === 'Site Manager' && <UserCog className="h-2.5 w-2.5 mr-1" />}
+                                            {member.role}
+                                        </Badge>
+                                        <div className="flex flex-col pl-1">
+                                            <span className="text-[10px] font-bold text-foreground">
+                                                {manager?.username || (member.role === 'Site Engineer' ? 'Unassigned' : '—')}
+                                            </span>
+                                            {override && (
+                                                <Badge variant="outline" className="w-fit text-[7px] h-3 px-1 mt-0.5 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site Override</Badge>
+                                            )}
+                                        </div>
+                                    </div>
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
+                                    {member.assignedProjectIds?.length || 0}
+                                  </Badge>
+                                </TableCell>
+                              </TableRow>
+                            );
+                          }) : !project.projectOwnerName && (
                             <TableRow>
                               <TableCell colSpan={3} className="p-20 text-center text-muted-foreground italic text-sm">No personnel currently mapped to this site.</TableCell>
                             </TableRow>
@@ -1333,8 +1290,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
                 <div className="space-y-6">
                   <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
-                    <CardHeader className="py-4 border-b bg-muted/5">
-                      <CardTitle className="text-xs font-bold uppercase tracking-widest uppercase">LIFECYCLE AND SHOW ALL PROJECT DATES</CardTitle>
+                    <CardHeader className="py-4 border-b bg-muted/5 text-left">
+                      <CardTitle className="text-xs font-bold uppercase tracking-widest">LIFECYCLE AND SHOW ALL PROJECT DATES</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-6 text-left">
                       <div className="grid grid-cols-2 gap-4">
@@ -1395,7 +1352,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                   </Card>
 
                   <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
-                    <CardHeader className="py-4 border-b bg-muted/5">
+                    <CardHeader className="py-4 border-b bg-muted/5 text-left">
                       <CardTitle className="text-xs font-bold uppercase tracking-widest">Compliance Health</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-4">
@@ -1543,7 +1500,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
               )}
             </TabsContent>
 
-            <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in duration-300">
+            <TabsContent value="bom" className="space-y-8 mt-6 animate-in fade-in duration-300 text-left">
               {canManageBom && (
                 <Card className="rounded-sm border-primary/10 bg-primary/5 shadow-sm">
                   <CardHeader className="py-2 border-b bg-muted/10">
@@ -1809,11 +1766,11 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                     <Table>
                       <TableHeader className="bg-muted/30">
                         <TableRow>
-                          <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('poNumber')}><div className="flex items-center">PO Number <POSortIcon column="poNumber" config={sortConfig} /></div></TableHead>
-                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('supplier')}><div className="flex items-center">Supplier <POSortIcon column="supplier" config={sortConfig} /></div></TableHead>
-                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('date')}><div className="flex items-center">Date <POSortIcon column="date" config={sortConfig} /></div></TableHead>
-                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}><div className="flex items-center">Status <POSortIcon column="status" config={sortConfig} /></div></TableHead>
-                          <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}><div className="flex items-center justify-end">Total Value <POSortIcon column="total" config={sortConfig} /></div></TableHead>
+                          <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('poNumber')}><div className="flex items-center">PO Number <POSortIcon column="poNumber" config={poSortConfig} /></div></TableHead>
+                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('supplier')}><div className="flex items-center">Supplier <POSortIcon column="supplier" config={poSortConfig} /></div></TableHead>
+                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('date')}><div className="flex items-center">Date <POSortIcon column="date" config={poSortConfig} /></div></TableHead>
+                          <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('status')}><div className="flex items-center">Status <POSortIcon column="status" config={poSortConfig} /></div></TableHead>
+                          <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePOSort('total')}><div className="flex items-center justify-end">Total Value <POSortIcon column="total" config={poSortConfig} /></div></TableHead>
                           <TableHead>Recorded By</TableHead>
                           <TableHead className="text-right px-6">Actions</TableHead>
                         </TableRow>
@@ -2219,7 +2176,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 </div>
                               </TableCell>
                               <TableCell>
-                                <div className="flex flex-col">
+                                <div className="flex flex-col text-left">
                                   <span className="font-bold text-sm text-foreground">{u.itemName}</span>
                                   <span className="text-[10px] font-black uppercase text-muted-foreground tracking-tighter">Inventory Consumption</span>
                                 </div>
@@ -2517,16 +2474,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </Dialog>
 
         <Dialog open={!!editingBomItem} onOpenChange={(o) => !o && setEditingBomItem(null)}>
-          <DialogContent className="rounded-sm max-lg w-full">
+          <DialogContent className="rounded-sm max-lg w-full text-left">
             <DialogHeader><DialogTitle>Edit BoM Entry</DialogTitle></DialogHeader>
             {editingBomItem && (
               <form onSubmit={handleUpdateBoM} className="space-y-4 py-4 text-left">
-                <div className="grid gap-2"><Label>Item Name</Label><Input name="itemName" defaultValue={editingBomItem.itemName} /></div>
+                <div className="grid gap-2 text-left"><Label>Item Name</Label><Input name="itemName" defaultValue={editingBomItem.itemName} /></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2"><Label>Planned Qty</Label><Input name="plannedQty" type="number" defaultValue={editingBomItem.plannedQuantity} /></div>
-                  <div className="grid gap-2"><Label>Unit</Label><Select name="unit" defaultValue={editingBomItem.unit}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
+                  <div className="grid gap-2 text-left"><Label>Planned Qty</Label><Input name="plannedQty" type="number" defaultValue={editingBomItem.plannedQuantity} /></div>
+                  <div className="grid gap-2 text-left"><Label>Unit</Label><Select name="unit" defaultValue={editingBomItem.unit}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{UNITS.map(u => <SelectItem key={u} value={u}>{u}</SelectItem>)}</SelectContent></Select></div>
                 </div>
-                <div className="grid gap-2"><Label>Specification</Label><Textarea name="specification" defaultValue={editingBomItem.specification} /></div>
+                <div className="grid gap-2 text-left"><Label>Specification</Label><Textarea name="specification" defaultValue={editingBomItem.specification} /></div>
                 <DialogFooter className="pt-4">
                   <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
                   <Button type="submit" className="rounded-sm font-bold" disabled={isUpdatingBom}>{isUpdatingBom ? <Loader2 className="animate-spin mr-2 h-4 w-4" /> : 'Update'}</Button>
@@ -2538,12 +2495,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
         <Dialog open={!!viewingBomLog} onOpenChange={(o) => !o && setViewingBomLog(null)}>
           <DialogContent className="rounded-sm max-w-lg">
-            <DialogHeader><DialogTitle>BoM Life-cycle Log</DialogTitle></DialogHeader>
+            <DialogHeader className="text-left"><DialogTitle>BoM Life-cycle Log</DialogTitle></DialogHeader>
             <ScrollArea className="h-[400px] pr-4">
               <div className="space-y-6 relative border-l-2 border-muted ml-3 pl-6 py-2">
                 {viewingBomLog?.auditLog?.map((entry, idx) => (
                   <div key={idx} className="relative">
-                    <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary" />
+                    <div className="absolute -left-[31px] top-1 h-2.5 w-2.5 rounded-full bg-primary ring-4 ring-background" />
                     <div className="flex flex-col gap-1 text-left">
                       <span className="text-xs font-bold text-primary uppercase">{entry.action} — {entry.userName}</span>
                       <p className="text-[10px] text-muted-foreground font-mono">{formatTimestamp(entry.timestamp)}</p>
@@ -2558,7 +2515,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
         <Dialog open={!!viewingPO} onOpenChange={(o) => !o && handleClosePOWO()}>
           <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
-            <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+            <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
               <div className="flex items-center gap-3">
                 <div className="bg-primary/10 p-2 rounded-sm"><ShoppingBag className="h-5 w-5 text-primary" /></div>
                 <div><DialogTitle className="text-xl font-black uppercase tracking-tight">PO Detail Audit</DialogTitle><DialogDescription className="text-xs font-bold text-muted-foreground">{viewingPO?.poNumber}</DialogDescription></div>
@@ -2586,7 +2543,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
         <Dialog open={!!viewingWO} onOpenChange={(o) => !o && handleClosePOWO()}>
           <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-[90vh]">
-            <DialogHeader className="p-6 bg-primary/5 border-b shrink-0">
+            <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
               <div className="flex items-center gap-3">
                 <div className="bg-primary/10 p-2 rounded-sm"><Gavel className="h-5 w-5 text-primary" /></div>
                 <div><DialogTitle className="text-xl font-black uppercase tracking-tight">WO Detail Audit</DialogTitle><DialogDescription className="text-xs font-bold text-muted-foreground">{viewingWO?.woNumber}</DialogDescription></div>
@@ -2615,7 +2572,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
         </Dialog>
 
         <Dialog open={!!viewingPayment} onOpenChange={(o) => !o && setViewingPayment(null)}>
-          <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col">
+          <DialogContent className="max-w-3xl p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col h-fit">
             <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
               <div className="flex items-center gap-3">
                 <div className="bg-primary/10 p-2 rounded-sm"><IndianRupee className="h-5 w-5 text-primary" /></div>
@@ -2645,14 +2602,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
         <AlertDialog open={!!poToDelete} onOpenChange={(o) => !o && setPoToDelete(null)}>
           <AlertDialogContent className="rounded-sm">
-            <AlertDialogHeader><AlertDialogTitle>Delete PO?</AlertDialogTitle><AlertDialogDescription>This will remove purchase order <strong>{poToDelete?.poNumber}</strong> from site records.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogHeader className="text-left"><AlertDialogTitle>Delete PO?</AlertDialogTitle><AlertDialogDescription>This will remove purchase order <strong>{poToDelete?.poNumber}</strong> from site records.</AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter><AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeletePO} className="bg-destructive text-destructive-foreground">Confirm Delete</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
 
         <AlertDialog open={!!woToDelete} onOpenChange={(o) => !o && setWoToDelete(null)}>
           <AlertDialogContent className="rounded-sm">
-            <AlertDialogHeader><AlertDialogTitle>Delete WO?</AlertDialogTitle><AlertDialogDescription>This will remove work order <strong>{woToDelete?.woNumber}</strong> from site records.</AlertDialogDescription></AlertDialogHeader>
+            <AlertDialogHeader className="text-left"><AlertDialogTitle>Delete WO?</AlertDialogTitle><AlertDialogDescription>This will remove work order <strong>{woToDelete?.woNumber}</strong> from site records.</AlertDialogDescription></AlertDialogHeader>
             <AlertDialogFooter><AlertDialogCancel className="rounded-sm">Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteWO} className="bg-destructive text-destructive-foreground">Confirm Delete</AlertDialogAction></AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -2661,7 +2618,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   );
 }
 
-function SummaryCard({ title, value, icon: Icon, color }: { title: string, value: number | string, icon: any, color: string }) {
+function SummaryCard({ title, value, icon: Icon, color, description, isLoading }: { title: string, value: number | string, icon: any, color: string, description?: string, isLoading?: boolean }) {
   const colors = {
     green: "text-green-600 bg-green-50 border-green-100",
     amber: "text-amber-600 bg-amber-50 border-amber-100",
@@ -2675,7 +2632,7 @@ function SummaryCard({ title, value, icon: Icon, color }: { title: string, value
         <CardTitle className="text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</CardTitle>
         <Icon className="h-3.5 sm:h-4 sm:w-4" />
       </CardHeader>
-      <CardContent className="p-3 sm:p-4 pt-0">
+      <CardContent className="p-3 sm:p-4 pt-0 text-left">
         <div className="text-xl sm:text-2xl font-black">{value}</div>
       </CardContent>
     </Card>
