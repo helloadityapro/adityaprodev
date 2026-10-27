@@ -52,7 +52,7 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { useToast } from '@/hooks/use-toast';
 
-type Site = { id: string; name: string; projectCompany: string };
+type Site = { id: string; name: string; projectCompany: string; projectType?: string };
 
 type LiaisoningRecord = {
   id: string;
@@ -96,8 +96,6 @@ export default function LiaisoningRegistryPage() {
 
   const [viewMode, setViewMode] = React.useState<'card' | 'table'>('card');
   const [searchTerm, setSearchTerm] = React.useState("");
-  const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
-  const [siteSearch, setSiteSearch] = React.useState("");
   const [deletingRecordId, setDeletingRecordId] = React.useState<string | null>(null);
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
@@ -110,25 +108,52 @@ export default function LiaisoningRegistryPage() {
   const recordsQuery = useMemoFirebase(() => query(collection(firestore, 'liaisoning_records'), orderBy('updatedAt', 'desc')), [firestore]);
   const { data: records, isLoading: recordsLoading } = useCollection<LiaisoningRecord>(recordsQuery);
 
-  const filteredRecords = React.useMemo(() => {
-    if (!records) return [];
-    return records.filter(r => 
+  // Merge all groundmount sites with existing liaisoning records
+  const mergedRecords = React.useMemo(() => {
+    if (!allSites || !records) return [];
+    
+    // 1. Filter for all Groundmount sites
+    const gmSites = allSites.filter(s => s.projectType === 'groundmount');
+    
+    // 2. Map each site to its record or a virtual placeholder
+    const mapped = gmSites.map(site => {
+      const existing = records.find(r => r.siteId === site.id || r.id === site.id);
+      if (existing) return existing;
+      
+      return {
+        id: site.id,
+        siteId: site.id,
+        siteName: site.name,
+        completionPercentage: 0,
+        status: 'Yet to Start',
+        updatedAt: null,
+        stages: {}
+      } as LiaisoningRecord;
+    });
+
+    // 3. Filter by search term
+    return mapped.filter(r => 
       r.siteName.toLowerCase().includes(searchTerm.toLowerCase()) ||
       r.status.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (r.contractorName || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [records, searchTerm]);
+  }, [allSites, records, searchTerm]);
 
-  const accessibleSites = React.useMemo(() => {
-    if (!allSites) return [];
-    return [...allSites].sort((a, b) => a.name.localeCompare(b.name));
-  }, [allSites]);
+  // Final sorted list for display: Most recently updated records first, then new sites
+  const displayRecords = React.useMemo(() => {
+    return [...mergedRecords].sort((a, b) => {
+      const da = a.updatedAt?.toDate?.()?.getTime() || 0;
+      const db = b.updatedAt?.toDate?.()?.getTime() || 0;
+      if (db !== da) return db - da;
+      return a.siteName.localeCompare(b.siteName);
+    });
+  }, [mergedRecords]);
 
   const handleDelete = async () => {
     if (!deletingRecordId) return;
     try {
       await deleteDocumentNonBlocking(doc(firestore, 'liaisoning_records', deletingRecordId));
-      toast({ title: 'Record Removed', description: 'The site tracker has been deleted.' });
+      toast({ title: 'Record Removed', description: 'The site tracker has been deleted. The project remains in the groundmount list.' });
       setDeletingRecordId(null);
     } catch (e: any) {
       toast({ variant: 'destructive', title: 'Delete Failed', description: e.message });
@@ -153,35 +178,10 @@ export default function LiaisoningRegistryPage() {
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <Popover open={isSitePopoverOpen} onOpenChange={setIsSitePopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest shadow-lg px-8">
-                  <Plus className="mr-2 h-4 w-4" /> Start New Site
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-[300px] p-0" align="start">
-                <div className="bg-primary/5 p-3 border-b">
-                  <h3 className="text-[10px] font-black uppercase tracking-widest text-primary">Select Project Site</h3>
-                </div>
-                <div className="flex items-center border-b px-3">
-                  <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                  <Input placeholder="Search sites..." className="h-10 border-none focus-visible:ring-0" value={siteSearch} onChange={e => setSiteSearch(e.target.value)} />
-                </div>
-                <ScrollArea className="h-[250px]">
-                  <div className="p-1">
-                    {accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearch.toLowerCase())).map(site => (
-                      <Button key={site.id} variant="ghost" className="w-full justify-start h-auto py-3 px-4 mb-0.5 text-xs text-left" onClick={() => router.push(`/liaisoning/manage/${site.id}`)}>
-                        <div className="flex flex-col items-start min-w-0">
-                          <span className="font-bold truncate w-full uppercase tracking-tight">{site.name}</span>
-                          <span className="text-[9px] text-muted-foreground uppercase opacity-60">{site.projectCompany}</span>
-                        </div>
-                      </Button>
-                    ))}
-                  </div>
-                </ScrollArea>
-              </PopoverContent>
-            </Popover>
+          <div className="flex items-center gap-3">
+             <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary bg-primary/5">
+                Monitoring {displayRecords.length} Groundmount Projects
+             </Badge>
           </div>
         </div>
       </div>
@@ -217,9 +217,6 @@ export default function LiaisoningRegistryPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary bg-primary/5">
-            {filteredRecords.length} Active Records
-          </Badge>
           <Button variant="ghost" size="icon" onClick={() => setSearchTerm("")} className="h-10 w-10 text-muted-foreground rounded-sm">
             <FilterX className="h-4 w-4" />
           </Button>
@@ -228,9 +225,10 @@ export default function LiaisoningRegistryPage() {
 
       {viewMode === 'card' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredRecords.length > 0 ? filteredRecords.map(record => {
+          {displayRecords.length > 0 ? displayRecords.map(record => {
             const nextStageKey = STAGE_ORDER.find(key => record.stages?.[key]?.status !== 'Completed');
             const nextMilestoneLabel = nextStageKey ? STAGE_LABELS[nextStageKey] : 'All Completed';
+            const isInitialized = record.updatedAt !== null;
 
             return (
               <Card key={record.id} className="group hover:shadow-xl transition-all duration-300 rounded-sm border-primary/10 overflow-hidden flex flex-col cursor-pointer" onClick={() => router.push(`/liaisoning/manage/${record.siteId}`)}>
@@ -245,7 +243,8 @@ export default function LiaisoningRegistryPage() {
                       </div>
                       <Badge variant="outline" className={cn(
                         "rounded-sm font-black uppercase text-[8px] h-5 px-1.5 border-primary/20",
-                        record.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" : "bg-primary/5 text-primary"
+                        record.status === 'Completed' ? "bg-green-50 text-green-700 border-green-200" : 
+                        isInitialized ? "bg-primary/5 text-primary" : "bg-muted text-muted-foreground opacity-50"
                       )}>
                         {record.status}
                       </Badge>
@@ -278,7 +277,7 @@ export default function LiaisoningRegistryPage() {
                       <div className="flex items-center gap-3">
                          <div className="bg-primary/10 p-2 rounded-sm"><Activity className="h-4 w-4 text-primary" /></div>
                          <div className="flex flex-col min-w-0">
-                            <span className="text-[8px] font-black text-muted-foreground uppercase">Pending Stage</span>
+                            <span className="text-[8px] font-black text-muted-foreground uppercase">Target Stage</span>
                             <span className="text-[10px] font-bold uppercase leading-tight line-clamp-2">
                               {nextMilestoneLabel}
                             </span>
@@ -287,14 +286,14 @@ export default function LiaisoningRegistryPage() {
                       <div className="flex items-center gap-3">
                          <div className="bg-primary/10 p-2 rounded-sm"><Clock className="h-4 w-4 text-primary" /></div>
                          <div className="flex flex-col">
-                            <span className="text-[8px] font-black text-muted-foreground uppercase">Activity Date</span>
-                            <span className="text-[10px] font-bold uppercase">{record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM') : '—'}</span>
+                            <span className="text-[8px] font-black text-muted-foreground uppercase">Activity</span>
+                            <span className="text-[10px] font-bold uppercase">{record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM') : 'No History'}</span>
                          </div>
                       </div>
                    </div>
                 </CardContent>
                 <CardFooter className="bg-muted/10 border-t p-3 flex justify-between items-center">
-                   {isAdmin && (
+                   {isAdmin && isInitialized && (
                      <Button 
                       variant="ghost" 
                       size="icon" 
@@ -305,7 +304,7 @@ export default function LiaisoningRegistryPage() {
                      </Button>
                    )}
                    <Button variant="ghost" size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase tracking-widest group-hover:bg-primary group-hover:text-white transition-all ml-auto">
-                      Details <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
+                      Manage <ChevronRight className="h-3.5 w-3.5 ml-1.5" />
                    </Button>
                 </CardFooter>
               </Card>
@@ -313,7 +312,7 @@ export default function LiaisoningRegistryPage() {
           }) : (
             <div className="col-span-full py-32 flex flex-col items-center justify-center text-center gap-4 bg-muted/5 border-2 border-dashed rounded-sm opacity-40">
                <PlugZap className="h-16 w-16 text-muted-foreground/30" />
-               <p className="text-sm font-bold uppercase tracking-widest">No active trackers found</p>
+               <p className="text-sm font-bold uppercase tracking-widest">No groundmount projects in registry</p>
             </div>
           )}
         </div>
@@ -332,9 +331,10 @@ export default function LiaisoningRegistryPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredRecords.length > 0 ? filteredRecords.map(record => {
+                {displayRecords.length > 0 ? displayRecords.map(record => {
                   const nextStageKey = STAGE_ORDER.find(key => record.stages?.[key]?.status !== 'Completed');
                   const nextMilestoneLabel = nextStageKey ? STAGE_LABELS[nextStageKey] : 'All Completed';
+                  const isInitialized = record.updatedAt !== null;
 
                   return (
                     <TableRow key={record.id} className="hover:bg-muted/5 cursor-pointer group" onClick={() => router.push(`/liaisoning/manage/${record.siteId}`)}>
@@ -366,11 +366,11 @@ export default function LiaisoningRegistryPage() {
                         ) : '—'}
                       </TableCell>
                       <TableCell className="font-mono text-[10px] font-bold text-muted-foreground">
-                        {record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM yyyy') : '—'}
+                        {record.updatedAt ? format(record.updatedAt.toDate(), 'dd MMM yyyy') : 'No History'}
                       </TableCell>
                       <TableCell className="text-right px-6" onClick={e => e.stopPropagation()}>
                         <div className="flex justify-end gap-1">
-                          {isAdmin && (
+                          {isAdmin && isInitialized && (
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDeletingRecordId(record.id)}>
                               <Trash2 className="h-4 w-4" />
                             </Button>
