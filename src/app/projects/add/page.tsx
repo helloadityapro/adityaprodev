@@ -88,6 +88,11 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { format } from 'date-fns';
 
+const formatCapacity = (val: any) => {
+  const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
+  return isNaN(num) ? "0.000" : num.toFixed(3);
+};
+
 const siteSchema = z.object({
   name: z.string().min(1, 'Site name is required.'),
   projectCompany: z.string().min(1, 'Project company is required.'),
@@ -532,7 +537,7 @@ export default function AddNewProjectPage() {
                         <Popover open={isOwnerPopoverOpen} onOpenChange={setIsOwnerPopoverOpen}>
                           <PopoverTrigger asChild>
                             <FormControl>
-                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11", !field.value && "text-muted-foreground")}>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                                 {field.value ? allPersonnel?.find(u => u.id === field.value)?.username : "Select Owner..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -1018,11 +1023,11 @@ export default function AddNewProjectPage() {
                   {filteredSitesList.length > 0 ? (
                     filteredSitesList.map((site) => {
                       return (
-                        <TableRow key={site.id} className={cn("hover:bg-muted/5 transition-colors group", selectedIds.includes(site.id) && "bg-primary/[0.02]")}>
+                        <TableRow key={site.id} className={cn("hover:bg-muted/5 transition-colors group", selectedIds.includes(site.id) && "bg-primary/[0.03]")}>
                           <TableCell className="text-center">
                             <Checkbox 
                               checked={selectedIds.includes(site.id)} 
-                              onCheckedChange={() => setSelectedIds(prev => prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, site.id])}
+                              onCheckedChange={() => setSelectedIds(prev => prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, id])}
                             />
                           </TableCell>
                           <TableCell className="py-4 text-left">
@@ -1098,3 +1103,4 @@ export default function AddNewProjectPage() {
     );
   }
 }
+
