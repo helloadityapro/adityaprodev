@@ -69,7 +69,8 @@ import {
   PlugZap,
   ShieldAlert,
   FileCheck,
-  Upload
+  Upload,
+  LayoutGrid
 } from 'lucide-react';
 import { format, parseISO, differenceInMinutes, endOfDay, isValid, differenceInDays, startOfDay } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -299,7 +300,6 @@ type WOSortKey = 'woNumber' | 'contractor' | 'status' | 'date' | 'total';
 type BoMSortKey = 'itemName' | 'category' | 'make' | 'status' | 'plannedQuantity' | 'approvedQuantity';
 type PaymentSortKey = 'date' | 'payee' | 'amount' | 'reference';
 
-// Liaisoning Types
 type LiaisoningDocument = {
   url: string;
   name: string;
@@ -469,7 +469,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [paymentSortConfig, setPaymentSortConfig] = React.useState<{ key: PaymentSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [viewingPayment, setViewingPayment] = React.useState<Payment | null>(null);
 
-  // Liaisoning State
   const [activeStageId, setActiveStageId] = React.useState<string>('grid_connectivity');
   const [uploadingStageId, setUploadingStageId] = React.useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = React.useState(0);
@@ -690,7 +689,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   );
   const { data: visits } = useCollection(visitQuery);
 
-  // Liaisoning Data Fetch
   const liaisonRef = useMemoFirebase(() => doc(firestore, 'liaisoning_records', projectId), [firestore, projectId]);
   const { data: liaisonRecord } = useDoc<LiaisoningRecord>(liaisonRef);
 
@@ -789,7 +787,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     return result;
   }, [workOrders, woSearch, woSortConfig]);
 
-  // Liaisoning Handlers
   const handleLiaisonInitialize = async () => {
     if (!project) return;
     const initialStages: Record<string, StageData> = {};
@@ -873,7 +870,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     } catch (e: any) { toast({ variant: 'destructive', title: 'Assignment Failed', description: e.message }); }
   };
 
-  // Other Tab Handlers
   const handlePOSort = (key: POSortKey) => {
     setSortConfig(prev => ({
       key,
@@ -881,9 +877,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }));
   };
 
-  const POSortIcon = ({ column }: { column: POSortKey }) => {
+  const POSortIcon = ({ column, config }: { column: POSortKey, config: any }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleWOSort = (key: WOSortKey) => {
@@ -893,7 +889,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }));
   };
 
-  const WOSortIcon = ({ column }: { column: SortKey }) => {
+  const WOSortIcon = ({ column }: { column: WOSortKey }) => {
     if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
@@ -1260,7 +1256,6 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {/* Project Owner Row */}
                           {project.projectOwnerName && (
                             <TableRow className="bg-primary/[0.03] hover:bg-primary/[0.05] transition-colors border-b-2">
                               <TableCell className="px-6 py-4">
@@ -1339,9 +1334,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <div className="space-y-6">
                   <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
                     <CardHeader className="py-4 border-b bg-muted/5">
-                      <CardTitle className="text-xs font-bold uppercase tracking-widest">LIFECYCLE AND SHOW ALL PROJECT DATES</CardTitle>
+                      <CardTitle className="text-xs font-bold uppercase tracking-widest uppercase">LIFECYCLE AND SHOW ALL PROJECT DATES</CardTitle>
                     </CardHeader>
-                    <CardContent className="pt-6 space-y-6">
+                    <CardContent className="pt-6 space-y-6 text-left">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-1">
                           <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest px-1">Work Status</Label>
@@ -1426,7 +1421,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 </div>
               ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 pb-20">
-                  <Card className="lg:col-span-4 rounded-sm border-primary/10 shadow-md h-fit overflow-hidden">
+                  <Card className="lg:col-span-4 rounded-sm border-primary/10 shadow-md h-fit overflow-hidden text-left">
                     <CardHeader className="bg-muted/5 border-b py-4">
                       <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
                         <LayoutGrid className="h-3.5 w-3.5 text-primary" /> Approval Milestones
@@ -1462,7 +1457,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                   </Card>
 
                   <div className="lg:col-span-8 space-y-6">
-                    <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden h-full flex flex-col">
+                    <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden h-full flex flex-col text-left">
                       <CardHeader className="bg-primary/5 border-b p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
                         <div className="space-y-1">
                           <CardTitle className="text-xl font-black uppercase tracking-tight text-foreground">{MAIN_STAGES.find(s => s.id === activeStageId)?.label}</CardTitle>
@@ -1641,7 +1636,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 {selectedMasterItem.unit === 'Sets' && selectedMasterItem.subItems && selectedMasterItem.subItems.length > 0 ? (
                                   <>
                                     <p className="text-[9px] font-black text-primary uppercase mb-1">Set Composition:</p>
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1 text-left">
                                       {selectedMasterItem.subItems.map((sub, idx) => (
                                         <div key={idx} className="flex items-center justify-between text-[10px] font-medium border-b border-border/20 pb-0.5">
                                           <span className="truncate mr-2">{sub.name}</span>
@@ -1739,7 +1734,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                       {expandedBomRows.has(item.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                                     </Button>
                                   )}
-                                  <div className="flex flex-col min-w-0">
+                                  <div className="flex flex-col min-w-0 text-left">
                                     <span className="font-bold text-sm text-foreground">{item.itemName}</span>
                                     <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{item.specification}</span>
                                   </div>
@@ -1788,7 +1783,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             {expandedBomRows.has(item.id) && item.subItems && (
                               <TableRow className="bg-primary/[0.02]">
                                 <TableCell colSpan={7} className="p-0 border-b">
-                                  <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Component Breakdown for {item.itemName}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{item.subItems.map((sub, sIdx) => (<div key={sIdx} className="p-3 bg-background border border-primary/5 rounded-sm flex flex-col gap-1"><span className="text-xs font-bold">{sub.name}</span><div className="flex items-center justify-between text-[10px]"><span className="text-muted-foreground uppercase font-medium">Per Set: {sub.quantityPerSet} {sub.unit}</span><span className="text-primary font-black uppercase">Total: {(sub.quantityPerSet * (item.approvedQuantity || item.plannedQuantity)).toFixed(2)} {sub.unit}</span></div></div>))}</div></div>
+                                  <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200 text-left"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Component Breakdown for {item.itemName}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{item.subItems.map((sub, sIdx) => (<div key={sIdx} className="p-3 bg-background border border-primary/5 rounded-sm flex flex-col gap-1"><span className="text-xs font-bold">{sub.name}</span><div className="flex items-center justify-between text-[10px]"><span className="text-muted-foreground uppercase font-medium">Per Set: {sub.quantityPerSet} {sub.unit}</span><span className="text-primary font-black uppercase">Total: {(sub.quantityPerSet * (item.approvedQuantity || item.plannedQuantity)).toFixed(2)} {sub.unit}</span></div></div>))}</div></div>
                                 </TableCell>
                               </TableRow>
                             )}
@@ -1828,7 +1823,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <React.Fragment key={po.id}>
                             <TableRow className="hover:bg-muted/5 transition-colors">
                               <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); togglePORow(po.id); }}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
-                              <TableCell className="text-sm font-semibold text-foreground">{po.supplierName}</TableCell>
+                              <TableCell className="text-sm font-semibold text-foreground text-left">{po.supplierName}</TableCell>
                               <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                               <TableCell>
                                 <div className="flex flex-col gap-1">
@@ -1845,7 +1840,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                     </span>
                                   )}
                                   {po.updatedAt && po.updatedByName && (
-                                    <span className="text-[8px] font-medium text-muted-foreground/60 leading-tight">
+                                    <span className="text-[8px] font-medium text-muted-foreground/60 leading-tight text-left">
                                       Last Edited: {formatTimestamp(po.updatedAt)} by {po.updatedByName}
                                     </span>
                                   )}
@@ -1873,7 +1868,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 {(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/procurement/${po.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setPoToDelete(po)}><Trash2 className="h-4 w-4" /></Button></>)}
                               </div></TableCell>
                             </TableRow>
-                            {expandedPORows.has(po.id) && po.items && (<TableRow className="bg-muted/30"><TableCell colSpan={7} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Breakdown for {po.poNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{po.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.itemName}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
+                            {expandedPORows.has(po.id) && po.items && (<TableRow className="bg-muted/30"><TableCell colSpan={7} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200 text-left"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Breakdown for {po.poNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{po.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.itemName}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Subtotal</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                           </React.Fragment>
                         )) : (
                           <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic text-xs">No POs found.</TableCell></TableRow>
@@ -1910,7 +1905,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <React.Fragment key={wo.id}>
                             <TableRow className="hover:bg-muted/5 transition-colors">
                               <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => toggleWORow(wo.id)}>{expandedWORows.has(wo.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span></div></TableCell>
-                              <TableCell className="text-sm font-semibold text-foreground">{wo.contractorName}</TableCell>
+                              <TableCell className="text-sm font-semibold text-foreground text-left">{wo.contractorName}</TableCell>
                               <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
                               <TableCell>
                                 <div className="flex flex-col gap-1">
@@ -1927,7 +1922,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                     </span>
                                   )}
                                   {wo.updatedAt && wo.updatedByName && (
-                                    <span className="text-[8px] font-medium text-muted-foreground/60 leading-tight">
+                                    <span className="text-[8px] font-medium text-muted-foreground/60 leading-tight text-left">
                                       Last Edited: {formatTimestamp(wo.updatedAt)} by {wo.updatedByName}
                                     </span>
                                   )}
@@ -1955,7 +1950,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 {(isAdmin || isManager) && (<><Button variant="ghost" size="icon" className="h-8 w-8 text-slate-600 rounded-sm" asChild><Link href={`/projects/${projectId}/work-orders/${wo.id}/edit`}><Pencil className="h-4 w-4" /></Link></Button><Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setWoToDelete(wo)}><Trash2 className="h-4 w-4" /></Button></>)}
                               </div></TableCell>
                             </TableRow>
-                            {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={7} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
+                            {expandedWORows.has(wo.id) && wo.items && wo.items.length > 0 && (<TableRow className="bg-muted/30"><TableCell colSpan={7} className="p-0"><div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200 text-left"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Service Breakdown for {wo.woNumber}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{wo.items.map((item, iIdx) => (<div key={iIdx} className="p-3 bg-background border border-primary/10 rounded-sm space-y-2 shadow-sm"><div className="flex justify-between items-start"><span className="text-xs font-black text-foreground">{item.description}</span><Badge variant="outline" className="h-4 px-1 text-[8px] font-black uppercase">Tax {item.gstPercent}%</Badge></div><div className="grid grid-cols-2 gap-2 border-t pt-2"><div className="flex flex-col"><span className="text-muted-foreground uppercase font-bold text-[8px]">Qty x Rate</span><span className="font-mono font-bold text-[10px]">{item.quantity} x ₹{item.rate.toLocaleString('en-IN')}</span></div><div className="flex flex-col text-right"><span className="text-muted-foreground uppercase font-bold text-[8px]">Amount</span><span className="text-primary font-black text-[10px]">₹{item.amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></div></div></div>))}</div></div></TableCell></TableRow>)}
                           </React.Fragment>
                         )) : (
                           <TableRow><TableCell colSpan={7} className="h-32 text-center text-muted-foreground italic text-xs">No work orders found.</TableCell></TableRow>
@@ -2007,12 +2002,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableBody>
                         {filteredSortedPayments.length > 0 ? filteredSortedPayments.map(p => (
                           <TableRow key={p.id} className="hover:bg-muted/5 transition-colors">
-                            <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">
+                            <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground uppercase">
                               {p.date ? format(p.date.toDate(), 'dd MMM yy HH:mm') : '—'}
                             </TableCell>
-                            <TableCell className="text-sm font-bold text-foreground">{p.payeeName}</TableCell>
+                            <TableCell className="text-sm font-bold text-foreground text-left">{p.payeeName}</TableCell>
                             <TableCell>
-                              <div className="flex flex-col">
+                              <div className="flex flex-col text-left">
                                 <span className="font-mono text-xs font-black text-primary uppercase">{p.referenceNumber}</span>
                                 <span className="text-[8px] font-bold text-muted-foreground uppercase">{p.paymentAgainst}</span>
                               </div>
@@ -2040,7 +2035,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </TabsContent>
 
             <TabsContent value="inventory" className="space-y-8 mt-6 animate-in fade-in duration-300">
-              <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+              <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden text-left">
                 <CardHeader className="bg-muted/5 border-b py-4">
                   <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> On-Site Inventory Registry</CardTitle>
                 </CardHeader>
@@ -2070,9 +2065,14 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                             <React.Fragment key={invRecord.id}>
                               <TableRow className="hover:bg-muted/5 transition-colors group">
                                 <TableCell className="px-6 py-4">
-                                  <div className="flex flex-col gap-0.5">
-                                    <span className="font-bold text-sm text-foreground">{invRecord.itemName}</span>
-                                    <span className="text-[10px] text-muted-foreground line-clamp-1">{bomItem?.specification || 'Site Allocated Asset'}</span>
+                                  <div className="flex items-center gap-2">
+                                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => toggleInvRow(invRecord.id)}>
+                                      {expandedInvRows.has(invRecord.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                    </Button>
+                                    <div className="flex flex-col gap-0.5">
+                                      <span className="font-bold text-sm text-foreground">{invRecord.itemName}</span>
+                                      <span className="text-[10px] text-muted-foreground line-clamp-1">{bomItem?.specification || 'Site Allocated Asset'}</span>
+                                    </div>
                                   </div>
                                 </TableCell>
                                 <TableCell>
@@ -2107,7 +2107,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               {expandedInvRows.has(invRecord.id) && (
                                 <TableRow className="bg-primary/[0.01]">
                                   <TableCell colSpan={6} className="p-0 border-b">
-                                    <div className="p-6 px-12 animate-in slide-in-from-top-1 duration-200 space-y-8">
+                                    <div className="p-6 px-12 animate-in slide-in-from-top-1 duration-200 space-y-8 text-left">
                                       <div className="space-y-4">
                                         <div className="flex items-center gap-2 mb-2">
                                           <History className="h-3.5 w-3.5 text-primary" />
@@ -2186,7 +2186,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </TabsContent>
 
             <TabsContent value="utilisation" className="mt-6 animate-in fade-in duration-300">
-              <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden">
+              <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden text-left">
                 <CardHeader className="bg-muted/5 border-b py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -2212,7 +2212,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         <TableBody>
                           {filteredUtilisations.map((u: any) => (
                             <TableRow key={u.id} className="hover:bg-muted/5 transition-colors">
-                              <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
+                              <TableCell className="px-6 py-4 font-mono text-xs font-bold text-muted-foreground uppercase whitespace-nowrap">
                                 <div className="flex items-center gap-1.5">
                                   <Calendar className="h-3 w-3" />
                                   {u.utilisationDate}
@@ -2230,7 +2230,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                 </Badge>
                               </TableCell>
                               <TableCell>
-                                <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase">
+                                <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase text-left">
                                   <User className="h-3 w-3 text-primary" />
                                   {u.userName}
                                 </div>
@@ -2254,7 +2254,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </TabsContent>
 
             <TabsContent value="movements" className="mt-6 animate-in fade-in duration-300">
-              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md text-left">
                 <CardHeader className="bg-muted/5 border-b py-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -2279,13 +2279,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableBody>
                         {movements.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((mov: any) => (
                           <TableRow key={mov.id} className="hover:bg-muted/5">
-                            <TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap">{mov.movementDate}</TableCell>
+                            <TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap uppercase">{mov.movementDate}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5", mov.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
                                 {mov.movementType}
                               </Badge>
                             </TableCell>
-                            <TableCell className="text-sm font-semibold">{mov.itemName}</TableCell>
+                            <TableCell className="text-sm font-semibold text-left">{mov.itemName}</TableCell>
                             <TableCell className="text-center text-xs font-bold text-primary">{mov.quantity} {mov.unit}</TableCell>
                             <TableCell className="text-right px-6 text-[10px] font-bold text-muted-foreground uppercase">{mov.sourceOrDestination}</TableCell>
                           </TableRow>
@@ -2300,7 +2300,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </TabsContent>
 
             <TabsContent value="ptw" className="mt-6 animate-in fade-in duration-300 transition-all">
-              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md text-left">
                 <CardContent className="p-0">
                   {permits && permits.length > 0 ? (
                     <Table>
@@ -2316,9 +2316,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableBody>
                         {permits.sort((a: any, b: any) => (b.requestDate?.toDate?.() || 0) - (a.requestDate?.toDate?.() || 0)).map((permit: any) => (
                           <TableRow key={permit.id} className="hover:bg-muted/5">
-                            <TableCell className="px-6 py-4 font-mono text-xs font-bold text-primary">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
-                            <TableCell className="text-sm font-semibold">{permit.ptwType}</TableCell>
-                            <TableCell className="text-xs font-medium">{permit.siteEngineerName || '—'}</TableCell>
+                            <TableCell className="px-6 py-4 font-mono text-xs font-bold text-primary uppercase">{permit.serialNumber || permit.id.slice(0, 8)}</TableCell>
+                            <TableCell className="text-sm font-semibold text-left">{permit.ptwType}</TableCell>
+                            <TableCell className="text-xs font-medium text-left">{permit.siteEngineerName || '—'}</TableCell>
                             <TableCell>
                               <Badge variant="outline" className={cn("text-[9px] font-black uppercase rounded-sm h-5 px-1.5", permit.status === 'Approved' ? "bg-green-50 text-green-700 border-green-200" : permit.status === 'Rejected' ? "bg-red-50 text-red-700 border-red-200" : permit.status === 'Pending' ? "bg-yellow-50 text-yellow-700 border-yellow-200" : permit.status === 'ManagerApproved' ? "bg-blue-50 text-blue-700 border-blue-200" : "bg-muted text-muted-foreground")}>{permit.status}</Badge>
                             </TableCell>
@@ -2335,7 +2335,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </TabsContent>
 
             <TabsContent value="dpr" className="mt-6 animate-in fade-in duration-300 transition-all">
-              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md text-left">
                 <CardContent className="p-0">
                   {dprs && dprs.length > 0 ? (
                     <Table>
@@ -2348,7 +2348,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       </TableHeader>
                       <TableBody>
                         {dprs.sort((a: any, b: any) => new Date(b.reportDate).getTime() - new Date(a.reportDate).getTime()).map((dpr: any) => (
-                          <TableRow key={dpr.id} className="hover:bg-muted/5"><TableCell className="px-6 py-4 font-mono text-xs font-bold">{dpr.reportDate}</TableCell><TableCell className="text-xs font-semibold">{dpr.userName}</TableCell><TableCell className="py-4"><div className="text-sm italic text-muted-foreground">"{dpr.description}"</div></TableCell></TableRow>
+                          <TableRow key={dpr.id} className="hover:bg-muted/5"><TableCell className="px-6 py-4 font-mono text-xs font-bold uppercase">{dpr.reportDate}</TableCell><TableCell className="text-xs font-semibold">{dpr.userName}</TableCell><TableCell className="py-4"><div className="text-sm italic text-muted-foreground">"{dpr.description}"</div></TableCell></TableRow>
                         ))}
                       </TableBody>
                     </Table>
@@ -2360,7 +2360,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </TabsContent>
 
             <TabsContent value="tasks" className="mt-6 animate-in fade-in duration-300 transition-all">
-              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md text-left">
                 <CardContent className="p-0">
                   {tasks && tasks.length > 0 ? (
                     <Table>
@@ -2375,10 +2375,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableBody>
                         {tasks.map((task: any) => (
                           <TableRow key={task.id} className="hover:bg-muted/5">
-                            <TableCell className="px-6 py-4 font-bold text-sm">{task.title}</TableCell>
-                            <TableCell className="text-xs font-medium">{task.assignedToName}</TableCell>
+                            <TableCell className="px-6 py-4 font-bold text-sm text-left">{task.title}</TableCell>
+                            <TableCell className="text-xs font-medium text-left">{task.assignedToName}</TableCell>
                             <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{task.status}</Badge></TableCell>
-                            <TableCell className="text-right px-6 text-[10px] font-mono font-black text-muted-foreground">{task.dueDate}</TableCell>
+                            <TableCell className="text-right px-6 text-[10px] font-mono font-black text-muted-foreground uppercase">{task.dueDate}</TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -2391,7 +2391,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             </TabsContent>
 
             <TabsContent value="visits" className="mt-6 animate-in fade-in duration-300 transition-all">
-              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md">
+              <Card className="rounded-sm overflow-hidden border-primary/10 shadow-md text-left">
                 <CardContent className="p-0">
                   {visits && visits.length > 0 ? (
                     <Table>
@@ -2406,8 +2406,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableBody>
                         {visits.map((visit: any) => (
                           <TableRow key={visit.id} className="hover:bg-muted/5 group">
-                            <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground">{formatTimestamp(visit.startTime)}</TableCell>
-                            <TableCell className="text-sm font-bold text-foreground">{visit.managerName}</TableCell>
+                            <TableCell className="px-6 py-4 font-mono text-[10px] font-bold text-muted-foreground uppercase">{formatTimestamp(visit.startTime)}</TableCell>
+                            <TableCell className="text-sm font-bold text-foreground text-left">{visit.managerName}</TableCell>
                             <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm">{visit.purpose || '—'}</Badge></TableCell>
                             <TableCell className="text-right px-6"><Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/site-visits/${visit.id}`}><ChevronRight className="h-4 w-4" /></Link></Button></TableCell>
                           </TableRow>
