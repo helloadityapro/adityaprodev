@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -423,28 +422,6 @@ const renderDaysBadge = (days: number | null) => {
     )}>
       {isOverdue ? `Overdue ${Math.abs(days)}d` : `${days}d Left`}
     </Badge>
-  );
-};
-
-const formatTimestamp = (ts: any) => {
-  if (!ts) return '—';
-  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
-  return format(date, 'dd MMM yy HH:mm');
-};
-
-const StatRow = ({ label, value, unit = "", color }: { label: string, value: number | string, unit?: string, color: string }) => {
-  const colors = {
-    green: "text-green-600 bg-green-50 border-green-100",
-    amber: "text-amber-600 bg-amber-50 border-amber-100",
-    blue: "text-blue-600 bg-blue-50 border-blue-100",
-    primary: "text-primary bg-primary/5 border-primary/10",
-    emerald: "text-emerald-600 bg-emerald-50 border-emerald-100"
-  };
-  return (
-    <div className={cn("flex items-center justify-between p-3 rounded-sm border", (colors as any)[color])}>
-      <span className="text-[10px] font-black uppercase tracking-wider">{label}</span>
-      <span className="text-lg font-black">{value}{unit}</span>
-    </div>
   );
 };
 
@@ -901,7 +878,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const handlePOSort = (key: POSortKey) => {
-    setSortConfig(prev => ({
+    setPoSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
@@ -943,9 +920,9 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     }));
   };
 
-  const PaymentSortIcon = ({ column }: { column: PaymentSortKey }) => {
-    if (paymentSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return paymentSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  const PaymentSortIcon = ({ column, config }: { column: PaymentSortKey, config: any }) => {
+    if (config.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   const handleAddBoM = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -1118,6 +1095,13 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const togglePORow = (id: string) => {
+    const newSet = new Set(expandedPORows);
+    if (newSet.has(id)) newSet.delete(id);
+    else newSet.add(id);
+    setExpandedPORows(newSet);
+  };
+
+  const toggleRow = (id: string) => {
     const newSet = new Set(expandedPORows);
     if (newSet.has(id)) newSet.delete(id);
     else newSet.add(id);
@@ -1436,10 +1420,22 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <CardTitle className="text-xs font-bold uppercase tracking-widest">Compliance Health</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-4">
-                      <StatRow label="Liaisoning Progress" value={liaisonRecord?.completionPercentage || 0} unit="%" color="emerald" />
-                      <StatRow label="Approved Permits" value={permits?.filter((p: any) => p.status === 'Approved').length || 0} color="green" />
-                      <StatRow label="Pending Audits" value={permits?.filter((p: any) => p.status === 'Pending' || p.status === 'ManagerApproved').length || 0} color="amber" />
-                      <StatRow label="Ongoing Work" value={tasks?.filter((t: any) => t.status !== 'Completed').length || 0} color="blue" />
+                      <div className={cn("flex items-center justify-between p-3 rounded-sm border text-emerald-600 bg-emerald-50 border-emerald-100")}>
+                        <span className="text-[10px] font-black uppercase tracking-wider">Liaisoning Progress</span>
+                        <span className="text-lg font-black">{liaisonRecord?.completionPercentage || 0}%</span>
+                      </div>
+                      <div className={cn("flex items-center justify-between p-3 rounded-sm border text-green-600 bg-green-50 border-green-100")}>
+                        <span className="text-[10px] font-black uppercase tracking-wider">Approved Permits</span>
+                        <span className="text-lg font-black">{permits?.filter((p: any) => p.status === 'Approved').length || 0}</span>
+                      </div>
+                      <div className={cn("flex items-center justify-between p-3 rounded-sm border text-amber-600 bg-amber-50 border-amber-100")}>
+                        <span className="text-[10px] font-black uppercase tracking-wider">Pending Audits</span>
+                        <span className="text-lg font-black">{permits?.filter((p: any) => p.status === 'Pending' || p.status === 'ManagerApproved').length || 0}</span>
+                      </div>
+                      <div className={cn("flex items-center justify-between p-3 rounded-sm border text-blue-600 bg-blue-50 border-blue-100")}>
+                        <span className="text-[10px] font-black uppercase tracking-wider">Ongoing Work</span>
+                        <span className="text-lg font-black">{tasks?.filter((t: any) => t.status !== 'Completed').length || 0}</span>
+                      </div>
                     </CardContent>
                   </Card>
                 </div>
@@ -1593,12 +1589,10 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Material Item</Label>
                           <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
                             <PopoverTrigger asChild>
-                              <FormControl>
-                                <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/10", !selectedMasterItem && "text-muted-foreground")}>
-                                  <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
-                                  <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                </Button>
-                              </FormControl>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/10", !selectedMasterItem && "text-muted-foreground")}>
+                                <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
+                                <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                              </Button>
                             </PopoverTrigger>
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                               <div className="flex items-center border-b px-3">
@@ -1989,16 +1983,16 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                       <TableHeader className="bg-muted/30">
                         <TableRow>
                           <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaymentSort('date')}>
-                            <div className="flex items-center">Date & Time <PaymentSortIcon column="date" /></div>
+                            <div className="flex items-center">Date & Time <PaymentSortIcon column="date" config={paymentSortConfig} /></div>
                           </TableHead>
                           <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaymentSort('payee')}>
-                            <div className="flex items-center">Paid to <PaymentSortIcon column="payee" /></div>
+                            <div className="flex items-center">Paid to <PaymentSortIcon column="payee" config={paymentSortConfig} /></div>
                           </TableHead>
                           <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaymentSort('reference')}>
-                            <div className="flex items-center">Reference <PaymentSortIcon column="reference" /></div>
+                            <div className="flex items-center">Reference <PaymentSortIcon column="reference" config={paymentSortConfig} /></div>
                           </TableHead>
                           <TableHead className="text-right cursor-pointer hover:text-primary transition-colors" onClick={() => handlePaymentSort('amount')}>
-                            <div className="flex items-center justify-end">Amount <PaymentSortIcon column="amount" /></div>
+                            <div className="flex items-center justify-end">Amount <PaymentSortIcon column="amount" config={paymentSortConfig} /></div>
                           </TableHead>
                           <TableHead>Mode</TableHead>
                           <TableHead className="text-right px-6">Actions</TableHead>
