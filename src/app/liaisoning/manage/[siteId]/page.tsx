@@ -40,7 +40,8 @@ import {
   LockKeyhole,
   HardHat,
   ChevronDown,
-  Search
+  Search,
+  History
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -62,12 +63,19 @@ type LiaisoningDocument = {
   uploadedAt: string;
 };
 
+type AuditLogEntry = {
+  action: string;
+  userName: string;
+  timestamp: string;
+};
+
 type StageData = {
   status: 'Pending' | 'In Progress' | 'Completed';
   remarks: string;
   documents: LiaisoningDocument[];
   subStages?: Record<string, boolean>;
   progressFlags?: string[];
+  auditLog?: AuditLogEntry[];
 };
 
 type LiaisoningRecord = {
@@ -168,6 +176,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
         status: 'Pending',
         remarks: "",
         documents: [],
+        auditLog: []
       };
 
       if (s.subStages) {
@@ -194,10 +203,25 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
     }, { merge: true });
   };
 
-  const handleUpdateStage = async (stageId: string, updates: Partial<StageData>) => {
-    if (!record) return;
+  const handleUpdateStage = async (stageId: string, updates: Partial<StageData>, logAction?: string) => {
+    if (!record || !userProfile) return;
     const updatedStages = { ...record.stages };
-    updatedStages[stageId] = { ...updatedStages[stageId], ...updates };
+    const currentStage = updatedStages[stageId];
+    
+    let nextLog = currentStage.auditLog || [];
+    if (logAction) {
+        nextLog = [...nextLog, {
+            action: logAction,
+            userName: userProfile.username || "System",
+            timestamp: new Date().toISOString()
+        }];
+    }
+
+    updatedStages[stageId] = { 
+        ...currentStage, 
+        ...updates,
+        auditLog: nextLog
+    };
     
     const completion = calculateCompletion(updatedStages);
     
@@ -227,10 +251,11 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   };
 
   const handleToggleSubStage = (stageId: string, subId: string) => {
-    if (!record) return;
+    if (!record || !userProfile) return;
     const stageDef = MAIN_STAGES.find(s => s.id === stageId);
     if (!stageDef?.subStages) return;
 
+    const subLabel = stageDef.subStages.find(ss => ss.id === subId)?.label || "Step";
     const currentSubStages = record.stages[stageId]?.subStages || {};
     const subIdx = stageDef.subStages.findIndex(ss => ss.id === subId);
     const isChecking = !currentSubStages[subId];
@@ -258,12 +283,12 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
       newStatus = 'In Progress';
     }
 
-    handleUpdateStage(stageId, { subStages: nextSubStages, status: newStatus });
+    handleUpdateStage(stageId, { subStages: nextSubStages, status: newStatus }, `${isChecking ? 'Authorized' : 'De-authorized'} Step: ${subLabel}`);
   };
 
   const handleUploadDoc = async (stageId: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !record) return;
+    if (!file || !record || !userProfile) return;
 
     setUploadingStageId(stageId);
     setUploadProgress(0);
@@ -287,9 +312,16 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
             uploadedAt: new Date().toISOString()
           };
 
+          const auditEntry: AuditLogEntry = {
+            action: `Uploaded File: ${file.name}`,
+            userName: userProfile.username || "System",
+            timestamp: new Date().toISOString()
+          };
+
           const updatedStages = { ...record.stages };
           if (updatedStages[stageId]) {
             updatedStages[stageId].documents = [...(updatedStages[stageId].documents || []), newDoc];
+            updatedStages[stageId].auditLog = [...(updatedStages[stageId].auditLog || []), auditEntry];
             
             updateDocumentNonBlocking(recordRef, {
               stages: updatedStages,
@@ -309,14 +341,21 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   };
 
   const handleDeleteDoc = async (stageId: string, docToDelete: LiaisoningDocument) => {
-    if (!record) return;
+    if (!record || !userProfile) return;
     try {
       const storage = getStorage(firebaseApp);
       await deleteObject(ref(storage, docToDelete.storagePath)).catch(e => console.warn("Storage removal failed", e));
       
+      const auditEntry: AuditLogEntry = {
+        action: `Removed File: ${docToDelete.name}`,
+        userName: userProfile.username || "System",
+        timestamp: new Date().toISOString()
+      };
+
       const updatedStages = { ...record.stages };
       if (updatedStages[stageId]) {
         updatedStages[stageId].documents = (updatedStages[stageId].documents || []).filter(d => d.url !== docToDelete.url);
+        updatedStages[stageId].auditLog = [...(updatedStages[stageId].auditLog || []), auditEntry];
         
         updateDocumentNonBlocking(recordRef, {
           stages: updatedStages,
@@ -345,7 +384,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   }
 
   const currentStage = MAIN_STAGES.find(s => s.id === activeStageId);
-  const activeStageData = record.stages?.[activeStageId] || { status: 'Pending', remarks: '', documents: [] };
+  const activeStageData = record.stages?.[activeStageId] || { status: 'Pending', remarks: '', documents: [], auditLog: [] };
 
   const isSubStageLocked = (idx: number) => {
     if (idx === 0) return false;
@@ -356,7 +395,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   return (
     <div className="space-y-6 sm:space-y-8 animate-in fade-in duration-500 pb-20 px-1 sm:px-0">
       <div className="flex flex-col gap-2">
-        <Button variant="ghost" size="sm" onClick={() => router.push('/liaisoning/list')} className="w-fit mb-1 -ml-2 text-muted-foreground hover:text-primary transition-colors h-8">
+        <Button variant="ghost" size="sm" onClick={() => router.push('/liaisoning/list')} className="w-fit mb-1 -ml-2 text-muted-foreground hover:text-primary transition-colors h-8 text-[10px] font-black uppercase tracking-widest">
           <ArrowLeft className="mr-2 h-4 w-4" /> Back to Liaisoning Hub
         </Button>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -369,7 +408,6 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
                   
                   <Separator orientation="vertical" className="h-3 hidden sm:block" />
                   
-                  {/* Contractor Assignment UI */}
                   <Popover open={isContractorPopoverOpen} onOpenChange={setIsContractorPopoverOpen}>
                     <PopoverTrigger asChild>
                       <button className="flex items-center gap-1.5 text-[8px] sm:text-[10px] font-black uppercase text-primary hover:opacity-80 transition-opacity">
@@ -424,7 +462,6 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8">
-        {/* Stages Sidebar */}
         <Card className="lg:col-span-4 rounded-sm border-primary/10 shadow-md h-fit overflow-hidden">
           <CardHeader className="bg-muted/5 border-b py-3 sm:py-4">
             <CardTitle className="text-[10px] sm:text-xs font-black uppercase tracking-widest flex items-center gap-2 text-muted-foreground">
@@ -474,7 +511,6 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
           </CardContent>
         </Card>
 
-        {/* Stage Content */}
         <div className="lg:col-span-8 space-y-6">
           <Card className="rounded-sm border-primary/10 shadow-lg overflow-hidden h-full flex flex-col">
             <CardHeader className="bg-primary/5 border-b p-5 sm:p-6 lg:p-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -498,7 +534,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
                         return;
                       }
                     }
-                    handleUpdateStage(activeStageId, { status: val });
+                    handleUpdateStage(activeStageId, { status: val }, `Status changed to ${val}`);
                   }}
                 >
                   <SelectTrigger className="h-11 md:h-10 w-full md:w-[180px] rounded-sm font-black uppercase text-[10px] tracking-widest bg-background border-primary/20 shadow-sm">
@@ -513,7 +549,6 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
               </div>
             </CardHeader>
             <CardContent className="p-5 sm:p-6 lg:p-8 flex-1 space-y-10">
-              {/* Nested Approvals for specific stages */}
               {currentStage?.subStages && (
                 <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2"><FileCheck className="h-4 w-4" /> Sequential Approval Workflow</Label>
@@ -554,7 +589,6 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
                 </div>
               )}
 
-              {/* Work Progress Flags */}
               {currentStage?.flags && (
                 <div className="space-y-4 animate-in slide-in-from-top-2 duration-300">
                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Progress Indicators</Label>
@@ -568,7 +602,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
                            onClick={() => {
                              const current = activeStageData.progressFlags || [];
                              const next = current.includes(flag.id) ? current.filter(id => id !== flag.id) : [...current, flag.id];
-                             handleUpdateStage(activeStageId, { progressFlags: next });
+                             handleUpdateStage(activeStageId, { progressFlags: next }, `${isSelected ? 'Removed' : 'Added'} flag: ${flag.label}`);
                            }}
                            className={cn(
                              "h-10 px-5 rounded-sm font-black uppercase text-[10px] tracking-widest cursor-pointer transition-all active:scale-95",
@@ -643,6 +677,28 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
                   )}
                 </div>
               </div>
+
+              {/* Audit Log Section */}
+              {activeStageData.auditLog && activeStageData.auditLog.length > 0 && (
+                <div className="space-y-4 pt-6 border-t border-dashed">
+                   <div className="flex items-center gap-2 px-1">
+                      <History className="h-3.5 w-3.5 text-muted-foreground opacity-50" />
+                      <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Activity Audit Trail</Label>
+                   </div>
+                   <div className="space-y-2 pl-1">
+                     {activeStageData.auditLog.slice(-10).reverse().map((log, lIdx) => (
+                       <div key={lIdx} className="flex items-start gap-2 text-[10px] text-muted-foreground/70 animate-in fade-in slide-in-from-left-1">
+                         <div className="h-1.5 w-1.5 rounded-full bg-primary/30 mt-1 shrink-0" />
+                         <div className="flex flex-wrap gap-x-2 items-center">
+                            <span className="font-bold text-foreground/70">{log.userName}</span>
+                            <span className="italic">{log.action}</span>
+                            <span className="font-mono text-[9px] opacity-40">{format(new Date(log.timestamp), 'dd MMM HH:mm')}</span>
+                         </div>
+                       </div>
+                     ))}
+                   </div>
+                </div>
+              )}
             </CardContent>
             <CardFooter className="bg-muted/5 border-t p-5 sm:p-6 lg:p-8 flex flex-row items-center justify-between">
                 <div className="flex items-center gap-2">

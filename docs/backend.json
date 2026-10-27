@@ -143,6 +143,17 @@
       "properties": {
         "status": { "type": "string", "enum": ["Pending", "In Progress", "Completed"] },
         "remarks": { "type": "string" },
+        "auditLog": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "action": { "type": "string" },
+              "userName": { "type": "string" },
+              "timestamp": { "type": "string", "format": "date-time" }
+            }
+          }
+        },
         "documents": {
           "type": "array",
           "items": {
