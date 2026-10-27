@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -45,7 +44,9 @@ import {
   ArrowDown,
   ArrowUpDown,
   Lock,
-  ShieldAlert
+  ShieldAlert,
+  ArrowRight,
+  XCircle
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -199,6 +200,10 @@ export default function AddNewProjectPage() {
     }
   }, [siteToEdit, siteForm]);
 
+  const handleTabChange = (val: string) => {
+    setActiveTab(val);
+  };
+
   const onSiteSubmit = (values: z.infer<typeof siteSchema>) => {
     addDocumentNonBlocking(collection(firestore, 'sites'), {
       ...values,
@@ -226,18 +231,14 @@ export default function AddNewProjectPage() {
     setVerificationError(null);
 
     try {
-      // 1. Verify Identity
       const credential = EmailAuthProvider.credential(user.email!, deletePassword);
       await reauthenticateWithCredential(user, credential);
 
-      // 2. Perform Deletion
       if (siteToDelete) {
-        // Individual Delete
         deleteDocumentNonBlocking(doc(firestore, 'sites', siteToDelete.id));
         toast({ title: 'Site Removed', description: `${siteToDelete.name} deleted from registry.` });
         setSelectedIds(prev => prev.filter(id => id !== siteToDelete.id));
       } else if (selectedIds.length > 0) {
-        // Bulk Delete
         const batchSize = 400;
         for (let i = 0; i < selectedIds.length; i += batchSize) {
           const batch = writeBatch(firestore);
@@ -251,7 +252,6 @@ export default function AddNewProjectPage() {
         setSelectedIds([]);
       }
 
-      // 3. Reset state
       setDeletePassword("");
       setIsDeleteConfirmOpen(false);
       setSiteToDelete(null);
@@ -629,7 +629,7 @@ export default function AddNewProjectPage() {
               disabled={isImporting}
             />
             <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isImporting} className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5">
-              {isImporting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="mr-2 h-4 w-4" />}
+              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin mr-2" /> : <FileUp className="mr-2 h-4 w-4" />}
               Bulk Import
             </Button>
           </div>
@@ -903,7 +903,7 @@ export default function AddNewProjectPage() {
             <div className="flex flex-wrap items-center gap-3">
               <Popover>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="h-9 rounded-sm border-primary/20 text-primary font-bold text-[10px] uppercase gap-1.5 min-w-[140px]">
+                  <Button variant="outline" size="sm" className="h-9 rounded-sm font-bold border-primary/20 text-primary gap-1.5 min-w-[140px]">
                     <Tags className="h-3.5 w-3.5" />
                     {selectedGroupIds.length === 0 ? "Filter Groups" : `${selectedGroupIds.length} Groups Active`}
                     <ChevronDown className="h-3 w-3 opacity-50 ml-1" />
@@ -948,6 +948,8 @@ export default function AddNewProjectPage() {
                   onChange={(e) => setSearchTerm(e.target.value)} 
                 />
               </div>
+
+              <Button variant="ghost" size="icon" onClick={() => { setSearchTerm(""); setSelectedIds([]); }} className="h-9 w-9"><FilterX className="h-4 w-4" /></Button>
               
               <Select value={sortOrder} onValueChange={(val: SortOrder) => setSortOrder(val)}>
                 <SelectTrigger className="w-32 h-9 text-[10px] font-bold uppercase rounded-sm border-primary/20">
@@ -998,7 +1000,7 @@ export default function AddNewProjectPage() {
                   <TableRow>
                     <TableHead className="w-12 text-center">
                       <Checkbox 
-                        checked={selectedIds.length === filteredSitesList.length && filteredSitesList.length > 0} 
+                        checked={filteredSitesList.length > 0 && selectedIds.length === filteredSitesList.length} 
                         onCheckedChange={toggleSelectAll} 
                       />
                     </TableHead>
@@ -1020,7 +1022,7 @@ export default function AddNewProjectPage() {
                           <TableCell className="text-center">
                             <Checkbox 
                               checked={selectedIds.includes(site.id)} 
-                              onCheckedChange={() => setSelectedIds(prev => prev.includes(site.id) ? prev.filter(i => i !== site.id) : [...prev, site.id])}
+                              onCheckedChange={() => setSelectedIds(prev => prev.includes(site.id) ? prev.filter(id => id !== site.id) : [...prev, site.id])}
                             />
                           </TableCell>
                           <TableCell className="py-4 text-left">
