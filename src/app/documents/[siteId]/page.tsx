@@ -7,7 +7,7 @@ import { collection, doc, query, where, serverTimestamp } from 'firebase/firesto
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { FileIcon, Upload, Trash2, ArrowLeft, Download, ExternalLink, Loader2, FileText, ImageIcon, Film, File as GenericFileIcon, X, Folder, FolderPlus, ChevronRight, Home, MoreVertical } from 'lucide-react';
+import { FileIcon, Upload, Trash2, ArrowLeft, Download, ExternalLink, Loader2, FileText, ImageIcon, Film, File as GenericFileIcon, X, Folder, FolderPlus, ChevronRight, Home, MoreVertical, ShieldCheck, PlugZap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -36,6 +36,26 @@ import {
 } from "@/components/ui/dialog";
 import { Progress } from "@/components/ui/progress";
 import { cn } from '@/lib/utils';
+
+type LiaisoningDocument = {
+  url: string;
+  name: string;
+  storagePath: string;
+  uploadedAt: string;
+};
+
+type StageData = {
+  status: string;
+  remarks: string;
+  documents: LiaisoningDocument[];
+};
+
+type LiaisoningRecord = {
+  id: string;
+  siteId: string;
+  siteName: string;
+  stages: Record<string, StageData>;
+};
 
 type SiteDocument = {
   id: string;
@@ -73,6 +93,26 @@ type UserProfile = {
   role: string;
   siteManagerId?: string;
 };
+
+const LIAISONING_STAGES = [
+  { id: 'loa', label: '1. LOA' },
+  { id: 'ppa', label: '2. PPA' },
+  { id: 'spv_docs', label: '3. SPV or Company Documents' },
+  { id: 'land_acquisition', label: '4. Land Acquisition' },
+  { id: 'grid_connectivity', label: '5. Grid Connectivity' },
+  { id: 'estimate_approval', label: '6. Estimate Approval' },
+  { id: 'estimate_sanction', label: '7. Estimate Sanction' },
+  { id: 'supervision_testing', label: '8. Supervision & Testing' },
+  { id: 'material_inspection', label: '9. Material Inspection' },
+  { id: 'work_progress', label: '10. Work Progress' },
+  { id: 'wcr', label: '11. WCR Submission' },
+  { id: 'pre_commissioning', label: '12. Pre-Commissioning' },
+  { id: 'format_ii_approval', label: '13. Format II Approval' },
+  { id: 'ptc', label: '14. PTC Issuance' },
+  { id: 'clearance', label: '15. Clearance Certificate' },
+  { id: 'commissioning', label: '16. Final Commissioning' },
+  { id: 'commissioning_certificate', label: '17. Commissioning Certificate' }
+];
 
 const getFileIcon = (type: string) => {
   if (type.startsWith('image/')) return <ImageIcon className="h-4 w-4" />;
@@ -125,19 +165,74 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
   );
   const { data: allFolders, isLoading: foldersLoading } = useCollection<SiteFolder>(foldersQuery);
 
+  const liaisonRef = useMemoFirebase(() => doc(firestore, 'liaisoning_records', siteId), [firestore, siteId]);
+  const { data: liaisonRecord, isLoading: liaisonLoading } = useDoc<LiaisoningRecord>(liaisonRef);
+
+  const isLiaisonRoot = currentFolderId === 'liaison_root';
+  const isLiaisonStage = currentFolderId?.startsWith('liaison_stage_');
+
   const displayedDocs = React.useMemo(() => {
+    if (isLiaisonRoot) return [];
+    if (isLiaisonStage) {
+      const stageId = currentFolderId?.replace('liaison_stage_', '');
+      const stageDocs = liaisonRecord?.stages?.[stageId || '']?.documents || [];
+      return stageDocs.map(d => ({
+        id: d.url,
+        fileName: d.name,
+        fileUrl: d.url,
+        fileType: d.name.toLowerCase().endsWith('.pdf') ? 'application/pdf' : 'image/jpeg',
+        fileSize: 0,
+        uploadedByName: 'Workflow Sync',
+        createdAt: { toDate: () => new Date(d.uploadedAt) },
+        isVirtual: true,
+        storagePath: d.storagePath
+      }));
+    }
     if (!allDocs) return [];
     return allDocs.filter(d => (d.parentFolderId || null) === currentFolderId);
-  }, [allDocs, currentFolderId]);
+  }, [allDocs, currentFolderId, isLiaisonRoot, isLiaisonStage, liaisonRecord]);
 
   const displayedFolders = React.useMemo(() => {
+    // If we are at root, add the virtual "Liaisoning Portfolio" folder
+    if (currentFolderId === null) {
+      const list = allFolders ? allFolders.filter(f => f.parentFolderId === null) : [];
+      return [
+        { id: 'liaison_root', name: 'Liaisoning Portfolio', isVirtual: true },
+        ...list
+      ];
+    }
+    
+    // If we are inside the liaison root, show the stages
+    if (isLiaisonRoot) {
+      return LIAISONING_STAGES.map(s => ({
+        id: `liaison_stage_${s.id}`,
+        name: s.label,
+        isVirtual: true,
+        isStage: true
+      }));
+    }
+
     if (!allFolders) return [];
     return allFolders.filter(f => (f.parentFolderId || null) === currentFolderId);
-  }, [allFolders, currentFolderId]);
+  }, [allFolders, currentFolderId, isLiaisonRoot]);
 
   const breadcrumbs = React.useMemo(() => {
     const path = [];
     let cur = currentFolderId;
+
+    if (isLiaisonRoot) {
+      path.unshift({ id: 'liaison_root', name: 'Liaisoning Portfolio' });
+      return path;
+    }
+
+    if (isLiaisonStage) {
+      const stageId = currentFolderId?.replace('liaison_stage_', '');
+      const stage = LIAISONING_STAGES.find(s => s.id === stageId);
+      path.unshift({ id: currentFolderId!, name: stage?.label || 'Stage' });
+      path.unshift({ id: 'liaison_root', name: 'Liaisoning Portfolio' });
+      return path;
+    }
+
     while (cur) {
       const folder = allFolders?.find(f => f.id === cur);
       if (folder) {
@@ -148,7 +243,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
       }
     }
     return path;
-  }, [allFolders, currentFolderId]);
+  }, [allFolders, currentFolderId, isLiaisonRoot, isLiaisonStage]);
 
   const handleCreateFolder = async () => {
     if (!newFolderName.trim() || !user || !site) return;
@@ -244,8 +339,6 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
   const confirmDeleteFolder = async () => {
     if (!folderToDelete) return;
     try {
-      // Note: In a real system we'd recursively delete or check if empty. 
-      // For this prototype we'll just delete the folder entry.
       await deleteDocumentNonBlocking(doc(firestore, 'site_folders', folderToDelete.id));
       toast({ title: 'Folder Removed' });
     } catch (e: any) {
@@ -255,7 +348,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
     }
   };
 
-  if (siteLoading || docsLoading || foldersLoading) {
+  if (siteLoading || docsLoading || foldersLoading || liaisonLoading) {
     return (
       <div className="space-y-6">
         <Skeleton className="h-9 w-64" />
@@ -267,6 +360,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
   if (!site) return <div className="p-8 text-center">Site not found.</div>;
 
   const uploadEntries = Object.entries(activeUploads);
+  const isReadOnlyArea = isLiaisonRoot || isLiaisonStage;
 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
@@ -281,23 +375,33 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
       </div>
 
       <div className="flex flex-col gap-4">
-        <div className="flex justify-end gap-2">
-          <Button 
-            variant="outline" 
-            className="rounded-sm font-bold h-11 px-6 shadow-sm border-primary/20 text-primary hover:bg-primary/5"
-            onClick={() => setIsFolderDialogOpen(true)}
-          >
-            <FolderPlus className="mr-2 h-4 w-4" /> New folder
-          </Button>
-          <div className="relative">
-            <input type="file" multiple className="hidden" id="file-upload" onChange={handleUpload} disabled={isUploading} />
-            <Button asChild disabled={isUploading} className="rounded-sm font-bold h-11 px-6 shadow-md">
-              <label htmlFor="file-upload" className="cursor-pointer">
-                {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : <><Upload className="mr-2 h-4 w-4" /> Upload Document(s)</>}
-              </label>
+        {!isReadOnlyArea && (
+          <div className="flex justify-end gap-2">
+            <Button 
+              variant="outline" 
+              className="rounded-sm font-bold h-11 px-6 shadow-sm border-primary/20 text-primary hover:bg-primary/5"
+              onClick={() => setIsFolderDialogOpen(true)}
+            >
+              <FolderPlus className="mr-2 h-4 w-4" /> New folder
             </Button>
+            <div className="relative">
+              <input type="file" multiple className="hidden" id="file-upload" onChange={handleUpload} disabled={isUploading} />
+              <Button asChild disabled={isUploading} className="rounded-sm font-bold h-11 px-6 shadow-md">
+                <label htmlFor="file-upload" className="cursor-pointer">
+                  {isUploading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Uploading...</> : <><Upload className="mr-2 h-4 w-4" /> Upload Document(s)</>}
+                </label>
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
+
+        {isReadOnlyArea && (
+          <div className="flex justify-end">
+            <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 py-2 px-4 rounded-sm font-black uppercase text-[10px] tracking-widest">
+              <ShieldCheck className="h-3.5 w-3.5 mr-2" /> Liaisoning Portfolio (Sync Only)
+            </Badge>
+          </div>
+        )}
 
         {uploadEntries.length > 0 && (
           <Card className="border-primary/20 bg-primary/5">
@@ -357,32 +461,37 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
               </TableHeader>
               <TableBody>
                 {/* Render Folders First */}
-                {displayedFolders.map((folder) => (
+                {displayedFolders.map((folder: any) => (
                   <TableRow key={folder.id} className="hover:bg-primary/[0.02] group transition-colors cursor-pointer" onClick={() => setCurrentFolderId(folder.id)}>
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
-                        <div className="p-2 bg-primary/10 rounded-sm text-primary group-hover:bg-primary group-hover:text-white transition-colors">
-                          <Folder className="h-4 w-4" />
+                        <div className={cn(
+                          "p-2 rounded-sm transition-colors",
+                          folder.isVirtual ? "bg-emerald-500/10 text-emerald-600" : "bg-primary/10 text-primary group-hover:bg-primary group-hover:text-white"
+                        )}>
+                          {folder.isVirtual ? <PlugZap className="h-4 w-4" /> : <Folder className="h-4 w-4" />}
                         </div>
                         <span className="font-bold text-sm truncate max-w-[250px]">{folder.name}</span>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm bg-muted border-none">FOLDER</Badge></TableCell>
+                    <TableCell><Badge variant="secondary" className={cn("text-[9px] font-black uppercase rounded-sm border-none", folder.isVirtual ? "bg-emerald-100 text-emerald-800" : "bg-muted")}>{folder.isVirtual ? 'SYNC FOLDER' : 'FOLDER'}</Badge></TableCell>
                     <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">—</TableCell>
                     <TableCell className="text-xs font-bold text-foreground">—</TableCell>
                     <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">
                       {folder.createdAt ? format(folder.createdAt.toDate(), 'dd MMM yyyy') : '—'}
                     </TableCell>
                     <TableCell className="text-right px-6" onClick={e => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setFolderToDelete(folder)}>
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {!folder.isVirtual && (
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setFolderToDelete(folder)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
 
                 {/* Render Documents */}
-                {displayedDocs.map((doc) => (
+                {displayedDocs.map((doc: any) => (
                   <TableRow key={doc.id} className="hover:bg-muted/5 group transition-colors">
                     <TableCell className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -392,8 +501,8 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
                         <span className="font-bold text-sm truncate max-w-[250px]" title={doc.fileName}>{doc.fileName}</span>
                       </div>
                     </TableCell>
-                    <TableCell><Badge variant="secondary" className="text-[9px] font-black uppercase rounded-sm bg-muted border-none">{doc.fileType.split('/')[1] || 'FILE'}</Badge></TableCell>
-                    <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">{formatSize(doc.fileSize)}</TableCell>
+                    <TableCell><Badge variant="secondary" className={cn("text-[9px] font-black uppercase rounded-sm border-none", doc.isVirtual ? "bg-primary/5 text-primary" : "bg-muted")}>{doc.fileType.split('/')[1]?.toUpperCase() || 'FILE'}</Badge></TableCell>
+                    <TableCell className="text-[10px] font-mono font-bold text-muted-foreground">{doc.fileSize ? formatSize(doc.fileSize) : '—'}</TableCell>
                     <TableCell className="text-xs font-bold text-foreground">{doc.uploadedByName}</TableCell>
                     <TableCell className="text-[10px] font-bold text-muted-foreground uppercase">
                       {doc.createdAt ? format(doc.createdAt.toDate(), 'dd MMM yyyy') : '—'}
@@ -403,9 +512,11 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-sm text-primary" asChild>
                           <a href={doc.fileUrl} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /></a>
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDocToDelete(doc)}>
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        {!doc.isVirtual && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm" onClick={() => setDocToDelete(doc)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -452,7 +563,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-black uppercase tracking-tight">Remove Document?</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs">Permanently remove this file from the repository?</AlertDialogDescription>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-muted-foreground">Permanently remove this file from the repository? This action cannot be undone.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
@@ -466,7 +577,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
             <AlertDialogTitle className="font-black uppercase tracking-tight">Remove Folder?</AlertDialogTitle>
-            <AlertDialogDescription className="text-xs">Deleting a folder will not delete the documents inside, but they will become orphaned or return to the root directory depending on system logic. Confirm removal of <strong>{folderToDelete?.name}</strong>?</AlertDialogDescription>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed text-muted-foreground">Deleting a folder will not delete the documents inside, but they will return to the root directory. Confirm removal of <strong>{folderToDelete?.name}</strong>?</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
