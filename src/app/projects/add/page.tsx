@@ -16,6 +16,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useCollection, useFirestore, useUser, useDoc, useMemoFirebase, addDocumentNonBlocking, deleteDocumentNonBlocking, updateDocumentNonBlocking } from '@/firebase';
 import { collection, doc, serverTimestamp, writeBatch, query, where, getDocs } from 'firebase/firestore';
+import { EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
 import { 
   Trash2, 
   Search, 
@@ -38,30 +39,17 @@ import {
   Globe,
   RefreshCcw,
   User as UserIcon,
-  ChevronsUpDown
+  ChevronsUpDown,
+  FilterX,
+  ArrowUp,
+  ArrowDown,
+  ArrowUpDown,
+  Lock,
+  ShieldAlert
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Skeleton } from '@/components/ui/skeleton';
-import { isSuperAdmin } from '@/lib/auth-constants';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -72,12 +60,32 @@ import {
   DialogTrigger,
   DialogClose,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import { Checkbox } from '@/components/ui/checkbox';
+import { isSuperAdmin } from '@/lib/auth-constants';
+import { format } from 'date-fns';
 
 const siteSchema = z.object({
   name: z.string().min(1, 'Site name is required.'),
@@ -95,11 +103,6 @@ const siteSchema = z.object({
 
 type SortOrder = 'name' | 'newest' | 'oldest';
 
-const formatCapacity = (val: any) => {
-  const num = typeof val === 'number' ? val : parseFloat(String(val || 0));
-  return isNaN(num) ? "0.000" : num.toFixed(3);
-};
-
 export default function AddNewProjectPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -112,7 +115,14 @@ export default function AddNewProjectPage() {
   const [selectedIds, setSelectedIds] = React.useState<string[]>([]);
   const [isDeletingBulk, setIsDeletingBulk] = React.useState(false);
   const [isMovingBulk, setIsMovingBulk] = React.useState(false);
-  const [isBulkDialogOpen, setIsBulkDialogOpen] = React.useState(false);
+  
+  // Deletion States
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = React.useState(false);
+  const [siteToDelete, setSiteToDelete] = React.useState<any | null>(null);
+  const [deletePassword, setDeletePassword] = React.useState("");
+  const [isVerifyingPassword, setIsVerifyingPassword] = React.useState(false);
+  const [verificationError, setVerificationError] = React.useState<string | null>(null);
+
   const [isAddDialogOpen, setIsAddDialogOpen] = React.useState(false);
   const [siteToEdit, setSiteToEdit] = React.useState<any | null>(null);
   const [isImporting, setIsImporting] = React.useState(false);
@@ -135,19 +145,6 @@ export default function AddNewProjectPage() {
 
   const allUsersQuery = useMemoFirebase(() => collection(firestore, 'users'), [firestore]);
   const { data: allPersonnel } = useCollection<any>(allUsersQuery);
-
-  // Persist active tab
-  React.useEffect(() => {
-    const saved = localStorage.getItem('projectAddActiveTab');
-    if (saved && (saved === 'groundmount' || saved === 'rooftop')) {
-      setActiveTab(saved);
-    }
-  }, []);
-
-  const handleTabChange = (val: string) => {
-    setActiveTab(val);
-    localStorage.setItem('projectAddActiveTab', val);
-  };
 
   const siteForm = useForm<z.infer<typeof siteSchema>>({
     resolver: zodResolver(siteSchema),
@@ -223,37 +220,47 @@ export default function AddNewProjectPage() {
     siteForm.reset();
   };
 
-  const deleteSite = (id: string) => {
-    deleteDocumentNonBlocking(doc(firestore, 'sites', id));
-    toast({ title: 'Success', description: 'Site deleted.' });
-    setSelectedIds(prev => prev.filter(selectedId => selectedId !== id));
-  };
+  const handleFinalDelete = async () => {
+    if (!user || !deletePassword) return;
+    setIsVerifyingPassword(true);
+    setVerificationError(null);
 
-  const handleBulkDelete = async () => {
-    if (selectedIds.length === 0) return;
-    setIsDeletingBulk(true);
-    
     try {
-      const batchSize = 400;
-      for (let i = 0; i < selectedIds.length; i += batchSize) {
-        const batch = writeBatch(firestore);
-        const chunk = selectedIds.slice(i, i + batchSize);
-        chunk.forEach(id => {
-          batch.delete(doc(firestore, 'sites', id));
-        });
-        await batch.commit();
+      // 1. Verify Identity
+      const credential = EmailAuthProvider.credential(user.email!, deletePassword);
+      await reauthenticateWithCredential(user, credential);
+
+      // 2. Perform Deletion
+      if (siteToDelete) {
+        // Individual Delete
+        deleteDocumentNonBlocking(doc(firestore, 'sites', siteToDelete.id));
+        toast({ title: 'Site Removed', description: `${siteToDelete.name} deleted from registry.` });
+        setSelectedIds(prev => prev.filter(id => id !== siteToDelete.id));
+      } else if (selectedIds.length > 0) {
+        // Bulk Delete
+        const batchSize = 400;
+        for (let i = 0; i < selectedIds.length; i += batchSize) {
+          const batch = writeBatch(firestore);
+          const chunk = selectedIds.slice(i, i + batchSize);
+          chunk.forEach(id => {
+            batch.delete(doc(firestore, 'sites', id));
+          });
+          await batch.commit();
+        }
+        toast({ title: 'Bulk Removal Complete', description: `Successfully removed ${selectedIds.length} projects.` });
+        setSelectedIds([]);
       }
-      
-      toast({ 
-        title: 'Bulk Action Complete', 
-        description: `Successfully removed ${selectedIds.length} site records.` 
-      });
-      setSelectedIds([]);
+
+      // 3. Reset state
+      setDeletePassword("");
+      setIsDeleteConfirmOpen(false);
+      setSiteToDelete(null);
     } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Action Failed', description: e.message });
+      console.error(e);
+      setVerificationError("Invalid password. Authorization denied.");
+      toast({ variant: 'destructive', title: 'Security Alert', description: 'Authentication failed. Record preserved.' });
     } finally {
-      setIsDeletingBulk(false);
-      setIsBulkDialogOpen(false);
+      setIsVerifyingPassword(false);
     }
   };
 
@@ -434,9 +441,20 @@ export default function AddNewProjectPage() {
     }
   };
 
+  const openDeleteDialog = (site?: any) => {
+    if (site) {
+        setSiteToDelete(site);
+    } else {
+        setSiteToDelete(null);
+    }
+    setDeletePassword("");
+    setVerificationError(null);
+    setIsDeleteConfirmOpen(true);
+  };
+
   if (isUserLoading || isProfileLoading || sitesLoading || groupsLoading) {
     return (
-      <div className="space-y-6 animate-pulse">
+      <div className="space-y-6 animate-pulse p-8">
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-[400px] w-full" />
       </div>
@@ -514,7 +532,7 @@ export default function AddNewProjectPage() {
                         <Popover open={isOwnerPopoverOpen} onOpenChange={setIsOwnerPopoverOpen}>
                           <PopoverTrigger asChild>
                             <FormControl>
-                              <Button variant="outline" className={cn("w-full justify-between font-normal h-11", !field.value && "text-muted-foreground")}>
+                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11", !field.value && "text-muted-foreground")}>
                                 {field.value ? allPersonnel?.find(u => u.id === field.value)?.username : "Select Owner..."}
                                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                               </Button>
@@ -772,7 +790,7 @@ export default function AddNewProjectPage() {
                 )} />
               </div>
               <DialogFooter className="pt-4 gap-2">
-                <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
+                <DialogClose asChild><Button variant="outline" className="rounded-sm">Cancel</Button></DialogClose>
                 <Button type="submit" className="rounded-sm font-black uppercase text-[10px]">Save Changes</Button>
               </DialogFooter>
             </form>
@@ -780,31 +798,64 @@ export default function AddNewProjectPage() {
         </DialogContent>
       </Dialog>
 
-      <AlertDialog open={isBulkDialogOpen} onOpenChange={setIsBulkDialogOpen}>
-        <AlertDialogContent className="rounded-sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" />
-              Confirm Bulk Deletion
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              You are about to permanently remove <strong>{selectedIds.length} project sites</strong> from the organization registry. 
-              This action will remove them from all dropdowns across the platform and cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleBulkDelete} 
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]"
-              disabled={isDeletingBulk}
+      <Dialog open={isDeleteConfirmOpen} onOpenChange={setIsDeleteConfirmOpen}>
+        <DialogContent className="sm:max-w-md rounded-sm border-none shadow-2xl overflow-hidden bg-background">
+          <DialogHeader className="p-6 bg-red-500/5 border-b space-y-2 text-left">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-red-500/10 text-red-600 rounded-sm">
+                <ShieldAlert className="h-6 w-6" />
+              </div>
+              <DialogTitle className="text-xl font-black uppercase tracking-tight text-red-700">Confirm Deletion</DialogTitle>
+            </div>
+            <DialogDescription className="text-xs font-medium leading-relaxed">
+              {siteToDelete ? (
+                <>You are about to permanently remove <strong className="text-foreground">{siteToDelete.name}</strong> from the organizational registry.</>
+              ) : (
+                <>You are about to permanently remove <strong className="text-foreground">{selectedIds.length} project sites</strong> from the organizational registry.</>
+              )}
+              <br/><br/>
+              <span className="text-red-600 font-bold uppercase">This action cannot be undone.</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1 flex items-center gap-2">
+                <Lock className="h-3 w-3" /> Security Verification
+              </Label>
+              <Input 
+                type="password" 
+                placeholder="Enter your account password..." 
+                className="h-12 rounded-sm font-medium border-primary/10 bg-muted/20 focus-visible:ring-primary/20"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleFinalDelete()}
+              />
+              {verificationError && (
+                <p className="text-[10px] font-bold text-destructive uppercase tracking-tight flex items-center gap-1.5 px-1 animate-in shake duration-300">
+                  <XCircle className="h-3 w-3" /> {verificationError}
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 flex flex-col sm:flex-row">
+            <DialogClose asChild>
+              <Button variant="outline" className="w-full sm:flex-1 h-12 font-bold uppercase text-[10px] tracking-widest rounded-sm">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button 
+              disabled={!deletePassword || isVerifyingPassword} 
+              onClick={handleFinalDelete}
+              className="w-full sm:flex-1 h-12 font-black uppercase text-[10px] tracking-widest bg-red-600 hover:bg-red-700 text-white shadow-lg"
             >
-              {isDeletingBulk ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-              Confirm Deletion
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              {isVerifyingPassword ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />}
+              Confirm Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 
@@ -933,7 +984,7 @@ export default function AddNewProjectPage() {
                     variant="destructive" 
                     size="sm" 
                     className="h-8 rounded-sm font-bold text-[10px] uppercase"
-                    onClick={() => setIsBulkDialogOpen(true)}
+                    onClick={() => openDeleteDialog()}
                   >
                     <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Remove Bulk
                   </Button>
@@ -964,7 +1015,6 @@ export default function AddNewProjectPage() {
                 <TableBody>
                   {filteredSitesList.length > 0 ? (
                     filteredSitesList.map((site) => {
-                      const siteGroups = groups?.filter(g => g.siteIds?.includes(site.id)) || [];
                       return (
                         <TableRow key={site.id} className={cn("hover:bg-muted/5 transition-colors group", selectedIds.includes(site.id) && "bg-primary/[0.02]")}>
                           <TableCell className="text-center">
@@ -973,7 +1023,7 @@ export default function AddNewProjectPage() {
                               onCheckedChange={() => setSelectedIds(prev => prev.includes(site.id) ? prev.filter(i => i !== site.id) : [...prev, site.id])}
                             />
                           </TableCell>
-                          <TableCell className="py-4">
+                          <TableCell className="py-4 text-left">
                             <div className="flex flex-col">
                               <span className="font-bold text-sm text-foreground">{site.name}</span>
                               <span className="text-[9px] font-black uppercase text-muted-foreground tracking-tighter mt-0.5">{site.projectCompany}</span>
@@ -1022,7 +1072,7 @@ export default function AddNewProjectPage() {
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm transition-colors" onClick={() => setSiteToEdit(site)}>
                                 <Pencil className="h-4 w-4" />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm transition-colors" onClick={() => deleteSite(site.id)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive rounded-sm transition-colors" onClick={() => openDeleteDialog(site)}>
                                 <Trash2 className="h-4 w-4" />
                               </Button>
                             </div>
