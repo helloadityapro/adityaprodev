@@ -403,6 +403,12 @@ const formatCapacity = (val: any) => {
   return isNaN(num) ? "0.000" : num.toFixed(3);
 };
 
+const formatTimestamp = (ts: any) => {
+  if (!ts) return '—';
+  const date = ts.toDate ? ts.toDate() : (typeof ts === 'string' ? new Date(ts) : ts);
+  return format(date, 'dd MMM yyyy HH:mm');
+};
+
 const getDaysRemaining = (dateStr?: string) => {
   if (!dateStr) return null;
   const date = parseISO(dateStr);
