@@ -102,10 +102,10 @@ export default function LiaisoningRegistryPage() {
   const { data: userProfile } = useDoc<any>(userProfileRef);
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
 
-  const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
+  const sitesQuery = useMemoFirebase(() => query(collection(firestore, 'sites'), limit(2000)), [firestore]);
   const { data: allSites, isLoading: sitesLoading } = useCollection<Site>(sitesQuery);
 
-  const recordsQuery = useMemoFirebase(() => query(collection(firestore, 'liaisoning_records'), orderBy('updatedAt', 'desc')), [firestore]);
+  const recordsQuery = useMemoFirebase(() => query(collection(firestore, 'liaisoning_records'), orderBy('updatedAt', 'desc'), limit(2000)), [firestore]);
   const { data: records, isLoading: recordsLoading } = useCollection<LiaisoningRecord>(recordsQuery);
 
   // Merge all groundmount sites with existing liaisoning records
@@ -238,7 +238,7 @@ export default function LiaisoningRegistryPage() {
                          <CardTitle className="text-lg font-black uppercase tracking-tight truncate text-foreground group-hover:text-primary transition-colors">{record.siteName}</CardTitle>
                          <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest flex items-center gap-1.5">
                             <Building2 className="h-3 w-3" />
-                            {allSites?.find(s => s.id === record.siteId)?.projectCompany || '—'}
+                            {allSites?.find(s => s.id === record.siteId || s.name === record.siteName)?.projectCompany || '—'}
                          </p>
                       </div>
                       <Badge variant="outline" className={cn(
@@ -341,7 +341,7 @@ export default function LiaisoningRegistryPage() {
                       <TableCell className="px-6 py-4">
                         <div className="flex flex-col">
                           <span className="font-black text-sm text-foreground group-hover:text-primary transition-colors">{record.siteName}</span>
-                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{allSites?.find(s => s.id === record.siteId)?.projectCompany || '—'}</span>
+                          <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">{allSites?.find(s => s.id === record.siteId || s.name === record.siteName)?.projectCompany || '—'}</span>
                         </div>
                       </TableCell>
                       <TableCell>
