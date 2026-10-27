@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -66,6 +67,10 @@ type LiaisoningRecord = {
 };
 
 const STAGE_LABELS: Record<string, string> = {
+  loa: 'LOA',
+  ppa: 'PPA',
+  spv_docs: 'SPV or Company Documents',
+  land_acquisition: 'Land Acquisition',
   grid_connectivity: 'Grid Connectivity',
   estimate_approval: 'Estimate Approval',
   estimate_sanction: 'Estimate Sanction',
@@ -82,6 +87,7 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 const STAGE_ORDER = [
+  'loa', 'ppa', 'spv_docs', 'land_acquisition',
   'grid_connectivity', 'estimate_approval', 'estimate_sanction', 
   'supervision_testing', 'material_inspection', 'work_progress', 
   'wcr', 'pre_commissioning', 'format_ii_approval', 'ptc', 

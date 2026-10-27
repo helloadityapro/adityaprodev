@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -354,10 +355,14 @@ type LiaisoningRecord = {
 const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Pairs", "Drums"];
 
 const MAIN_STAGES = [
-  { id: 'grid_connectivity', label: '1. Grid Connectivity' },
+  { id: 'loa', label: '1. LOA' },
+  { id: 'ppa', label: '2. PPA' },
+  { id: 'spv_docs', label: '3. SPV or Company Documents' },
+  { id: 'land_acquisition', label: '4. Land Acquisition' },
+  { id: 'grid_connectivity', label: '5. Grid Connectivity' },
   { 
     id: 'estimate_approval', 
-    label: '2. Estimate – Approval Stages', 
+    label: '6. Estimate – Approval Stages', 
     subStages: [
       { id: 'ae_je', label: 'Approved from AE/JE' },
       { id: 'dyee', label: 'Approved from DYEE' },
@@ -365,33 +370,33 @@ const MAIN_STAGES = [
       { id: 'circle_office', label: 'Approved from Circle Office' }
     ] 
   },
-  { id: 'estimate_sanction', label: '3. Estimate Sanction' },
-  { id: 'supervision_testing', label: '4. Supervision & Testing Charges' },
-  { id: 'material_inspection', label: '5. Material Inspection' },
+  { id: 'estimate_sanction', label: '7. Estimate Sanction' },
+  { id: 'supervision_testing', label: '8. Supervision & Testing Charges' },
+  { id: 'material_inspection', label: '9. Material Inspection' },
   { 
     id: 'work_progress', 
-    label: '6. Work Progress',
+    label: '10. Work Progress',
     flags: [
       { id: 'started', label: 'Started' },
       { id: 'not_started', label: 'Not Started Yet' },
       { id: 'row', label: 'ROW' }
     ]
   },
-  { id: 'wcr', label: '7. Work Completion Report (WCR)' },
-  { id: 'pre_commissioning', label: '8. Pre-Commissioning' },
+  { id: 'wcr', label: '11. Work Completion Report (WCR)' },
+  { id: 'pre_commissioning', label: '12. Pre-Commissioning' },
   { 
     id: 'format_ii_approval', 
-    label: '9. Format II – Approval Stages',
+    label: '13. Format II – Approval Stages',
     subStages: [
       { id: 'eet', label: 'EE Testing (EET)' },
       { id: 'om', label: 'Superintending Engineer (O&M)' },
       { id: 'setqa', label: 'SE TQA Approved' }
     ]
   },
-  { id: 'ptc', label: '10. Permission to Commission (PTC)' },
-  { id: 'clearance', label: '11. Clearance Certificate / Release Order' },
-  { id: 'commissioning', label: '12. Commissioning' },
-  { id: 'commissioning_certificate', label: '13. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
+  { id: 'ptc', label: '14. Permission to Commission (PTC)' },
+  { id: 'clearance', label: '15. Clearance Certificate / Release Order' },
+  { id: 'commissioning', label: '16. Commissioning' },
+  { id: 'commissioning_certificate', label: '17. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
 ];
 
 const formatCapacity = (val: any) => {
@@ -494,7 +499,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const [paymentSortConfig, setPaymentSortConfig] = React.useState<{ key: PaymentSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [viewingPayment, setViewingPayment] = React.useState<Payment | null>(null);
 
-  const [activeStageId, setActiveStageId] = React.useState<string>('grid_connectivity');
+  const [activeStageId, setActiveStageId] = React.useState<string>('loa');
   const [uploadingStageId, setUploadingStageId] = React.useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = React.useState(0);
   const [isContractorPopoverOpen, setIsContractorPopoverOpen] = React.useState(false);
@@ -896,7 +901,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const handlePOSort = (key: POSortKey) => {
-    setPoSortConfig(prev => ({
+    setSortConfig(prev => ({
       key,
       direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc'
     }));
@@ -915,7 +920,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   };
 
   const WOSortIcon = ({ column }: { column: WOSortKey }) => {
-    if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    if (woSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
@@ -1588,10 +1593,12 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                           <Label className="text-[10px] font-bold uppercase text-muted-foreground tracking-tight">Material Item</Label>
                           <Popover open={isBomItemPopoverOpen} onOpenChange={setIsBomItemPopoverOpen}>
                             <PopoverTrigger asChild>
-                              <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/10", !selectedMasterItem && "text-muted-foreground")}>
-                                <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
-                                <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                              </Button>
+                              <FormControl>
+                                <Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-9 rounded-sm bg-background border-primary/10", !selectedMasterItem && "text-muted-foreground")}>
+                                  <span className="truncate">{selectedMasterItem ? selectedMasterItem.name : "Choose material..."}</span>
+                                  <CheckCircle2 className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                </Button>
+                              </FormControl>
                             </PopoverTrigger>
                             <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                               <div className="flex items-center border-b px-3">

@@ -1,8 +1,8 @@
 
-'use client';
+"use client";
 
-import * as React from 'react';
-import { useRouter } from 'next/navigation';
+import * as React from "react";
+import { useRouter } from "next/navigation";
 import { 
   useFirestore, 
   useUser, 
@@ -82,10 +82,14 @@ type LiaisoningRecord = {
 };
 
 const MAIN_STAGES = [
-  { id: 'grid_connectivity', label: '1. Grid Connectivity' },
+  { id: 'loa', label: '1. LOA' },
+  { id: 'ppa', label: '2. PPA' },
+  { id: 'spv_docs', label: '3. SPV or Company Documents' },
+  { id: 'land_acquisition', label: '4. Land Acquisition' },
+  { id: 'grid_connectivity', label: '5. Grid Connectivity' },
   { 
     id: 'estimate_approval', 
-    label: '2. Estimate – Approval Stages', 
+    label: '6. Estimate – Approval Stages', 
     subStages: [
       { id: 'ae_je', label: 'Approved from AE/JE' },
       { id: 'dyee', label: 'Approved from DYEE' },
@@ -93,33 +97,33 @@ const MAIN_STAGES = [
       { id: 'circle_office', label: 'Approved from Circle Office' }
     ] 
   },
-  { id: 'estimate_sanction', label: '3. Estimate Sanction' },
-  { id: 'supervision_testing', label: '4. Supervision & Testing Charges' },
-  { id: 'material_inspection', label: '5. Material Inspection' },
+  { id: 'estimate_sanction', label: '7. Estimate Sanction' },
+  { id: 'supervision_testing', label: '8. Supervision & Testing Charges' },
+  { id: 'material_inspection', label: '9. Material Inspection' },
   { 
     id: 'work_progress', 
-    label: '6. Work Progress',
+    label: '10. Work Progress',
     flags: [
       { id: 'started', label: 'Started' },
       { id: 'not_started', label: 'Not Started Yet' },
       { id: 'row', label: 'ROW' }
     ]
   },
-  { id: 'wcr', label: '7. Work Completion Report (WCR)' },
-  { id: 'pre_commissioning', label: '8. Pre-Commissioning' },
+  { id: 'wcr', label: '11. Work Completion Report (WCR)' },
+  { id: 'pre_commissioning', label: '12. Pre-Commissioning' },
   { 
     id: 'format_ii_approval', 
-    label: '9. Format II – Approval Stages',
+    label: '13. Format II – Approval Stages',
     subStages: [
       { id: 'eet', label: 'EE Testing (EET)' },
       { id: 'om', label: 'Superintending Engineer (O&M)' },
       { id: 'setqa', label: 'SE TQA Approved' }
     ]
   },
-  { id: 'ptc', label: '10. Permission to Commission (PTC)' },
-  { id: 'clearance', label: '11. Clearance Certificate / Release Order' },
-  { id: 'commissioning', label: '12. Commissioning' },
-  { id: 'commissioning_certificate', label: '13. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
+  { id: 'ptc', label: '14. Permission to Commission (PTC)' },
+  { id: 'clearance', label: '15. Clearance Certificate / Release Order' },
+  { id: 'commissioning', label: '16. Commissioning' },
+  { id: 'commissioning_certificate', label: '17. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
 ];
 
 export default function ManageLiaisoningPage({ params }: { params: Promise<{ siteId: string }> }) {
@@ -130,7 +134,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   const router = useRouter();
   const { toast } = useToast();
 
-  const [activeStageId, setActiveStageId] = React.useState<string>('grid_connectivity');
+  const [activeStageId, setActiveStageId] = React.useState<string>('loa');
   const [uploadingStageId, setUploadingStageId] = React.useState<string | null>(null);
   const [uploadProgress, setUploadProgress] = React.useState(0);
   
