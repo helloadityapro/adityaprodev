@@ -139,6 +139,57 @@ import { Separator } from '@/components/ui/separator';
 import { type PageKey, slugifyRole } from '@/lib/access-control';
 import { Progress } from '@/components/ui/progress';
 
+type DataItem = {
+  id: string;
+  siteId?: string;
+  siteName: string;
+  sourceOrDestinationType?: string;
+  sourceOrDestination?: string;
+  title?: string;
+  itemName?: string;
+  tableNumber?: string;
+  name?: string;
+  fileName?: string;
+  createdAt?: any;
+  requestDate?: any;
+  date?: any;
+  status?: string;
+  userId?: string;
+  userName?: string;
+  siteEngineerId?: string;
+  siteEngineerName?: string;
+  assignedToId?: string;
+  assignedToName?: string;
+  assignedById?: string;
+  assignedByName?: string;
+  siteManagerId?: string | null;
+  ptwType?: string;
+  movementType?: string;
+  amount?: number;
+  poNumber?: string;
+  woNumber?: string;
+  createdByName?: string;
+  recordedByName?: string;
+  referenceNumber?: string;
+  amountInRs?: number;
+  username?: string;
+  pickupLocation?: string;
+  dropLocation?: string;
+  vehicleDetails?: string;
+  driverId?: string;
+  driverName?: string;
+  uploadedByName?: string;
+  createdBy?: string;
+  comments?: any[];
+  updatedAt?: any;
+  startTime?: any;
+  endTime?: any;
+  approvalDate?: any;
+  assigneeIds?: string[];
+  assigneeStates?: Record<string, any>;
+  assignedRoles?: string[];
+};
+
 type Project = {
   id: string;
   name: string;
@@ -690,11 +741,36 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   );
   const { data: tasks } = useCollection(taskQuery);
 
-  const movementQuery = useMemoFirebase(() => 
-    query(collection(firestore, 'material_movements'), where('siteId', '==', projectId)),
-    [firestore, projectId]
-  );
-  const { data: movements } = useCollection(movementQuery);
+  const movementQuery = useMemoFirebase(() => {
+    if (!projectId || !siteName) return null;
+    return query(
+      collection(firestore, 'material_movements'),
+      or(
+        where('siteId', '==', projectId),
+        and(
+          where('sourceOrDestinationType', '==', 'Site'),
+          where('sourceOrDestination', '==', siteName)
+        )
+      )
+    );
+  }, [firestore, projectId, siteName]);
+  
+  const { data: rawMovements } = useCollection<DataItem>(movementQuery);
+
+  const movements = React.useMemo(() => {
+    if (!rawMovements || !siteName) return [];
+    return rawMovements.map(m => {
+      // If this site is the "Other Side" of a transfer recorded elsewhere
+      if (m.siteId !== projectId && m.sourceOrDestinationType === 'Site' && m.sourceOrDestination === siteName) {
+        return {
+          ...m,
+          movementType: m.movementType === 'Inward' ? 'Outward' : 'Inward',
+          sourceOrDestination: m.siteName, // The other site's name
+        };
+      }
+      return m;
+    });
+  }, [rawMovements, projectId, siteName]);
 
   const visitQuery = useMemoFirebase(() => 
     query(collection(firestore, 'site_visits'), where('siteId', '==', projectId)),
@@ -1136,7 +1212,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const handleDeleteWO = async () => {
     if (!woToDelete) return;
     try {
-      await deleteDocumentNonBlocking(doc(firestore, 'project_wos', woToDelete.id));
+      await deleteDocumentNonBlocking(doc(firestore, 'work_orders', woToDelete.id));
       toast({ title: 'WO Removed', description: 'Work Order has been deleted from site records.' });
       setWoToDelete(null);
     } catch (e: any) {
@@ -1821,7 +1897,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                               </TableCell>
                             </TableRow>
                             {expandedBomRows.has(item.id) && item.subItems && (
-                              <TableRow className="bg-primary/[0.02]">
+                              <TableRow className="bg-primary/[0.01]">
                                 <TableCell colSpan={7} className="p-0 border-b">
                                   <div className="p-4 px-12 space-y-3 animate-in slide-in-from-top-1 duration-200 text-left"><div className="flex items-center gap-2 mb-2"><Layers className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-widest text-primary">Component Breakdown for {item.itemName}</span></div><div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">{item.subItems.map((sub, sIdx) => (<div key={sIdx} className="p-3 bg-background border border-primary/5 rounded-sm flex flex-col gap-1"><span className="text-xs font-bold">{sub.name}</span><div className="flex items-center justify-between text-[10px]"><span className="text-muted-foreground uppercase font-medium">Per Set: {sub.quantityPerSet} {sub.unit}</span><span className="text-primary font-black uppercase">Total: {(sub.quantityPerSet * (item.approvedQuantity || item.plannedQuantity)).toFixed(2)} {sub.unit}</span></div></div>))}</div></div>
                                 </TableCell>
@@ -2121,7 +2197,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                         </div>
                                         {itemMovements.length > 0 ? (
                                           <div className="grid gap-2">
-                                            {itemMovements.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((m: any) => (
+                                            {[...itemMovements].sort((a: any, b: any) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0)).map((m: any) => (
                                               <div key={m.id} className="flex items-center justify-between p-3 bg-background border rounded-sm text-[11px] shadow-sm">
                                                 <div className="flex items-center gap-4">
                                                   <Badge variant="outline" className={cn("text-[8px] font-black h-5 px-1.5 uppercase", m.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>
@@ -2152,7 +2228,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                                         </div>
                                         {itemUtilisations.length > 0 ? (
                                           <div className="grid gap-2">
-                                            {itemUtilisations.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((u: any) => (
+                                            {[...itemUtilisations].sort((a: any, b: any) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0)).map((u: any) => (
                                               <div key={u.id} className="flex items-center justify-between p-3 bg-background border rounded-sm text-[11px] shadow-sm">
                                                 <div className="flex items-center gap-4">
                                                   <Badge variant="outline" className="text-[8px] font-black h-5 px-1.5 uppercase bg-amber-50 text-amber-700 border-amber-200">
@@ -2283,7 +2359,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {movements.sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((mov: any) => (
+                        {[...movements].sort((a: any, b: any) => (b.createdAt?.toDate?.() || 0) - (a.createdAt?.toDate?.() || 0)).map((mov: any) => (
                           <TableRow key={mov.id} className="hover:bg-muted/5">
                             <TableCell className="px-6 py-4 font-mono text-xs font-bold whitespace-nowrap uppercase">{mov.movementDate}</TableCell>
                             <TableCell>
