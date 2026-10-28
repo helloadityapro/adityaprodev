@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -6,7 +5,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, limit, getDocs, addDoc, and, or } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, limit, getDocs, addDoc, and, or, increment } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -23,12 +22,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
 import { Progress } from "@/components/ui/progress";
-import { increment } from "firebase/firestore";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -122,9 +121,6 @@ export default function RecordMovementPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
-
-  const contractorsQuery = useMemoFirebase(() => collection(firestore, 'contractors'), [firestore]);
-  const { data: allContractors } = useCollection<any>(contractorsQuery);
 
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
@@ -371,23 +367,24 @@ export default function RecordMovementPage() {
       let receivingManagerId = null;
       if (isTransfer) {
         const destSiteName = values.movementType === 'Outward' ? values.sourceOrDestination : values.siteName;
-        const destSiteId = allSites?.find(s => s.name === destSiteName)?.id;
+        const destSite = allSites?.find(s => s.name === destSiteName);
         
-        if (destSiteId) {
-          const receivingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', destSiteId)));
+        if (destSite) {
+          const receivingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', destSite.id)));
           const receivingOverridesSnap = await getDocs(receivingOverridesQ);
           if (!receivingOverridesSnap.empty) {
             receivingManagerId = receivingOverridesSnap.docs[0].data().managerId;
           } else {
             const usersQ = query(collection(firestore, 'users'), where('role', '==', 'Site Manager'));
             const usersSnap = await getDocs(usersQ);
-            const manager = usersSnap.docs.find(d => (d.data().assignedProjectIds || []).includes(destSiteId));
+            const manager = usersSnap.docs.find(d => (d.data().assignedProjectIds || []).includes(destSite.id));
             receivingManagerId = manager?.id || null;
           }
         }
       }
 
       for (const item of values.items) {
+        // Log the movement for the current site
         addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           ...values,
           itemName: item.itemName,
@@ -403,53 +400,53 @@ export default function RecordMovementPage() {
           createdAt: serverTimestamp()
         });
 
-        const shouldUpdateStock = values.movementType === 'Outward' || !isTransfer;
+        // Always update stock at the current recording site
+        const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('itemName', '==', item.itemName));
+        const invSnap = await getDocs(invQuery);
+        const currentSiteAdjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
 
-        if (shouldUpdateStock) {
-          const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('itemName', '==', item.itemName));
-          const invSnap = await getDocs(invQuery);
-          const adjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
-
-          if (!invSnap.empty) {
-            const invDoc = invSnap.docs[0];
-            updateDocumentNonBlocking(doc(firestore, 'project_inventory', invDoc.id), {
-              stockLevel: increment(adjustment),
-              lastUpdated: serverTimestamp()
-            });
-          } else {
-            const newInvRef = doc(collection(firestore, 'project_inventory'));
-            setDocumentNonBlocking(newInvRef, {
-              siteId: selectedSiteId,
-              siteName: values.siteName,
-              itemName: item.itemName,
-              stockLevel: Math.max(0, adjustment),
-              unit: item.unit,
-              lastUpdated: serverTimestamp()
-            }, { merge: true });
-          }
+        if (!invSnap.empty) {
+          const invDoc = invSnap.docs[0];
+          updateDocumentNonBlocking(doc(firestore, 'project_inventory', invDoc.id), {
+            stockLevel: increment(currentSiteAdjustment),
+            lastUpdated: serverTimestamp()
+          });
+        } else {
+          const newInvRef = doc(collection(firestore, 'project_inventory'));
+          setDocumentNonBlocking(newInvRef, {
+            siteId: selectedSiteId,
+            siteName: values.siteName,
+            itemName: item.itemName,
+            stockLevel: Math.max(0, currentSiteAdjustment),
+            unit: item.unit,
+            lastUpdated: serverTimestamp()
+          }, { merge: true });
         }
 
-        // Logic for destination site update in site-to-site outward transfers
-        if (values.movementType === 'Outward' && isTransfer) {
-          const destSite = allSites?.find(s => s.name === values.sourceOrDestination);
-          if (destSite) {
-            const destInvQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', destSite.id), where('itemName', '==', item.itemName));
-            const destInvSnap = await getDocs(destInvQuery);
-            const destAdjustment = item.quantity; // Add stock to destination
+        // Logic for "Other Side" update in site-to-site transfers
+        if (isTransfer) {
+          const otherSite = allSites?.find(s => s.name === values.sourceOrDestination);
+          if (otherSite) {
+            const otherInvQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', otherSite.id), where('itemName', '==', item.itemName));
+            const otherInvSnap = await getDocs(otherInvQuery);
+            
+            // If current is Inward (receiving from other), other is Outward (deduct)
+            // If current is Outward (sending to other), other is Inward (add)
+            const otherSiteAdjustment = values.movementType === 'Inward' ? -item.quantity : item.quantity;
 
-            if (!destInvSnap.empty) {
-              const destInvDoc = destInvSnap.docs[0];
-              updateDocumentNonBlocking(doc(firestore, 'project_inventory', destInvDoc.id), {
-                stockLevel: increment(destAdjustment),
+            if (!otherInvSnap.empty) {
+              const otherInvDoc = otherInvSnap.docs[0];
+              updateDocumentNonBlocking(doc(firestore, 'project_inventory', otherInvDoc.id), {
+                stockLevel: increment(otherSiteAdjustment),
                 lastUpdated: serverTimestamp()
               });
             } else {
-              const newDestInvRef = doc(collection(firestore, 'project_inventory'));
-              setDocumentNonBlocking(newDestInvRef, {
-                siteId: destSite.id,
-                siteName: destSite.name,
+              const newOtherInvRef = doc(collection(firestore, 'project_inventory'));
+              setDocumentNonBlocking(newOtherInvRef, {
+                siteId: otherSite.id,
+                siteName: otherSite.name,
                 itemName: item.itemName,
-                stockLevel: destAdjustment,
+                stockLevel: Math.max(0, otherSiteAdjustment),
                 unit: item.unit,
                 lastUpdated: serverTimestamp()
               }, { merge: true });
@@ -734,7 +731,7 @@ export default function RecordMovementPage() {
                             <Popover open={openItemPopoverIndex === index} onOpenChange={o => setOpenItemPopoverIndex(o ? index : null)}>
                               <PopoverTrigger asChild>
                                 <FormControl>
-                                  <Button variant="outline" className={cn("w-full justify-between h-auto min-h-10 bg-background text-left text-xs rounded-sm", !itemField.value && "text-muted-foreground")}>
+                                  <Button variant="outline" role="combobox" className={cn("w-full justify-between h-auto min-h-10 bg-background text-left text-xs rounded-sm", !itemField.value && "text-muted-foreground")}>
                                     <span className="truncate whitespace-normal leading-tight">{itemField.value || "Select material..."}</span>
                                     <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                                   </Button>
