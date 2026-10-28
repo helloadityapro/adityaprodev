@@ -197,7 +197,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
     if (currentFolderId === null) {
       const list = allFolders ? allFolders.filter(f => f.parentFolderId === null) : [];
       return [
-        { id: 'liaison_root', name: 'Liaisoning Portfolio', isVirtual: true },
+        { id: 'liaison_root', name: 'Liaisoning Documents', isVirtual: true },
         ...list
       ];
     }
@@ -221,7 +221,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
     let cur = currentFolderId;
 
     if (isLiaisonRoot) {
-      path.unshift({ id: 'liaison_root', name: 'Liaisoning Portfolio' });
+      path.unshift({ id: 'liaison_root', name: 'Liaisoning Documents' });
       return path;
     }
 
@@ -229,7 +229,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
       const stageId = currentFolderId?.replace('liaison_stage_', '');
       const stage = LIAISONING_STAGES.find(s => s.id === stageId);
       path.unshift({ id: currentFolderId!, name: stage?.label || 'Stage' });
-      path.unshift({ id: 'liaison_root', name: 'Liaisoning Portfolio' });
+      path.unshift({ id: 'liaison_root', name: 'Liaisoning Documents' });
       return path;
     }
 
@@ -398,7 +398,7 @@ export default function SiteDocumentsPage({ params }: { params: Promise<{ siteId
         {isReadOnlyArea && (
           <div className="flex justify-end">
             <Badge variant="outline" className="bg-primary/5 text-primary border-primary/20 py-2 px-4 rounded-sm font-black uppercase text-[10px] tracking-widest">
-              <ShieldCheck className="h-3.5 w-3.5 mr-2" /> Liaisoning Portfolio (Sync Only)
+              <ShieldCheck className="h-3.5 w-3.5 mr-2" /> Liaisoning Documents
             </Badge>
           </div>
         )}

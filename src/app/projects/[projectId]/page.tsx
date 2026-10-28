@@ -569,7 +569,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     if (!bomItems) return [];
     
     let result = bomItems.filter(item => {
-      const matchesSearch = item.itemName.toLowerCase().includes(bomTableSearch.toLowerCase()) || 
+      const matchesSearch =(item.itemName || "").toLowerCase().includes(bomTableSearch.toLowerCase()) || 
                            (item.specification || "").toLowerCase().includes(bomTableSearch.toLowerCase()) ||
                            (item.category || "").toLowerCase().includes(bomTableSearch.toLowerCase()) ||
                            (item.make || "").toLowerCase().includes(bomTableSearch.toLowerCase());
@@ -949,6 +949,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
       siteId: projectId,
       siteName: siteName,
       make: selectedMasterItem.make || "Standard",
+      itemName: selectedMasterItem.name || itemName,
       category: selectedMasterItem.category,
       specification: selectedMasterItem.description || "",
       plannedQuantity: parseFloat(formData.get('qty') as string),
@@ -1361,7 +1362,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
                 <div className="space-y-6">
                   <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">
                     <CardHeader className="py-4 border-b bg-muted/5 text-left">
-                      <CardTitle className="text-xs font-bold uppercase tracking-widest">LIFECYCLE AND SHOW ALL PROJECT DATES</CardTitle>
+                      <CardTitle className="text-xs font-bold uppercase tracking-widest">WORK STATUS AND PROJECT DATES</CardTitle>
                     </CardHeader>
                     <CardContent className="pt-6 space-y-6 text-left">
                       <div className="grid grid-cols-2 gap-4">

@@ -24,6 +24,7 @@ import {
   Lock,
   Mail,
   User,
+  UserIcon,
   Tag,
   RotateCcw
 } from 'lucide-react';

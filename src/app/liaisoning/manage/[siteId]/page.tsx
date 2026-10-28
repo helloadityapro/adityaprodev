@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -17,6 +16,7 @@ import { doc, serverTimestamp, collection, query, where, getDocs, updateDoc, ref
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { 
@@ -53,7 +53,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Input } from '@/components/ui/input';
+import { Input as StandardInput } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 
 type LiaisoningDocument = {
@@ -206,6 +206,17 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
   const handleUpdateStage = async (stageId: string, updates: Partial<StageData>, logAction?: string) => {
     if (!record || !userProfile) return;
     const updatedStages = { ...record.stages };
+    
+    // Safety check for missing stage data
+    if (!updatedStages[stageId]) {
+      updatedStages[stageId] = {
+        status: 'Pending',
+        remarks: "",
+        documents: [],
+        auditLog: []
+      };
+    }
+    
     const currentStage = updatedStages[stageId];
     
     let nextLog = currentStage.auditLog || [];
@@ -276,7 +287,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
       });
     }
 
-    let newStatus = record.stages[stageId].status;
+    let newStatus = record.stages[stageId]?.status || 'Pending';
     const allChecked = stageDef.subStages.every(ss => nextSubStages[ss.id]);
     
     if (!allChecked && newStatus === 'Completed') {
@@ -319,17 +330,25 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
           };
 
           const updatedStages = { ...record.stages };
-          if (updatedStages[stageId]) {
-            updatedStages[stageId].documents = [...(updatedStages[stageId].documents || []), newDoc];
-            updatedStages[stageId].auditLog = [...(updatedStages[stageId].auditLog || []), auditEntry];
-            
-            updateDocumentNonBlocking(recordRef, {
-              stages: updatedStages,
-              updatedAt: serverTimestamp()
-            });
-
-            toast({ title: 'Document Uploaded' });
+          
+          if (!updatedStages[stageId]) {
+            updatedStages[stageId] = {
+              status: 'Pending',
+              remarks: "",
+              documents: [],
+              auditLog: []
+            };
           }
+
+          updatedStages[stageId].documents = [...(updatedStages[stageId].documents || []), newDoc];
+          updatedStages[stageId].auditLog = [...(updatedStages[stageId].auditLog || []), auditEntry];
+          
+          updateDocumentNonBlocking(recordRef, {
+            stages: updatedStages,
+            updatedAt: serverTimestamp()
+          });
+
+          toast({ title: 'Document Uploaded' });
           setUploadingStageId(null);
           setUploadProgress(0);
         }
@@ -422,7 +441,7 @@ export default function ManageLiaisoningPage({ params }: { params: Promise<{ sit
                       </div>
                       <div className="flex items-center border-b px-3">
                         <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                        <Input 
+                        <StandardInput 
                           placeholder="Search registry..." 
                           className="h-10 border-none focus-visible:ring-0 text-xs" 
                           value={contractorSearch} 
