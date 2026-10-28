@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -5,7 +6,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, and, or } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, limit, getDocs, addDoc, and, or } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,12 +23,12 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { format } from "date-fns";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
 import { Progress } from "@/components/ui/progress";
+import { increment } from "firebase/firestore";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -49,6 +50,7 @@ const movementSchema = z.object({
 type Site = {
   id: string;
   name: string;
+  projectCompany: string;
 };
 
 type Supplier = {
@@ -410,7 +412,7 @@ export default function RecordMovementPage() {
 
           if (!invSnap.empty) {
             const invDoc = invSnap.docs[0];
-            updateDocumentNonBlocking(invDoc.ref, {
+            updateDocumentNonBlocking(doc(firestore, 'project_inventory', invDoc.id), {
               stockLevel: increment(adjustment),
               lastUpdated: serverTimestamp()
             });
@@ -424,6 +426,34 @@ export default function RecordMovementPage() {
               unit: item.unit,
               lastUpdated: serverTimestamp()
             }, { merge: true });
+          }
+        }
+
+        // Logic for destination site update in site-to-site outward transfers
+        if (values.movementType === 'Outward' && isTransfer) {
+          const destSite = allSites?.find(s => s.name === values.sourceOrDestination);
+          if (destSite) {
+            const destInvQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', destSite.id), where('itemName', '==', item.itemName));
+            const destInvSnap = await getDocs(destInvQuery);
+            const destAdjustment = item.quantity; // Add stock to destination
+
+            if (!destInvSnap.empty) {
+              const destInvDoc = destInvSnap.docs[0];
+              updateDocumentNonBlocking(doc(firestore, 'project_inventory', destInvDoc.id), {
+                stockLevel: increment(destAdjustment),
+                lastUpdated: serverTimestamp()
+              });
+            } else {
+              const newDestInvRef = doc(collection(firestore, 'project_inventory'));
+              setDocumentNonBlocking(newDestInvRef, {
+                siteId: destSite.id,
+                siteName: destSite.name,
+                itemName: item.itemName,
+                stockLevel: destAdjustment,
+                unit: item.unit,
+                lastUpdated: serverTimestamp()
+              }, { merge: true });
+            }
           }
         }
       }

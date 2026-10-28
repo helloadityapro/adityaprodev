@@ -5,28 +5,29 @@ import * as React from "react";
 import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
+import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, addDoc, and, or } from "firebase/firestore";
+import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useFirebaseApp, useFirestore, useUser, useDoc, useMemoFirebase, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, increment, query, where, limit, getDocs, setDoc, and, or } from "firebase/firestore";
-import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
+import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { isSuperAdmin } from "@/lib/auth-constants";
-import { Separator } from "@/components/ui/separator";
-import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { useRouter } from "next/navigation";
 import { sendNotification } from "@/lib/notifications";
 import { slugifyRole } from "@/lib/access-control";
+import { Progress } from "@/components/ui/progress";
 
 const itemSchema = z.object({
   itemName: z.string().min(1, "Item selection is required"),
@@ -48,6 +49,7 @@ const movementSchema = z.object({
 type Site = {
   id: string;
   name: string;
+  projectCompany: string;
 };
 
 type Supplier = {
@@ -120,6 +122,9 @@ export default function RecordMovementPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
+  const contractorsQuery = useMemoFirebase(() => collection(firestore, 'contractors'), [firestore]);
+  const { data: allContractors } = useCollection<any>(contractorsQuery);
+
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
@@ -136,7 +141,6 @@ export default function RecordMovementPage() {
     if (!allSites || !userProfile) return [];
     if (isAdmin) return Array.from(new Map(allSites.map(s => [s.name, s])).values());
     
-    // Sovereignty Logic
     const siteIds = new Set<string>(userProfile.assignedProjectIds || []);
     if (isManager) {
       allOverrides?.filter(o => o.managerId === userProfile.id).forEach(o => siteIds.add(o.siteId));
@@ -190,23 +194,24 @@ export default function RecordMovementPage() {
 
   const selectedSiteId = React.useMemo(() => allSites?.find(s => s.name === watchSiteName)?.id, [allSites, watchSiteName]);
 
+  const inventoryQuery = useMemoFirebase(() => {
+    if (!selectedSiteId) return null;
+    return query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId));
+  }, [firestore, selectedSiteId]);
+  const { data: projectInventory } = useCollection<InventoryItem>(inventoryQuery);
+
   React.useEffect(() => {
     if (selectedSiteId && watchSiteName) {
       const fetchData = async () => {
-        // 1. Fetch approved BoM
-        const bomQ = query(collection(firestore, 'project_bom'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
+        const bomQ = query(collection(firestore, 'project_boms'), where('siteId', '==', selectedSiteId), where('status', '==', 'Approved'));
         const bomSnap = await getDocs(bomQ);
         setApprovedBomItems(bomSnap.docs.map(d => ({ id: d.id, ...d.data() } as BoMItem)));
 
-        // 2. Fetch approved POs for inward supplier restriction
         const poQ = query(
           collection(firestore, 'project_pos'), 
           and(
             where('status', '==', 'Accepted'),
-            or(
-              where('siteId', '==', selectedSiteId),
-              where('siteName', '==', watchSiteName)
-            )
+            or(where('siteId', '==', selectedSiteId), where('siteName', '==', watchSiteName))
           )
         );
         const poSnap = await getDocs(poQ);
@@ -217,7 +222,7 @@ export default function RecordMovementPage() {
   }, [selectedSiteId, watchSiteName, firestore]);
 
   React.useEffect(() => {
-    if (sourceOrDestinationType === 'Site' && watchSource) {
+    if (movementType === 'Inward' && sourceOrDestinationType === 'Site' && watchSource) {
       const sourceSiteId = allSites?.find(s => s.name === watchSource)?.id;
       if (sourceSiteId) {
         const fetchInv = async () => {
@@ -227,8 +232,10 @@ export default function RecordMovementPage() {
         };
         fetchInv();
       }
+    } else {
+      setSourceSiteInventory([]);
     }
-  }, [sourceOrDestinationType, watchSource, allSites, firestore]);
+  }, [movementType, sourceOrDestinationType, watchSource, allSites, firestore]);
 
   React.useEffect(() => {
     form.setValue("items", [{ itemName: "", quantity: 0, unit: "Numbers" }]);
@@ -248,48 +255,95 @@ export default function RecordMovementPage() {
   }, [allSuppliers, suppliersWithPOs, movementType, sourceOrDestinationType, supplierSearchQuery]);
 
   const filteredLookupItems = React.useMemo(() => {
-    let list: { name: string; unit: string; make: string; stockLevel: number }[] = [];
+    let list: { name: string; unit: string; make: string; stockLevel: number; id: string }[] = [];
 
-    const projectInventoryQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId || ""));
-    // Since this is in a useMemo we can't easily await getDocs here without more state.
-    // Relying on the projectInventory from useCollection if we were using it globally, but for now we list all BoM items.
-
-    if (movementType === 'Inward' && sourceOrDestinationType === 'Supplier') {
-      const selectedSupplierId = allSuppliers?.find(s => s.name === watchSource)?.id;
-      const supplierPOs = approvedPOs.filter(po => po.supplierId === selectedSupplierId);
-      const itemNames = new Set<string>();
-      supplierPOs.forEach(po => po.items.forEach(it => itemNames.add(it.itemName)));
-      
-      approvedBomItems.forEach(item => {
-        if (itemNames.has(item.itemName)) {
-          if (item.subItems && item.subItems.length > 0) {
-            item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "", stockLevel: 999999 }));
-          } else {
-            list.push({ name: item.itemName, unit: item.unit, make: item.make || "", stockLevel: 999999 });
-          }
-        }
-      });
-    } else if (sourceOrDestinationType === 'Site') {
-      const sourceSiteName = movementType === 'Outward' ? watchSiteName : watchSource;
-      const sourceSiteId = allSites?.find(s => s.name === sourceSiteName)?.id;
-      
-      sourceSiteInventory.forEach(inv => {
+    if (movementType === 'Outward') {
+      projectInventory?.forEach(inv => {
         if (inv.stockLevel > 0) {
-          list.push({ name: inv.itemName, unit: inv.unit, make: "", stockLevel: inv.stockLevel });
+          list.push({
+            id: inv.id,
+            name: inv.itemName,
+            unit: inv.unit,
+            make: "",
+            stockLevel: inv.stockLevel
+          });
         }
       });
     } else {
-      approvedBomItems.forEach(item => {
-        if (item.subItems && item.subItems.length > 0) {
-          item.subItems.forEach(sub => list.push({ name: `${item.itemName} - ${sub.name}`, unit: sub.unit, make: item.make || "", stockLevel: 999999 }));
-        } else {
-          list.push({ name: item.itemName, unit: item.unit, make: item.make || "", stockLevel: 999999 });
-        }
-      });
+      if (sourceOrDestinationType === 'Supplier') {
+        const selectedSupplierId = allSuppliers?.find(s => s.name === watchSource)?.id;
+        const supplierPOs = approvedPOs.filter(po => po.supplierId === selectedSupplierId);
+        const itemNames = new Set<string>();
+        supplierPOs.forEach(po => po.items?.forEach(it => itemNames.add(it.itemName)));
+        
+        approvedBomItems.forEach(item => {
+          if (itemNames.has(item.itemName)) {
+            if (item.subItems && item.subItems.length > 0) {
+              item.subItems.forEach(sub => {
+                const fullName = `${item.itemName} - ${sub.name}`;
+                const inv = projectInventory?.find(i => i.itemName === fullName);
+                list.push({
+                  id: inv?.id || `new-${fullName}`,
+                  name: fullName,
+                  unit: sub.unit,
+                  make: item.make || "",
+                  stockLevel: 999999 
+                });
+              });
+            } else {
+              const inv = projectInventory?.find(i => i.itemName === item.itemName);
+              list.push({
+                id: inv?.id || `new-${item.id}`,
+                name: item.itemName,
+                unit: item.unit,
+                make: item.make || "",
+                stockLevel: 999999
+              });
+            }
+          }
+        });
+      } else if (sourceOrDestinationType === 'Site') {
+        sourceSiteInventory.forEach(inv => {
+          if (inv.stockLevel > 0) {
+            list.push({
+              id: inv.id,
+              name: inv.itemName,
+              unit: inv.unit,
+              make: "",
+              stockLevel: inv.stockLevel
+            });
+          }
+        });
+      } else {
+        approvedBomItems.forEach(item => {
+          if (item.subItems && item.subItems.length > 0) {
+            item.subItems.forEach(sub => {
+              const fullName = `${item.itemName} - ${sub.name}`;
+              const inv = projectInventory?.find(i => i.itemName === fullName);
+              list.push({
+                id: inv?.id || `new-${fullName}`,
+                name: fullName,
+                unit: sub.unit,
+                make: item.make || "",
+                stockLevel: 999999
+              });
+            });
+          } else {
+            const inv = projectInventory?.find(i => i.itemName === item.itemName);
+            list.push({
+              id: inv?.id || `new-${item.id}`,
+              name: item.itemName,
+              unit: item.unit,
+              make: item.make || "",
+              stockLevel: 999999
+            });
+          }
+        });
+      }
     }
 
-    return list.filter(i => i.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
-  }, [approvedBomItems, approvedPOs, sourceSiteInventory, itemSearchQuery, movementType, sourceOrDestinationType, watchSource, allSuppliers, allSites, watchSiteName, firestore, selectedSiteId]);
+    return list.filter(m => m.name.toLowerCase().includes(itemSearchQuery.toLowerCase()));
+  }, [movementType, projectInventory, sourceOrDestinationType, watchSource, allSuppliers, approvedPOs, approvedBomItems, sourceSiteInventory, itemSearchQuery]);
 
   const onSubmit = async (values: z.infer<typeof movementSchema>) => {
     if (!user || !userProfile || !selectedSiteId) return;
@@ -348,11 +402,6 @@ export default function RecordMovementPage() {
           createdAt: serverTimestamp()
         });
 
-        // Stock Update Logic
-        // Rule: 
-        // 1. If Outward: Always deduct from current site immediately (it's leaving).
-        // 2. If Inward and NOT a transfer (from Supplier): Add to current site immediately.
-        // 3. If Inward and IS a transfer: Wait for approval (don't update stock here).
         const shouldUpdateStock = values.movementType === 'Outward' || !isTransfer;
 
         if (shouldUpdateStock) {
@@ -378,6 +427,34 @@ export default function RecordMovementPage() {
             }, { merge: true });
           }
         }
+
+        // Logic for destination site update in site-to-site outward transfers
+        if (values.movementType === 'Outward' && isTransfer) {
+          const destSite = allSites?.find(s => s.name === values.sourceOrDestination);
+          if (destSite) {
+            const destInvQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', destSite.id), where('itemName', '==', item.itemName));
+            const destInvSnap = await getDocs(destInvQuery);
+            const destAdjustment = item.quantity; // Add stock to destination
+
+            if (!destInvSnap.empty) {
+              const destInvDoc = destInvSnap.docs[0];
+              updateDocumentNonBlocking(doc(firestore, 'project_inventory', destInvDoc.id), {
+                stockLevel: increment(destAdjustment),
+                lastUpdated: serverTimestamp()
+              });
+            } else {
+              const newDestInvRef = doc(collection(firestore, 'project_inventory'));
+              setDocumentNonBlocking(newDestInvRef, {
+                siteId: destSite.id,
+                siteName: destSite.name,
+                itemName: item.itemName,
+                stockLevel: destAdjustment,
+                unit: item.unit,
+                lastUpdated: serverTimestamp()
+              }, { merge: true });
+            }
+          }
+        }
       }
 
       setSubmittedData(values);
@@ -388,16 +465,9 @@ export default function RecordMovementPage() {
       });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
+    } finally {
       setIsSubmitting(false);
     }
-  };
-
-  const triggerWhatsApp = () => {
-    if (!submittedData) return;
-    const itemsText = submittedData.items.map((it: any) => `- ${it.itemName}: ${it.quantity} ${it.unit}`).join('\n');
-    const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Flow:* ${submittedData.movementType}\n*Src/Dest:* ${submittedData.sourceOrDestination}\n\n*Items:*\n${itemsText}\n\n*Recorded By:* ${userProfile?.username || user?.email}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    window.open(url, '_blank');
   };
 
   const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
@@ -420,7 +490,13 @@ export default function RecordMovementPage() {
           <CardContent className="space-y-4 pb-8 px-8">
             <Button 
               className="w-full bg-green-600 hover:bg-green-700 h-12 text-lg font-semibold rounded-sm shadow-md" 
-              onClick={triggerWhatsApp}
+              onClick={() => {
+                if (!submittedData) return;
+                const itemsText = submittedData.items.map((it: any) => `- ${it.itemName}: ${it.quantity} ${it.unit}`).join('\n');
+                const message = `*Aditya Pro - Material Movement Report*\n\n*Site:* ${submittedData.siteName}\n*Date:* ${format(new Date(submittedData.movementDate), 'dd MMM yyyy')}\n*Flow:* ${submittedData.movementType}\n*Src/Dest:* ${submittedData.sourceOrDestination}\n\n*Items:*\n${itemsText}\n\n*Recorded By:* ${userProfile?.username || user?.email}`;
+                const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
+                window.open(url, '_blank');
+              }}
             >
               <MessageCircle className="mr-2 h-5 w-5" />
               Share on WhatsApp
@@ -525,7 +601,7 @@ export default function RecordMovementPage() {
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             <span className="truncate">{field.value || "Select Vendor..."}</span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -550,7 +626,7 @@ export default function RecordMovementPage() {
                     <Popover open={isSupplierPopoverOpen} onOpenChange={setIsSupplierPopoverOpen}>
                       <PopoverTrigger asChild>
                         <FormControl>
-                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 font-normal rounded-sm", !field.value && "text-muted-foreground")}>
+                          <Button variant="outline" disabled={!watchSiteName} className={cn("w-full justify-between h-11 rounded-sm", !field.value && "text-muted-foreground")}>
                             <span className="truncate">{field.value || "Select Target Site..."}</span>
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                           </Button>
@@ -643,9 +719,6 @@ export default function RecordMovementPage() {
                   <h3 className="text-xs sm:text-sm font-black uppercase tracking-widest flex items-center gap-2">
                     <ListPlus className="h-4 w-4 text-primary" /> Materials List
                   </h3>
-                  <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="h-8 rounded-sm font-bold border-primary text-primary text-[10px] px-3">
-                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Line
-                  </Button>
                 </div>
                 <div className="space-y-3">
                   {fields.map((field, index) => (
@@ -667,7 +740,7 @@ export default function RecordMovementPage() {
                                 </FormControl>
                               </PopoverTrigger>
                               <PopoverContent className="w-[calc(100vw-2rem)] sm:w-[500px] p-0" align="start">
-                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none focus-visible:ring-0 text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
+                                <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Filter materials..." className="h-9 border-none focus-visible:ring-0 px-0 text-sm" value={itemSearchQuery} onChange={e => setItemSearchQuery(e.target.value)} /></div>
                                 <ScrollArea className="h-[250px]">
                                   <div className="p-1">
                                     {filteredLookupItems.length > 0 ? filteredLookupItems.map((lookup, lIdx) => (
@@ -707,6 +780,9 @@ export default function RecordMovementPage() {
                     </Card>
                   ))}
                 </div>
+                <Button type="button" variant="outline" size="sm" onClick={() => append({ itemName: "", quantity: 0, unit: "Numbers" })} className="h-10 rounded-sm font-bold border-primary text-primary text-[10px] px-3 w-full border-dashed">
+                  <Plus className="mr-1.5 h-3.5 w-3.5" /> Add New Item
+                </Button>
               </div>
 
               <div className="flex justify-end pt-4">
