@@ -76,6 +76,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { sendNotification } from "@/lib/notifications";
 
 type RequisitionItem = {
   itemId: string;
@@ -405,7 +406,7 @@ export default function RequisitionsListPage() {
                       All Personnel
                     </Button>
                     {allUsers?.filter(u => u.username?.toLowerCase().includes(assigneeSearchQuery.toLowerCase())).map(u => (
-                      <Button key={u.id} variant="ghost" className="w-full justify-start h-auto py-2 px-3 text-xs text-left" onClick={() => { setAssignedToFilter(u.id); setIsAssigneePopoverOpen(false); setAssigneeSearchQuery(""); }}>
+                      <Button key={u.id} variant="ghost" className="w-full justify-start h-auto py-2.5 px-3 text-xs text-left" onClick={() => { setAssignedToFilter(u.id); setIsAssigneePopoverOpen(false); setAssigneeSearchQuery(""); }}>
                         <Check className={cn("mr-2 h-3 w-3 text-primary", assignedToFilter === u.id ? "opacity-100" : "opacity-0")} />
                         <div className="flex flex-col min-w-0">
                           <span className="font-bold truncate">{u.username}</span>
