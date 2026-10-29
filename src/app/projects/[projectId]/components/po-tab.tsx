@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -37,16 +37,25 @@ import { cn } from '@/lib/utils';
 import { doc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { useFirestore, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import Link from 'next/link';
 import { PurchaseOrder, MasterItem, UserProfile, POSortKey } from '../types';
+import { formatTimestamp } from '../utils';
 
-interface POTabProps {
+interface BoMTabProps {
   projectId: string;
-  purchaseOrders: PurchaseOrder[] | null;
+  siteName: string;
+  bomItems: BoMItem[] | null;
+  masterItems: MasterItem[] | null;
   userProfile: UserProfile | null;
+  user: any;
   isAdmin: boolean;
+  isManager: boolean;
+  canManageBom: boolean;
 }
 
-export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTabProps) {
+const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Pairs", "Drums"];
+
+export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: { projectId: string, purchaseOrders: PurchaseOrder[] | null, userProfile: UserProfile | null, isAdmin: boolean }) {
   const firestore = useFirestore();
   const [poSearch, setPoSearch] = React.useState("");
   const [poSortConfig, setPoSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
@@ -61,6 +70,7 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTab
       const { key, direction } = poSortConfig;
       let valA: any = ''; let valB: any = '';
       if (key === 'poNumber') { valA = a.poNumber; valB = b.poNumber; }
+      else if (key === 'site') { valA = a.siteName; valB = b.siteName; }
       else if (key === 'supplier') { valA = a.supplierName; valB = b.supplierName; }
       else if (key === 'status') { valA = a.status; valB = b.status; }
       else if (key === 'date') { valA = new Date(a.orderDate).getTime(); valB = new Date(b.orderDate).getTime(); }
@@ -88,6 +98,13 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTab
     return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
+  function toggleRow(id: string) {
+    const next = new Set(expandedPORows);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExpandedPORows(next);
+  }
+
   return (
     <div className="mt-6 animate-in fade-in duration-300 transition-all space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
@@ -108,7 +125,7 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTab
                 {filteredSortedPOs.length > 0 ? filteredSortedPOs.map(po => (
                   <React.Fragment key={po.id}>
                     <TableRow className="hover:bg-muted/5 transition-colors">
-                      <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); const n = new Set(expandedPORows); if(n.has(po.id)) n.delete(po.id); else n.add(po.id); setExpandedPORows(n); }}>{expandedRows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
+                      <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(po.id); }}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
                       <TableCell className="text-sm font-semibold">{po.supplierName}</TableCell><TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                       <TableCell><Badge variant="outline" className={cn("text-[8px] font-black uppercase rounded-sm px-1.5 h-5", po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{po.status || 'Pending'}</Badge></TableCell>
                       <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
@@ -133,11 +150,4 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTab
       </Dialog>
     </div>
   );
-
-  function toggleRow(id: string) {
-    const next = new Set(expandedPORows);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setExpandedPORows(next);
-  }
 }

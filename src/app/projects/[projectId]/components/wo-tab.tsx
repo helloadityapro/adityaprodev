@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   Gavel, 
   Search, 
@@ -33,7 +36,6 @@ import { format } from 'date-fns';
 import { doc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { WorkOrder, UserProfile, WOSortKey } from '../types';
 
@@ -86,6 +88,17 @@ export default function WOTab({ projectId, workOrders, userProfile, isAdmin }: W
     return woSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
+  function handleWOSort(key: WOSortKey) {
+    setWoSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
+  }
+
+  function toggleRow(id: string) {
+    const next = new Set(expandedWORows);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExpandedWORows(next);
+  }
+
   return (
     <div className="mt-6 animate-in fade-in duration-300 transition-all space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1">
@@ -131,15 +144,4 @@ export default function WOTab({ projectId, workOrders, userProfile, isAdmin }: W
       </Dialog>
     </div>
   );
-
-  function handleWOSort(key: WOSortKey) {
-    setWoSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
-  }
-
-  function toggleRow(id: string) {
-    const next = new Set(expandedWORows);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setExpandedWORows(next);
-  }
 }
