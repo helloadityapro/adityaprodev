@@ -24,7 +24,8 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowRight,
-  RotateCcw
+  RotateCcw,
+  CheckCircle2
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -116,30 +117,55 @@ export default function ProjectDatesPage() {
   };
 
   const SortIcon = ({ column }: { column: SortKey }) => {
-    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3.5 w-3.5 opacity-30" />;
-    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3.5 w-3.5 text-primary" /> : <ArrowDown className="ml-2 h-3.5 w-3.5 text-primary" />;
+    if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
-  const getDaysRemaining = (dateStr?: string) => {
-    if (!dateStr) return null;
-    const date = parseISO(dateStr);
-    if (!isValid(date)) return null;
-    const today = startOfDay(new Date());
-    return differenceInDays(date, today);
+  const getDaysRemaining = (targetDateStr?: string, relativeToDateStr?: string) => {
+    if (!targetDateStr) return null;
+    const targetDate = parseISO(targetDateStr);
+    if (!isValid(targetDate)) return null;
+    
+    let relativeDate = startOfDay(new Date());
+    if (relativeToDateStr) {
+      const parsedRelative = parseISO(relativeToDateStr);
+      if (isValid(parsedRelative)) {
+        relativeDate = startOfDay(parsedRelative);
+      }
+    }
+    
+    return differenceInDays(targetDate, relativeDate);
   };
 
-  const renderDaysBadge = (days: number | null) => {
+  const getCommissioningDuration = (start?: string, end?: string) => {
+    if (!start || !end) return null;
+    const s = parseISO(start);
+    const e = parseISO(end);
+    if (!isValid(s) || !isValid(e)) return null;
+    return differenceInDays(e, s);
+  };
+
+  const renderDaysBadge = (days: number | null, isCommissioned: boolean) => {
     if (days === null) return <span className="text-muted-foreground/30 font-bold">—</span>;
     
     const isOverdue = days < 0;
-    const isCritical = days <= 30;
+    const isCritical = !isCommissioned && days <= 30;
+
+    let label = "";
+    if (isCommissioned) {
+      label = isOverdue ? `Late by ${Math.abs(days)}d` : `Early by ${days}d`;
+    } else {
+      label = isOverdue ? `Overdue ${Math.abs(days)}d` : `${days} Days Left`;
+    }
 
     return (
       <Badge variant="outline" className={cn(
         "font-mono font-black text-[10px] h-6 px-2 rounded-sm border-none shadow-sm",
-        isOverdue ? "bg-red-50 text-red-700 border-red-200" : isCritical ? "bg-amber-500 text-white" : "bg-emerald-100 text-emerald-800"
+        isOverdue ? "bg-red-50 text-red-700 border-red-200" : 
+        isCommissioned ? "bg-green-100 text-green-800" :
+        isCritical ? "bg-amber-500 text-white" : "bg-emerald-100 text-emerald-800"
       )}>
-        {isOverdue ? `Overdue ${Math.abs(days)}d` : `${days} Days Left`}
+        {label}
       </Badge>
     );
   };
@@ -281,13 +307,20 @@ export default function ProjectDatesPage() {
                       {site.workStartDate ? format(parseISO(site.workStartDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
-                      {site.commissioningDate ? format(parseISO(site.commissioningDate), 'dd MMM yyyy') : '—'}
+                      <div className="flex flex-col items-center gap-1">
+                        <span>{site.commissioningDate ? format(parseISO(site.commissioningDate), 'dd MMM yyyy') : '—'}</span>
+                        {site.commissioningDate && site.workStartDate && (
+                          <Badge variant="secondary" className="text-[8px] h-4 px-1 rounded-sm bg-primary/5 text-primary border-none">
+                            In {getCommissioningDuration(site.workStartDate, site.commissioningDate)} Days
+                          </Badge>
+                        )}
+                      </div>
                     </TableCell>
                     <TableCell className="text-center bg-primary/[0.01]">
-                      {renderDaysBadge(getDaysRemaining(site.ppaScodDate))}
+                      {renderDaysBadge(getDaysRemaining(site.ppaScodDate, site.commissioningDate), !!site.commissioningDate)}
                     </TableCell>
                     <TableCell className="text-center bg-slate-50/30">
-                      {renderDaysBadge(getDaysRemaining(site.plannedScodDate))}
+                      {renderDaysBadge(getDaysRemaining(site.plannedScodDate, site.commissioningDate), !!site.commissioningDate)}
                     </TableCell>
                     <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1">
