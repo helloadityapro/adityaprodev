@@ -239,19 +239,20 @@ export default function ProjectDatesPage() {
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('financialClosureDate')}>
                     <div className="flex items-center">Fin. Closure <SortIcon column="financialClosureDate" /></div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('workStartDate')}>
-                    <div className="flex items-center">Work Start <SortIcon column="workStartDate" /></div>
-                  </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('commissioningDate')}>
-                    <div className="flex items-center">Commissioned <SortIcon column="commissioningDate" /></div>
-                  </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('ppaScodDate')}>
                     <div className="flex items-center">PPA SCOD <SortIcon column="ppaScodDate" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('plannedScodDate')}>
                     <div className="flex items-center">Planned SCOD <SortIcon column="plannedScodDate" /></div>
                   </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('workStartDate')}>
+                    <div className="flex items-center">Work Start <SortIcon column="workStartDate" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('commissioningDate')}>
+                    <div className="flex items-center">Commissioned <SortIcon column="commissioningDate" /></div>
+                  </TableHead>
                   <TableHead className="text-center font-black uppercase text-[10px] tracking-widest bg-primary/[0.03]">Days to PPA SCOD</TableHead>
+                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest bg-slate-100/50">Days to Planned SCOD</TableHead>
                   <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -270,20 +271,23 @@ export default function ProjectDatesPage() {
                     <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
                       {site.financialClosureDate ? format(parseISO(site.financialClosureDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
-                    <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
-                      {site.workStartDate ? format(parseISO(site.workStartDate), 'dd MMM yyyy') : '—'}
-                    </TableCell>
-                    <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
-                      {site.commissioningDate ? format(parseISO(site.commissioningDate), 'dd MMM yyyy') : '—'}
-                    </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary whitespace-nowrap">
                       {site.ppaScodDate ? format(parseISO(site.ppaScodDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
                     <TableCell className="font-mono text-xs font-black text-foreground whitespace-nowrap">
                       {site.plannedScodDate ? format(parseISO(site.plannedScodDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
+                      {site.workStartDate ? format(parseISO(site.workStartDate), 'dd MMM yyyy') : '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
+                      {site.commissioningDate ? format(parseISO(site.commissioningDate), 'dd MMM yyyy') : '—'}
+                    </TableCell>
                     <TableCell className="text-center bg-primary/[0.01]">
                       {renderDaysBadge(getDaysRemaining(site.ppaScodDate))}
+                    </TableCell>
+                    <TableCell className="text-center bg-slate-50/30">
+                      {renderDaysBadge(getDaysRemaining(site.plannedScodDate))}
                     </TableCell>
                     <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1">
@@ -298,7 +302,7 @@ export default function ProjectDatesPage() {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={9} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20 tracking-[0.3em]">
+                    <TableCell colSpan={10} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20 tracking-[0.3em]">
                       No groundmount projects in registry
                     </TableCell>
                   </TableRow>
@@ -335,17 +339,6 @@ export default function ProjectDatesPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Work Start Date</Label>
-                  <Input name="workStartDate" type="date" defaultValue={editingSite.workStartDate} className="h-10 font-bold" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Commissioned Date</Label>
-                  <Input name="commissioningDate" type="date" defaultValue={editingSite.commissioningDate} className="h-10 font-bold" />
-                </div>
-              </div>
-
               <Separator className="opacity-10" />
 
               <div className="grid grid-cols-2 gap-4">
@@ -356,6 +349,19 @@ export default function ProjectDatesPage() {
                 <div className="space-y-2">
                   <Label className="text-[10px] font-black uppercase text-foreground tracking-widest">Planned SCOD (Internal)</Label>
                   <Input name="plannedScodDate" type="date" defaultValue={editingSite.plannedScodDate} className="h-10 font-black" />
+                </div>
+              </div>
+
+              <Separator className="opacity-10" />
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Work Start Date</Label>
+                  <Input name="workStartDate" type="date" defaultValue={editingSite.workStartDate} className="h-10 font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Commissioned Date</Label>
+                  <Input name="commissioningDate" type="date" defaultValue={editingSite.commissioningDate} className="h-10 font-bold" />
                 </div>
               </div>
 
