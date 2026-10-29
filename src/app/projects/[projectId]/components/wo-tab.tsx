@@ -24,7 +24,6 @@ import {
   History,
   Building2,
   Calendar,
-  SeparatorHorizontal,
   ArrowUpDown,
   ArrowUp,
   ArrowDown
@@ -35,10 +34,8 @@ import { doc, serverTimestamp, arrayUnion } from 'firebase/firestore';
 import { useFirestore, updateDocumentNonBlocking } from '@/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import Link from 'next/link';
 import { WorkOrder, UserProfile, WOSortKey } from '../types';
-import { formatTimestamp } from '../utils';
 
 interface WOTabProps {
   projectId: string;
@@ -47,12 +44,11 @@ interface WOTabProps {
   isAdmin: boolean;
 }
 
-export function WOTab({ projectId, workOrders, userProfile, isAdmin }: WOTabProps) {
+export default function WOTab({ projectId, workOrders, userProfile, isAdmin }: WOTabProps) {
   const firestore = useFirestore();
   const [woSearch, setWoSearch] = React.useState("");
   const [woSortConfig, setWoSortConfig] = React.useState<{ key: WOSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedWORows, setExpandedWORows] = React.useState<Set<string>>(new Set());
-  const [viewingWO, setViewingWO] = React.useState<WorkOrder | null>(null);
   const [woActionState, setWoActionState] = React.useState<{ wo: WorkOrder, type: 'Accepted' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
 
@@ -102,7 +98,7 @@ export function WOTab({ projectId, workOrders, userProfile, isAdmin }: WOTabProp
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => setWoSortConfig({key: 'woNumber', direction: woSortConfig.direction === 'asc' ? 'desc' : 'asc'})}><div className="flex items-center">WO Number <WOSortIcon column="woNumber" /></div></TableHead>
+                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleWOSort('woNumber')}><div className="flex items-center">WO Number <WOSortIcon column="woNumber" /></div></TableHead>
                   <TableHead>Contractor</TableHead><TableHead>Date</TableHead><TableHead>Status</TableHead><TableHead className="text-right">Contract Value</TableHead><TableHead className="text-right px-6">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -110,11 +106,13 @@ export function WOTab({ projectId, workOrders, userProfile, isAdmin }: WOTabProp
                 {filteredSortedWOs.map(wo => (
                   <React.Fragment key={wo.id}>
                     <TableRow className="hover:bg-muted/5 transition-colors">
-                      <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => { const n = new Set(expandedWORows); if(n.has(wo.id)) n.delete(wo.id); else n.add(wo.id); setExpandedWORows(n); }}>{expandedWORows.has(wo.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span></div></TableCell>
+                      <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); toggleRow(wo.id); }}>{expandedWORows.has(wo.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{wo.woNumber}</span></div></TableCell>
                       <TableCell className="text-sm font-semibold">{wo.contractorName}</TableCell><TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{wo.orderDate}</TableCell>
                       <TableCell><Badge variant="outline" className={cn("text-[8px] font-black uppercase rounded-sm px-1.5 h-5", wo.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{wo.status || 'Pending'}</Badge></TableCell>
                       <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{wo.totalAmount.toLocaleString('en-IN')}</TableCell>
-                      <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingWO(wo)}><Eye className="h-4 w-4" /></Button></div></TableCell>
+                      <TableCell className="text-right px-6"><div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/work-orders/manage?view=${wo.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                      </div></TableCell>
                     </TableRow>
                   </React.Fragment>
                 ))}
@@ -123,7 +121,7 @@ export function WOTab({ projectId, workOrders, userProfile, isAdmin }: WOTabProp
           </div>
         </CardContent>
       </Card>
-      {/* Action Dialog for WO */}
+      
       <Dialog open={!!woActionState} onOpenChange={(o) => !o && setWoActionState(null)}>
         <DialogContent className="rounded-sm max-md">
           <DialogHeader><DialogTitle>Authorize Work Order</DialogTitle></DialogHeader>
@@ -133,4 +131,15 @@ export function WOTab({ projectId, workOrders, userProfile, isAdmin }: WOTabProp
       </Dialog>
     </div>
   );
+
+  function handleWOSort(key: WOSortKey) {
+    setWoSortConfig(prev => ({ key, direction: prev.key === key && prev.direction === 'asc' ? 'desc' : 'asc' }));
+  }
+
+  function toggleRow(id: string) {
+    const next = new Set(expandedWORows);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExpandedWORows(next);
+  }
 }

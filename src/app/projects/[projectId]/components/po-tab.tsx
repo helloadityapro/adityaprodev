@@ -1,13 +1,16 @@
 'use client';
 
 import * as React from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { 
   ShoppingBag, 
   Search, 
@@ -21,27 +24,20 @@ import {
   CircleX, 
   Layers, 
   Loader2, 
-  MessageCircle, 
   Clock, 
   User as UserIcon, 
   History,
   Building2,
   Calendar,
-  SeparatorHorizontal,
   ArrowUpDown,
   ArrowUp,
   ArrowDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
 import { doc, serverTimestamp, arrayUnion } from 'firebase/firestore';
-import { useFirestore, updateDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
+import { useFirestore, updateDocumentNonBlocking, addDocumentNonBlocking, deleteDocumentNonBlocking } from '@/firebase';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import Link from 'next/link';
-import { PurchaseOrder, UserProfile, POSortKey } from '../types';
-import { formatTimestamp } from '../utils';
+import { PurchaseOrder, MasterItem, UserProfile, POSortKey } from '../types';
 
 interface POTabProps {
   projectId: string;
@@ -55,7 +51,6 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTab
   const [poSearch, setPoSearch] = React.useState("");
   const [poSortConfig, setPoSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedPORows, setExpandedPORows] = React.useState<Set<string>>(new Set());
-  const [viewingPO, setViewingPO] = React.useState<PurchaseOrder | null>(null);
   const [poActionState, setPoActionState] = React.useState<{ po: PurchaseOrder, type: 'Accepted' | 'Rejected' } | null>(null);
   const [isActionProcessing, setIsActionProcessing] = React.useState(false);
 
@@ -89,7 +84,7 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTab
   };
 
   const POSortIcon = ({ column }: { column: POSortKey }) => {
-    if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-4 w-4 opacity-30" />;
+    if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
@@ -110,23 +105,25 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTab
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredSortedPOs.map(po => (
+                {filteredSortedPOs.length > 0 ? filteredSortedPOs.map(po => (
                   <React.Fragment key={po.id}>
                     <TableRow className="hover:bg-muted/5 transition-colors">
-                      <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => { const n = new Set(expandedPORows); if(n.has(po.id)) n.delete(po.id); else n.add(po.id); setExpandedPORows(n); }}>{expandedPORows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
+                      <TableCell className="px-6 py-4"><div className="flex items-center gap-2"><Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={(e) => { e.stopPropagation(); const n = new Set(expandedPORows); if(n.has(po.id)) n.delete(po.id); else n.add(po.id); setExpandedPORows(n); }}>{expandedRows.has(po.id) ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}</Button><span className="font-mono text-xs font-black text-primary uppercase">{po.poNumber}</span></div></TableCell>
                       <TableCell className="text-sm font-semibold">{po.supplierName}</TableCell><TableCell className="text-[10px] font-bold text-muted-foreground uppercase">{po.orderDate}</TableCell>
                       <TableCell><Badge variant="outline" className={cn("text-[8px] font-black uppercase rounded-sm px-1.5 h-5", po.status === 'Accepted' ? "bg-green-50 text-green-700 border-green-200" : "bg-yellow-50 text-yellow-700 border-yellow-200")}>{po.status || 'Pending'}</Badge></TableCell>
                       <TableCell className="text-right font-black text-sm font-mono text-foreground">₹{po.totalAmount.toLocaleString('en-IN')}</TableCell>
-                      <TableCell className="text-right px-6"><div className="flex justify-end gap-1"><Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm" onClick={() => setViewingPO(po)}><Eye className="h-4 w-4" /></Button></div></TableCell>
+                      <TableCell className="text-right px-6"><div className="flex justify-end gap-1">
+                        <Button variant="ghost" size="icon" asChild className="h-8 w-8 text-primary rounded-sm"><Link href={`/purchase-orders/manage?view=${po.id}`}><Eye className="h-4 w-4" /></Link></Button>
+                      </div></TableCell>
                     </TableRow>
                   </React.Fragment>
-                ))}
+                )) : <TableRow><TableCell colSpan={6} className="h-32 text-center text-muted-foreground italic text-xs">Registry empty.</TableCell></TableRow>}
               </TableBody>
             </Table>
           </div>
         </CardContent>
       </Card>
-      {/* Action Dialog for PO */}
+      
       <Dialog open={!!poActionState} onOpenChange={(o) => !o && setPoActionState(null)}>
         <DialogContent className="rounded-sm max-md">
           <DialogHeader><DialogTitle>Authorize Purchase Order</DialogTitle></DialogHeader>
@@ -136,4 +133,11 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: POTab
       </Dialog>
     </div>
   );
+
+  function toggleRow(id: string) {
+    const next = new Set(expandedPORows);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setExpandedPORows(next);
+  }
 }
