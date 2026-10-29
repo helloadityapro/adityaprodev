@@ -71,20 +71,17 @@ export function SiteDashboard({
               {project.projectOwnerName && (
                 <TableRow className="bg-primary/[0.03] hover:bg-primary/[0.05] transition-colors border-b-2">
                   <TableCell className="px-6 py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-background rounded-full border shadow-sm shrink-0">
-                        <User className="h-4 w-4 text-primary" />
-                      </div>
-                      <div className="flex flex-col text-left">
-                        <span className="font-black text-sm text-primary uppercase">{project.projectOwnerName}</span>
-                        <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-wider">Authority Holder</span>
-                      </div>
+                    <div className="flex flex-col text-left">
+                      <span className="font-bold text-sm text-foreground">{project.projectOwnerName}</span>
+                      <span className="text-[10px] text-muted-foreground uppercase">Authority Holder</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <Badge className="rounded-sm text-[9px] font-black uppercase bg-primary text-white border-none h-5 px-2">
-                      Project Owner
-                    </Badge>
+                    <div className="flex flex-col gap-1 text-left">
+                      <Badge className="w-fit rounded-sm text-[9px] font-black uppercase bg-primary text-white border-none h-5 px-2">
+                        Project Owner
+                      </Badge>
+                    </div>
                   </TableCell>
                   <TableCell className="text-center">
                     <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">—</Badge>
