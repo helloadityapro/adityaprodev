@@ -30,7 +30,10 @@ import {
   Filter,
   ArrowUpDown,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  Lock,
+  ShieldAlert,
+  XCircle
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -430,13 +433,13 @@ export default function ProjectsListPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+        <div className="flex flex-col gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
           <div className="flex flex-col md:flex-row md:items-center gap-4 w-full">
             <div className="relative flex-1 md:w-96">
               <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
               <Input 
                 placeholder="Search project or company..." 
-                className="pl-10 h-11 rounded-sm border-primary/20 bg-background"
+                className="pl-10 h-11 rounded-sm border-primary/20 bg-background text-sm"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
@@ -758,8 +761,12 @@ export default function ProjectsListPage() {
                       const siteEngineers = team.filter(u => u.role === 'Site Engineer').map(u => u.username);
 
                       return (
-                        <TableRow key={site.id} className="hover:bg-muted/5 transition-colors group">
-                          <TableCell className="text-center pl-4">
+                        <TableRow 
+                          key={site.id} 
+                          className={cn("hover:bg-muted/5 transition-colors group cursor-pointer", starredIds.has(site.id) && "bg-primary/[0.01]")}
+                          onClick={() => router.push(`/projects/${site.id}`)}
+                        >
+                          <TableCell className="text-center pl-4" onClick={e => e.stopPropagation()}>
                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={(e) => toggleStar(e, site.id)}>
                               <Star className={cn("h-4 w-4 transition-all", isStarred ? "fill-primary text-primary scale-110" : "text-muted-foreground/30")} />
                             </Button>
@@ -816,7 +823,11 @@ export default function ProjectsListPage() {
                           </TableCell>
                           <TableCell className="text-center font-mono text-xs font-bold text-primary">{formatCapacity(site.acCapacity)}</TableCell>
                           <TableCell className="text-center font-mono text-xs font-bold text-amber-600">{formatCapacity(site.dcCapacity)}</TableCell>
-                          <TableCell className="text-right px-6"><Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary"><Link href={`/projects/${site.id}`}>Manage Site <ArrowRight className="ml-1.5 h-3 w-3" /></Link></Button></TableCell>
+                          <TableCell className="text-right px-6">
+                            <Button asChild size="sm" className="h-8 rounded-sm font-black text-[10px] uppercase px-4 bg-primary" onClick={e => e.stopPropagation()}>
+                              <Link href={`/projects/${site.id}`}>Manage <ArrowRight className="ml-1.5 h-3 w-3" /></Link>
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       );
                     }) : <TableRow><TableCell colSpan={10} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20">No matching projects discovered</TableCell></TableRow>}
@@ -830,3 +841,9 @@ export default function ProjectsListPage() {
     );
   }
 }
+
+function SortIcon({ column, config }: { column: string, config: { key: string | null; direction: 'asc' | 'desc' } }) {
+  if (config.key !== column) return <ArrowUpDown className="ml-1 h-3 w-3 opacity-30 shrink-0" />;
+  return config.direction === 'asc' ? <ArrowUp className="ml-1 h-3 w-3 text-primary shrink-0" /> : <ArrowDown className="ml-1 h-3 w-3 text-primary shrink-0" />;
+}
+
