@@ -25,7 +25,8 @@ import {
   ArrowDown,
   ArrowRight,
   RotateCcw,
-  CheckCircle2
+  CheckCircle2,
+  Filter
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -46,6 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 
 type Site = {
   id: string;
@@ -62,6 +64,8 @@ type Site = {
 
 type SortKey = 'name' | 'company' | 'ppaDate' | 'financialClosureDate' | 'ppaScodDate' | 'plannedScodDate' | 'workStartDate' | 'commissioningDate';
 
+type DateRange = { start: string; end: string };
+
 export default function ProjectDatesPage() {
   const firestore = useFirestore();
   const { user } = useUser();
@@ -72,6 +76,16 @@ export default function ProjectDatesPage() {
   const [siteToClear, setSiteToClear] = React.useState<Site | null>(null);
   const [isSaving, setIsSaving] = React.useState(false);
   const [sortConfig, setSortConfig] = React.useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'name', direction: 'asc' });
+
+  // Column Filters
+  const [columnFilters, setColumnFilters] = React.useState<Record<string, DateRange>>({
+    ppaDate: { start: "", end: "" },
+    financialClosureDate: { start: "", end: "" },
+    ppaScodDate: { start: "", end: "" },
+    plannedScodDate: { start: "", end: "" },
+    workStartDate: { start: "", end: "" },
+    commissioningDate: { start: "", end: "" }
+  });
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
@@ -86,12 +100,27 @@ export default function ProjectDatesPage() {
     // Policy: Only display groundmount projects for chronological milestone tracking
     let result = allSites.filter(s => s.projectType === 'groundmount');
 
+    // General Search
     if (searchTerm.trim()) {
       result = result.filter(s => 
         s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         s.projectCompany.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
+
+    // Columnar Date Filters
+    result = result.filter(s => {
+      for (const [key, range] of Object.entries(columnFilters)) {
+        const val = s[key as keyof Site];
+        if (!val) {
+          if (range.start || range.end) return false;
+          continue;
+        }
+        if (range.start && val < range.start) return false;
+        if (range.end && val > range.end) return false;
+      }
+      return true;
+    });
 
     result.sort((a, b) => {
       const { key, direction } = sortConfig;
@@ -107,7 +136,7 @@ export default function ProjectDatesPage() {
     });
 
     return result;
-  }, [allSites, searchTerm, sortConfig]);
+  }, [allSites, searchTerm, sortConfig, columnFilters]);
 
   const handleSort = (key: SortKey) => {
     setSortConfig(prev => ({
@@ -119,6 +148,24 @@ export default function ProjectDatesPage() {
   const SortIcon = ({ column }: { column: SortKey }) => {
     if (sortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
     return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+  };
+
+  const hasActiveFilter = (key: string) => {
+    const range = columnFilters[key];
+    return range && (range.start || range.end);
+  };
+
+  const clearAllFilters = () => {
+    setSearchTerm("");
+    setColumnFilters({
+      ppaDate: { start: "", end: "" },
+      financialClosureDate: { start: "", end: "" },
+      ppaScodDate: { start: "", end: "" },
+      plannedScodDate: { start: "", end: "" },
+      workStartDate: { start: "", end: "" },
+      commissioningDate: { start: "", end: "" }
+    });
+    setSortConfig({ key: 'name', direction: 'asc' });
   };
 
   const getDaysRemaining = (targetDateStr?: string, relativeToDateStr?: string) => {
@@ -219,6 +266,53 @@ export default function ProjectDatesPage() {
     }
   };
 
+  const renderDateFilterPopover = (key: string, label: string) => (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto">
+          <Filter className={cn("h-3 w-3", hasActiveFilter(key) ? "text-primary fill-primary" : "text-muted-foreground/30")} />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-4 shadow-2xl rounded-sm border-primary/10">
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b pb-2">
+            <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">{label} Range</h4>
+            {hasActiveFilter(key) && (
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="h-6 px-2 text-[9px] font-black uppercase text-destructive hover:bg-destructive/5"
+                onClick={() => setColumnFilters(prev => ({ ...prev, [key]: { start: "", end: "" } }))}
+              >
+                Reset
+              </Button>
+            )}
+          </div>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <Label className="text-[9px] font-bold uppercase text-muted-foreground">From</Label>
+              <Input 
+                type="date" 
+                className="h-8 text-xs font-bold" 
+                value={columnFilters[key]?.start} 
+                onChange={e => setColumnFilters(prev => ({ ...prev, [key]: { ...prev[key], start: e.target.value } }))}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[9px] font-bold uppercase text-muted-foreground">To</Label>
+              <Input 
+                type="date" 
+                className="h-8 text-xs font-bold" 
+                value={columnFilters[key]?.end} 
+                onChange={e => setColumnFilters(prev => ({ ...prev, [key]: { ...prev[key], end: e.target.value } }))}
+              />
+            </div>
+          </div>
+        </div>
+      </PopoverContent>
+    </Popover>
+  );
+
   if (isProfileLoading || sitesLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
 
   return (
@@ -244,7 +338,7 @@ export default function ProjectDatesPage() {
            <Badge variant="outline" className="rounded-sm font-black uppercase text-[10px] tracking-widest px-3 h-10 border-primary/20 text-primary bg-primary/5">
               {filteredSites.length} Groundmount Sites
            </Badge>
-           <Button variant="ghost" size="icon" onClick={() => setSearchTerm("")} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
+           <Button variant="ghost" size="icon" onClick={clearAllFilters} className="h-10 w-10 text-muted-foreground rounded-sm border border-transparent hover:border-primary/10">
               <FilterX className="h-4 w-4" />
            </Button>
         </div>
@@ -256,27 +350,68 @@ export default function ProjectDatesPage() {
             <Table>
               <TableHeader className="bg-muted/30">
                 <TableRow>
-                  <TableHead className="px-6 cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('name')}>
-                    <div className="flex items-center">Project Name <SortIcon column="name" /></div>
+                  <TableHead className="px-6">
+                    <div className="flex items-center justify-between group">
+                      <div className="flex items-center cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('name')}>
+                        Project Name <SortIcon column="name" />
+                      </div>
+                    </div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('ppaDate')}>
-                    <div className="flex items-center">PPA Date <SortIcon column="ppaDate" /></div>
+                  
+                  <TableHead>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center cursor-pointer hover:text-primary transition-colors whitespace-nowrap" onClick={() => handleSort('ppaDate')}>
+                        PPA Date <SortIcon column="ppaDate" />
+                      </div>
+                      {renderDateFilterPopover('ppaDate', 'PPA')}
+                    </div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('financialClosureDate')}>
-                    <div className="flex items-center">Fin. Closure <SortIcon column="financialClosureDate" /></div>
+
+                  <TableHead>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center cursor-pointer hover:text-primary transition-colors whitespace-nowrap" onClick={() => handleSort('financialClosureDate')}>
+                        Fin. Closure <SortIcon column="financialClosureDate" />
+                      </div>
+                      {renderDateFilterPopover('financialClosureDate', 'Fin. Closure')}
+                    </div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('ppaScodDate')}>
-                    <div className="flex items-center">PPA SCOD <SortIcon column="ppaScodDate" /></div>
+
+                  <TableHead>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center cursor-pointer hover:text-primary transition-colors whitespace-nowrap" onClick={() => handleSort('ppaScodDate')}>
+                        PPA SCOD <SortIcon column="ppaScodDate" />
+                      </div>
+                      {renderDateFilterPopover('ppaScodDate', 'PPA SCOD')}
+                    </div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('plannedScodDate')}>
-                    <div className="flex items-center">Planned SCOD <SortIcon column="plannedScodDate" /></div>
+
+                  <TableHead>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center cursor-pointer hover:text-primary transition-colors whitespace-nowrap" onClick={() => handleSort('plannedScodDate')}>
+                        Planned SCOD <SortIcon column="plannedScodDate" />
+                      </div>
+                      {renderDateFilterPopover('plannedScodDate', 'Planned SCOD')}
+                    </div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('workStartDate')}>
-                    <div className="flex items-center">Work Start <SortIcon column="workStartDate" /></div>
+
+                  <TableHead>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center cursor-pointer hover:text-primary transition-colors whitespace-nowrap" onClick={() => handleSort('workStartDate')}>
+                        Work Start <SortIcon column="workStartDate" />
+                      </div>
+                      {renderDateFilterPopover('workStartDate', 'Work Start')}
+                    </div>
                   </TableHead>
-                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('commissioningDate')}>
-                    <div className="flex items-center">Commissioned <SortIcon column="commissioningDate" /></div>
+
+                  <TableHead>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center cursor-pointer hover:text-primary transition-colors whitespace-nowrap" onClick={() => handleSort('commissioningDate')}>
+                        Commissioned <SortIcon column="commissioningDate" />
+                      </div>
+                      {renderDateFilterPopover('commissioningDate', 'Commissioned')}
+                    </div>
                   </TableHead>
+
                   <TableHead className="text-center font-black uppercase text-[10px] tracking-widest bg-primary/[0.03]">Days to PPA SCOD</TableHead>
                   <TableHead className="text-center font-black uppercase text-[10px] tracking-widest bg-slate-100/50">Days to Planned SCOD</TableHead>
                   <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Actions</TableHead>
@@ -335,8 +470,8 @@ export default function ProjectDatesPage() {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={10} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20 tracking-[0.3em]">
-                      No groundmount projects in registry
+                    <TableCell colSpan={10} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20 tracking-[0.2em]">
+                      No records matching your filters
                     </TableCell>
                   </TableRow>
                 )}
