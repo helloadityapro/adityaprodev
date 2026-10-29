@@ -36,6 +36,11 @@ export function SiteDashboard({
   liaisonCompletion
 }: SiteDashboardProps) {
   
+  const owner = React.useMemo(() => 
+    allUsers?.find(u => u.id === project.projectOwnerId), 
+    [allUsers, project.projectOwnerId]
+  );
+
   const renderDaysBadge = (days: number | null) => {
     if (days === null) return <span className="text-muted-foreground/30 font-bold">—</span>;
     const isOverdue = days < 0;
@@ -73,7 +78,7 @@ export function SiteDashboard({
                   <TableCell className="px-6 py-4">
                     <div className="flex flex-col text-left">
                       <span className="font-bold text-sm text-foreground">{project.projectOwnerName}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">Authority Holder</span>
+                      <span className="text-[10px] text-muted-foreground uppercase">{owner?.email || 'Authority Holder'}</span>
                     </div>
                   </TableCell>
                   <TableCell>
