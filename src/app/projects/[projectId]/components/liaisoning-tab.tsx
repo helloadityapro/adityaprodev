@@ -19,6 +19,7 @@ import {
   HardHat, 
   Search, 
   Check, 
+  Plus,
   ChevronsUpDown, 
   ChevronRight, 
   ChevronDown, 
