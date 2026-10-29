@@ -6,11 +6,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Users, Building2, User, UserCog, HardHat, Clock } from 'lucide-react';
+import { 
+  Users, 
+  Building2, 
+  User, 
+  UserCog, 
+  HardHat, 
+  Clock, 
+  Activity, 
+  PlugZap, 
+  CheckCircle2, 
+  ArrowRight,
+  TrendingUp
+} from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
-import { Project, UserProfile, MappingOverride } from '../types';
+import { Project, UserProfile, MappingOverride, LiaisoningRecord, MAIN_STAGES } from '../types';
 import { getDaysRemaining } from '../utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 interface SiteDashboardProps {
   project: Project;
@@ -22,6 +35,7 @@ interface SiteDashboardProps {
   visitsCount: number;
   tasksCount: number;
   liaisonCompletion: number;
+  liaisonRecord: LiaisoningRecord | null;
 }
 
 export function SiteDashboard({
@@ -33,7 +47,8 @@ export function SiteDashboard({
   dprsCount,
   visitsCount,
   tasksCount,
-  liaisonCompletion
+  liaisonCompletion,
+  liaisonRecord
 }: SiteDashboardProps) {
   
   const owner = React.useMemo(() => 
@@ -57,90 +72,134 @@ export function SiteDashboard({
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-      <Card className="lg:col-span-2 rounded-sm border-primary/10 shadow-md overflow-hidden">
-        <CardHeader className="bg-muted/5 border-b py-4 text-left">
-          <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" /> Site Personnel Hierarchy
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader className="bg-muted/30">
-              <TableRow>
-                <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Personnel</TableHead>
-                <TableHead className="font-black uppercase text-[10px] tracking-widest">Supervisor</TableHead>
-                <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Sites</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {project.projectOwnerName && (
-                <TableRow className="bg-primary/[0.03] hover:bg-primary/[0.05] transition-colors border-b-2">
-                  <TableCell className="px-6 py-4">
-                    <div className="flex flex-col text-left">
-                      <span className="font-bold text-sm text-foreground">{project.projectOwnerName}</span>
-                      <span className="text-[10px] text-muted-foreground uppercase">{owner?.email || 'Authority Holder'}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex flex-col gap-1 text-left">
-                      <Badge className="w-fit rounded-sm text-[9px] font-black uppercase bg-primary text-white border-none h-5 px-2">
-                        Project Owner
-                      </Badge>
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-center">
-                    <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">—</Badge>
-                  </TableCell>
+      <div className="lg:col-span-2 space-y-8">
+        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+          <CardHeader className="bg-muted/5 border-b py-4 text-left">
+            <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" /> Site Personnel Hierarchy
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader className="bg-muted/30">
+                <TableRow>
+                  <TableHead className="px-6 font-black uppercase text-[10px] tracking-widest">Personnel</TableHead>
+                  <TableHead className="font-black uppercase text-[10px] tracking-widest">Supervisor</TableHead>
+                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest">Sites</TableHead>
                 </TableRow>
-              )}
-              {siteTeam.length > 0 ? siteTeam.map(member => {
-                const override = siteOverrides?.find(o => o.engineerId === member.id);
-                const effectiveManagerId = override ? override.managerId : member.siteManagerId;
-                const manager = allUsers?.find(m => m.id === effectiveManagerId);
-                
-                return (
-                  <TableRow key={member.id} className="hover:bg-muted/5 group transition-colors">
+              </TableHeader>
+              <TableBody>
+                {project.projectOwnerName && (
+                  <TableRow className="bg-primary/[0.03] hover:bg-primary/[0.05] transition-colors border-b-2">
                     <TableCell className="px-6 py-4">
                       <div className="flex flex-col text-left">
-                        <span className="font-bold text-sm text-foreground">{member.username}</span>
-                        <span className="text-[10px] text-muted-foreground uppercase">{member.email}</span>
+                        <span className="font-bold text-sm text-foreground">{project.projectOwnerName}</span>
+                        <span className="text-[10px] text-muted-foreground uppercase">{owner?.email || 'Authority Holder'}</span>
                       </div>
                     </TableCell>
                     <TableCell>
-                        <div className="flex flex-col gap-1 text-left">
-                            <Badge variant="outline" className={cn(
-                                "w-fit rounded-sm text-[9px] font-black uppercase border-primary/20",
-                                member.role === 'Site Manager' ? "bg-primary text-white border-none" : "text-primary bg-primary/5"
-                            )}>
-                                {member.role === 'Site Manager' && <UserCog className="h-2.5 w-2.5 mr-1" />}
-                                {member.role}
-                            </Badge>
-                            <div className="flex flex-col pl-1">
-                                <span className="text-[10px] font-bold text-foreground">
-                                    {manager?.username || (member.role === 'Site Engineer' ? 'Unassigned' : '—')}
-                                </span>
-                                {override && (
-                                    <Badge variant="outline" className="w-fit text-[7px] h-3 px-1 mt-0.5 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site Override</Badge>
-                                )}
-                            </div>
-                        </div>
+                      <div className="flex flex-col gap-1 text-left">
+                        <Badge className="w-fit rounded-sm text-[9px] font-black uppercase bg-primary text-white border-none h-5 px-2">
+                          Project Owner
+                        </Badge>
+                      </div>
                     </TableCell>
                     <TableCell className="text-center">
-                      <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
-                        {member.assignedProjectIds?.length || 0}
-                      </Badge>
+                      <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">—</Badge>
                     </TableCell>
                   </TableRow>
-                );
-              }) : !project.projectOwnerName && (
-                <TableRow>
-                  <TableCell colSpan={3} className="p-20 text-center text-muted-foreground italic text-sm">No personnel currently mapped to this site.</TableCell>
-                </TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                )}
+                {siteTeam.length > 0 ? siteTeam.map(member => {
+                  const override = siteOverrides?.find(o => o.engineerId === member.id);
+                  const effectiveManagerId = override ? override.managerId : member.siteManagerId;
+                  const manager = allUsers?.find(m => m.id === effectiveManagerId);
+                  
+                  return (
+                    <TableRow key={member.id} className="hover:bg-muted/5 group transition-colors">
+                      <TableCell className="px-6 py-4">
+                        <div className="flex flex-col text-left">
+                          <span className="font-bold text-sm text-foreground">{member.username}</span>
+                          <span className="text-[10px] text-muted-foreground uppercase">{member.email}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                          <div className="flex flex-col gap-1 text-left">
+                              <Badge variant="outline" className={cn(
+                                  "w-fit rounded-sm text-[9px] font-black uppercase border-primary/20",
+                                  member.role === 'Site Manager' ? "bg-primary text-white border-none" : "text-primary bg-primary/5"
+                              )}>
+                                  {member.role === 'Site Manager' && <UserCog className="h-2.5 w-2.5 mr-1" />}
+                                  {member.role}
+                              </Badge>
+                              <div className="flex flex-col pl-1">
+                                  <span className="text-[10px] font-bold text-foreground">
+                                      {manager?.username || (member.role === 'Site Engineer' ? 'Unassigned' : '—')}
+                                  </span>
+                                  {override && (
+                                      <Badge variant="outline" className="w-fit text-[7px] h-3 px-1 mt-0.5 border-amber-200 text-amber-700 bg-amber-50 font-black uppercase">Site Override</Badge>
+                                  )}
+                              </div>
+                          </div>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge variant="outline" className="rounded-sm font-mono text-[10px] bg-primary/5 border-primary/20 text-primary">
+                          {member.assignedProjectIds?.length || 0}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  );
+                }) : !project.projectOwnerName && (
+                  <TableRow>
+                    <TableCell colSpan={3} className="p-20 text-center text-muted-foreground italic text-sm">No personnel currently mapped to this site.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+
+        {/* New Liaisoning Progress Card */}
+        <Card className="rounded-sm border-primary/10 shadow-md overflow-hidden">
+           <CardHeader className="bg-muted/5 border-b py-4 text-left">
+             <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2">
+               <PlugZap className="h-4 w-4 text-primary" /> Liaisoning Milestone tracking
+             </CardTitle>
+           </CardHeader>
+           <CardContent className="p-0">
+             <ScrollArea className="h-[300px]">
+               <div className="divide-y">
+                 {MAIN_STAGES.map((s, idx) => {
+                   const stageData = liaisonRecord?.stages?.[s.id] || { status: 'Pending' };
+                   const isDone = stageData.status === 'Completed';
+                   return (
+                     <div key={s.id} className="flex items-center justify-between p-4 hover:bg-muted/5 transition-colors">
+                        <div className="flex items-center gap-3 min-w-0">
+                           <div className={cn(
+                             "h-6 w-6 rounded-full flex items-center justify-center shrink-0 border-2",
+                             isDone ? "bg-green-500 border-green-500 text-white" : "border-muted text-muted-foreground bg-muted/10"
+                           )}>
+                             {isDone ? <CheckCircle2 className="h-4 w-4" /> : <span className="text-[10px] font-black">{idx + 1}</span>}
+                           </div>
+                           <span className="text-xs font-bold text-foreground truncate uppercase tracking-tight">{s.label}</span>
+                        </div>
+                        <Badge variant="outline" className={cn(
+                          "rounded-sm text-[8px] font-black uppercase px-2 h-5 border-none",
+                          isDone ? "bg-green-50 text-green-700" : stageData.status === 'In Progress' ? "bg-blue-50 text-blue-700" : "bg-muted text-muted-foreground/50"
+                        )}>
+                          {stageData.status}
+                        </Badge>
+                     </div>
+                   );
+                 })}
+               </div>
+             </ScrollArea>
+           </CardContent>
+           <CardFooter className="bg-muted/10 border-t p-3 text-right">
+              <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mr-2">Overall:</span>
+              <span className="text-xs font-black text-primary">{liaisonCompletion}%</span>
+           </CardFooter>
+        </Card>
+      </div>
 
       <div className="space-y-6">
         <Card className="rounded-sm border-primary/10 shadow-sm overflow-hidden h-fit">

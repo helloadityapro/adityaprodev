@@ -36,52 +36,7 @@ import { format } from 'date-fns';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject } from 'firebase/storage';
 import { doc, serverTimestamp, collection, updateDoc, deleteDoc } from 'firebase/firestore';
 import { useFirestore, useFirebaseApp, updateDocumentNonBlocking, setDocumentNonBlocking } from '@/firebase';
-import { Project, UserProfile, LiaisoningRecord, StageData, LiaisoningDocument } from '../types';
-
-const MAIN_STAGES = [
-  { id: 'loa', label: '1. LOA' },
-  { id: 'ppa', label: '2. PPA' },
-  { id: 'spv_docs', label: '3. SPV or Company Documents' },
-  { id: 'land_acquisition', label: '4. Land Acquisition' },
-  { id: 'grid_connectivity', label: '5. Grid Connectivity' },
-  { 
-    id: 'estimate_approval', 
-    label: '6. Estimate – Approval Stages', 
-    subStages: [
-      { id: 'ae_je', label: 'Approved from AE/JE' },
-      { id: 'dyee', label: 'Approved from DYEE' },
-      { id: 'ee', label: 'Approved from Executive Engineer' },
-      { id: 'circle_office', label: 'Approved from Circle Office' }
-    ] 
-  },
-  { id: 'estimate_sanction', label: '7. Estimate Sanction' },
-  { id: 'supervision_testing', label: '8. Supervision & Testing Charges' },
-  { id: 'material_inspection', label: '9. Material Inspection' },
-  { 
-    id: 'work_progress', 
-    label: '10. Work Progress',
-    flags: [
-      { id: 'started', label: 'Started' },
-      { id: 'not_started', label: 'Not Started Yet' },
-      { id: 'row', label: 'ROW' }
-    ]
-  },
-  { id: 'wcr', label: '11. Work Completion Report (WCR)' },
-  { id: 'pre_commissioning', label: '12. Pre-Commissioning' },
-  { 
-    id: 'format_ii_approval', 
-    label: '13. Format II – Approval Stages',
-    subStages: [
-      { id: 'eet', label: 'EE Testing (EET)' },
-      { id: 'om', label: 'Superintending Engineer (O&M)' },
-      { id: 'setqa', label: 'SE TQA Approved' }
-    ]
-  },
-  { id: 'ptc', label: '14. Permission to Commission (PTC)' },
-  { id: 'clearance', label: '15. Clearance Certificate / Release Order' },
-  { id: 'commissioning', label: '16. Commissioning' },
-  { id: 'commissioning_certificate', label: '17. Commissioning Certificate upload from SE(O&M) to Single Window Portal' }
-];
+import { Project, UserProfile, LiaisoningRecord, StageData, LiaisoningDocument, MAIN_STAGES } from '../types';
 
 interface LiaisoningTabProps {
   projectId: string;

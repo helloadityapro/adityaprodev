@@ -105,7 +105,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   ], []);
 
   const authorizedTabs = React.useMemo(() => {
-    if (!user || isProfileLoading || !userProfile) return [];
+    if (!user || isProfileLoading || !userProfile || !roleConfigs) return [];
     if (isSuperAdmin(user.email)) return ALL_TABS;
     const roleId = userProfile.role ? slugifyRole(userProfile.role) : 'none';
     const allowedKeys = userProfile.customPermissions ? new Set(userProfile.customPermissions) : new Set(roleConfigs?.find((c: any) => c.id === roleId)?.allowedPageKeys || []);
@@ -224,19 +224,19 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
             <ScrollBar orientation="horizontal" />
           </ScrollArea>
 
-          <TabsContent value="dashboard"><SiteDashboard project={project} siteTeam={siteTeam} allUsers={allUsers} siteOverrides={siteOverrides} permitsCount={permits?.filter((p:any) => p.status === 'Approved').length || 0} dprsCount={dprs?.length || 0} visitsCount={visits?.filter((v:any) => v.status !== 'completed').length || 0} tasksCount={tasks?.filter((t:any) => t.status !== 'Completed').length || 0} liaisonCompletion={liaisonRecord?.completionPercentage || 0} /></TabsContent>
+          <TabsContent value="dashboard"><SiteDashboard project={project} siteTeam={siteTeam} allUsers={allUsers} siteOverrides={siteOverrides} permitsCount={permits?.filter((p:any) => p.status === 'Approved').length || 0} dprsCount={dprs?.length || 0} visitsCount={visits?.filter((v:any) => v.status !== 'completed').length || 0} tasksCount={tasks?.filter((t:any) => t.status !== 'Completed').length || 0} liaisonCompletion={liaisonRecord?.completionPercentage || 0} liaisonRecord={liaisonRecord || null} /></TabsContent>
           <TabsContent value="liaisoning"><LiaisoningTab projectId={projectId} project={project} liaisonRecord={liaisonRecord || null} allContractors={allContractors} userProfile={userProfile} user={user} /></TabsContent>
-          <TabsContent value="bom"><BoMTab projectId={projectId} siteName={siteName} bomItems={bomItems} masterItems={masterItems} userProfile={userProfile} user={user} isAdmin={isAdmin} isManager={isManager} canManageBom={canManageBom} /></TabsContent>
-          <TabsContent value="po"><POTab projectId={projectId} purchaseOrders={purchaseOrders} userProfile={userProfile} isAdmin={isAdmin} /></TabsContent>
-          <TabsContent value="wo"><WOTab projectId={projectId} workOrders={workOrders} userProfile={userProfile} isAdmin={isAdmin} /></TabsContent>
-          <TabsContent value="payments"><PaymentsTab projectId={projectId} payments={payments} /></TabsContent>
-          <TabsContent value="inventory"><InventoryTab inventory={inventory} bomItems={bomItems} movements={movements} utilisations={utilisations} /></TabsContent>
-          <TabsContent value="utilisation"><UtilisationTab utilisations={utilisations} /></TabsContent>
-          <TabsContent value="movements"><MovementsTab movements={movements} /></TabsContent>
-          <TabsContent value="ptw"><PermitsTab permits={permits} /></TabsContent>
-          <TabsContent value="dpr"><DPRTab dprs={dprs} /></TabsContent>
-          <TabsContent value="tasks"><TasksTab tasks={tasks} /></TabsContent>
-          <TabsContent value="visits"><VisitsTab visits={visits} /></TabsContent>
+          <TabsContent value="bom"><BoMTab projectId={projectId} siteName={siteName} bomItems={bomItems || []} masterItems={masterItems || []} userProfile={userProfile} user={user} isAdmin={isAdmin} isManager={isManager} canManageBom={canManageBom} /></TabsContent>
+          <TabsContent value="po"><POTab projectId={projectId} purchaseOrders={purchaseOrders || []} userProfile={userProfile} isAdmin={isAdmin} /></TabsContent>
+          <TabsContent value="wo"><WOTab projectId={projectId} workOrders={workOrders || []} userProfile={userProfile} isAdmin={isAdmin} /></TabsContent>
+          <TabsContent value="payments"><PaymentsTab projectId={projectId} payments={payments || []} /></TabsContent>
+          <TabsContent value="inventory"><InventoryTab inventory={inventory || []} bomItems={bomItems || []} movements={movements || []} utilisations={utilisations || []} /></TabsContent>
+          <TabsContent value="utilisation"><UtilisationTab utilisations={utilisations || []} /></TabsContent>
+          <TabsContent value="movements"><MovementsTab movements={movements || []} /></TabsContent>
+          <TabsContent value="ptw"><PermitsTab permits={permits || []} /></TabsContent>
+          <TabsContent value="dpr"><DPRTab dprs={dprs || []} /></TabsContent>
+          <TabsContent value="tasks"><TasksTab tasks={tasks || []} /></TabsContent>
+          <TabsContent value="visits"><VisitsTab visits={visits || []} /></TabsContent>
         </Tabs>
       </div>
     </div>
