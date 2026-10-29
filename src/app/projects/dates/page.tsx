@@ -55,9 +55,11 @@ type Site = {
   financialClosureDate?: string;
   ppaScodDate?: string;
   plannedScodDate?: string;
+  workStartDate?: string;
+  commissioningDate?: string;
 };
 
-type SortKey = 'name' | 'company' | 'ppaDate' | 'financialClosureDate' | 'ppaScodDate' | 'plannedScodDate';
+type SortKey = 'name' | 'company' | 'ppaDate' | 'financialClosureDate' | 'ppaScodDate' | 'plannedScodDate' | 'workStartDate' | 'commissioningDate';
 
 export default function ProjectDatesPage() {
   const firestore = useFirestore();
@@ -92,8 +94,8 @@ export default function ProjectDatesPage() {
 
     result.sort((a, b) => {
       const { key, direction } = sortConfig;
-      let valA: any = a[key] || '';
-      let valB: any = b[key] || '';
+      let valA: any = a[key as keyof Site] || '';
+      let valB: any = b[key as keyof Site] || '';
       
       if (typeof valA === 'string') valA = valA.toLowerCase();
       if (typeof valB === 'string') valB = valB.toLowerCase();
@@ -135,7 +137,7 @@ export default function ProjectDatesPage() {
     return (
       <Badge variant="outline" className={cn(
         "font-mono font-black text-[10px] h-6 px-2 rounded-sm border-none shadow-sm",
-        isOverdue ? "bg-red-500 text-white" : isCritical ? "bg-amber-500 text-white" : "bg-emerald-100 text-emerald-800"
+        isOverdue ? "bg-red-50 text-red-700 border-red-200" : isCritical ? "bg-amber-500 text-white" : "bg-emerald-100 text-emerald-800"
       )}>
         {isOverdue ? `Overdue ${Math.abs(days)}d` : `${days} Days Left`}
       </Badge>
@@ -153,6 +155,8 @@ export default function ProjectDatesPage() {
       financialClosureDate: formData.get('financialClosureDate') as string,
       ppaScodDate: formData.get('ppaScodDate') as string,
       plannedScodDate: formData.get('plannedScodDate') as string,
+      workStartDate: formData.get('workStartDate') as string,
+      commissioningDate: formData.get('commissioningDate') as string,
       updatedAt: serverTimestamp()
     };
 
@@ -176,6 +180,8 @@ export default function ProjectDatesPage() {
         financialClosureDate: "",
         ppaScodDate: "",
         plannedScodDate: "",
+        workStartDate: "",
+        commissioningDate: "",
         updatedAt: serverTimestamp()
       });
       toast({ title: 'Dates Cleared', description: `Milestones reset for ${siteToClear.name}.` });
@@ -231,7 +237,13 @@ export default function ProjectDatesPage() {
                     <div className="flex items-center">PPA Date <SortIcon column="ppaDate" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('financialClosureDate')}>
-                    <div className="flex items-center">Financial Closure <SortIcon column="financialClosureDate" /></div>
+                    <div className="flex items-center">Fin. Closure <SortIcon column="financialClosureDate" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('workStartDate')}>
+                    <div className="flex items-center">Work Start <SortIcon column="workStartDate" /></div>
+                  </TableHead>
+                  <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('commissioningDate')}>
+                    <div className="flex items-center">Commissioned <SortIcon column="commissioningDate" /></div>
                   </TableHead>
                   <TableHead className="cursor-pointer hover:text-primary transition-colors" onClick={() => handleSort('ppaScodDate')}>
                     <div className="flex items-center">PPA SCOD <SortIcon column="ppaScodDate" /></div>
@@ -240,7 +252,6 @@ export default function ProjectDatesPage() {
                     <div className="flex items-center">Planned SCOD <SortIcon column="plannedScodDate" /></div>
                   </TableHead>
                   <TableHead className="text-center font-black uppercase text-[10px] tracking-widest bg-primary/[0.03]">Days to PPA SCOD</TableHead>
-                  <TableHead className="text-center font-black uppercase text-[10px] tracking-widest bg-primary/[0.03]">Days to P SCOD</TableHead>
                   <TableHead className="text-right px-6 font-black uppercase text-[10px] tracking-widest">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -259,6 +270,12 @@ export default function ProjectDatesPage() {
                     <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
                       {site.financialClosureDate ? format(parseISO(site.financialClosureDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
+                      {site.workStartDate ? format(parseISO(site.workStartDate), 'dd MMM yyyy') : '—'}
+                    </TableCell>
+                    <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
+                      {site.commissioningDate ? format(parseISO(site.commissioningDate), 'dd MMM yyyy') : '—'}
+                    </TableCell>
                     <TableCell className="font-mono text-xs font-black text-primary whitespace-nowrap">
                       {site.ppaScodDate ? format(parseISO(site.ppaScodDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
@@ -267,9 +284,6 @@ export default function ProjectDatesPage() {
                     </TableCell>
                     <TableCell className="text-center bg-primary/[0.01]">
                       {renderDaysBadge(getDaysRemaining(site.ppaScodDate))}
-                    </TableCell>
-                    <TableCell className="text-center bg-primary/[0.01]">
-                      {renderDaysBadge(getDaysRemaining(site.plannedScodDate))}
                     </TableCell>
                     <TableCell className="text-right px-6">
                         <div className="flex justify-end gap-1">
@@ -284,7 +298,7 @@ export default function ProjectDatesPage() {
                   </TableRow>
                 )) : (
                   <TableRow>
-                    <TableCell colSpan={8} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20 tracking-[0.3em]">
+                    <TableCell colSpan={9} className="h-48 text-center text-muted-foreground italic uppercase font-black text-[10px] opacity-20 tracking-[0.3em]">
                       No groundmount projects in registry
                     </TableCell>
                   </TableRow>
@@ -321,6 +335,17 @@ export default function ProjectDatesPage() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Work Start Date</Label>
+                  <Input name="workStartDate" type="date" defaultValue={editingSite.workStartDate} className="h-10 font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Commissioned Date</Label>
+                  <Input name="commissioningDate" type="date" defaultValue={editingSite.commissioningDate} className="h-10 font-bold" />
+                </div>
+              </div>
+
               <Separator className="opacity-10" />
 
               <div className="grid grid-cols-2 gap-4">
@@ -337,14 +362,14 @@ export default function ProjectDatesPage() {
               <div className="p-4 bg-muted/20 border rounded-sm flex items-start gap-3">
                  <AlertCircle className="h-5 w-5 text-muted-foreground opacity-40 shrink-0 mt-0.5" />
                  <p className="text-[11px] font-medium text-muted-foreground leading-relaxed italic">
-                   Note: Updating SCOD milestones will immediately recalculate the "Days Left" countdowns across the global organizational registry.
+                   Note: Updating milestones here will also synchronize with the main project registry.
                  </p>
               </div>
 
               <DialogFooter className="pt-4 gap-3 flex flex-col sm:flex-row">
                 <DialogClose asChild><Button variant="outline" className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Discard</Button></DialogClose>
                 <Button type="submit" disabled={isSaving} className="rounded-sm font-black uppercase text-[10px] h-11 shadow-lg flex-1">
-                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                  {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Save className="h-4 w-4 mr-2" />}
                   Finalize Dates
                 </Button>
               </DialogFooter>
@@ -364,12 +389,12 @@ export default function ProjectDatesPage() {
               You are about to clear all contractual and internal dates for <strong>{siteToClear?.name}</strong>. This will reset the countdown trackers and cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px]">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleClearDates} 
               disabled={isSaving}
-              className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-black uppercase text-[10px]"
+              className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px]"
             >
               {isSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" /> : null}
               Confirm Reset
