@@ -210,6 +210,30 @@ export type MappingOverride = {
   managerId: string;
 };
 
+export type Meeting = {
+  id: string;
+  siteId: string;
+  siteName: string;
+  date: string;
+  observations: Record<string, string>;
+  criticalPoints: string;
+  userId: string;
+  userName: string;
+  attendees?: { id: string, name: string }[];
+  createdAt: any;
+};
+
+export type ChecklistRecord = {
+  id: string;
+  siteId: string;
+  siteName: string;
+  userName: string;
+  createdAt: any;
+  status: string;
+  type: 'MMS' | 'Inverter' | 'HT Line' | 'HT Conductor' | 'Module Breakage';
+  reference?: string;
+};
+
 export type DataItem = any;
 
 export type POSortKey = 'poNumber' | 'site' | 'supplier' | 'status' | 'date' | 'total' | 'createdBy' | 'createdAt';

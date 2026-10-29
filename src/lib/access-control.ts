@@ -46,6 +46,8 @@ export type PageKey =
   | 'admin-dashboard'
   | 'admin-permits'
   | 'admin-vehicles'
+  | 'admin-expenses'
+  | 'admin-disbursements'
   | 'admin-rewards'
   | 'admin-suppliers'
   | 'admin-makes'
@@ -66,7 +68,9 @@ export type PageKey =
   | 'project-tab-dpr'
   | 'project-tab-tasks'
   | 'project-tab-visits'
-  | 'project-tab-liaisoning';
+  | 'project-tab-liaisoning'
+  | 'project-tab-meetings'
+  | 'project-tab-checklists';
 
 export interface AppPage {
   id: PageKey;
@@ -145,6 +149,8 @@ export const APP_PAGES: AppPage[] = [
   { id: 'project-tab-tasks', label: 'Project: Tasks', category: 'Project Detail Tabs', path: '' },
   { id: 'project-tab-visits', label: 'Project: Visits', category: 'Project Detail Tabs', path: '' },
   { id: 'project-tab-liaisoning', label: 'Project: Liaisoning', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-meetings', label: 'Project: Meetings', category: 'Project Detail Tabs', path: '' },
+  { id: 'project-tab-checklists', label: 'Project: Checklists', category: 'Project Detail Tabs', path: '' },
 ];
 
 /**

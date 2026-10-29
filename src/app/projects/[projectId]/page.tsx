@@ -40,7 +40,9 @@ import {
   FolderOpen,
   Activity,
   Users,
-  TrendingUp
+  TrendingUp,
+  NotebookPen,
+  ClipboardCheck
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
@@ -50,7 +52,7 @@ import { isSuperAdmin } from '@/lib/auth-constants';
 import { cn } from '@/lib/utils';
 
 // Types & Utils
-import { Project, UserProfile, MappingOverride, DataItem, BoMItem, PurchaseOrder, WorkOrder, Payment, InventoryItem, MasterItem, MaterialUtilisation, LiaisoningRecord } from './types';
+import { Project, UserProfile, MappingOverride, DataItem, BoMItem, PurchaseOrder, WorkOrder, Payment, InventoryItem, MasterItem, MaterialUtilisation, LiaisoningRecord, Meeting, ChecklistRecord } from './types';
 import { formatCapacity } from './utils';
 
 // Tab Components
@@ -67,6 +69,8 @@ import { PermitsTab } from './components/permits-tab';
 import { DPRTab } from './components/dpr-tab';
 import { TasksTab } from './components/tasks-tab';
 import { VisitsTab } from './components/visits-tab';
+import { MeetingsTab } from './components/meetings-tab';
+import { ChecklistsTab } from './components/checklists-tab';
 
 export default function ProjectCommandCenterPage({ params }: { params: Promise<{ projectId: string }> }) {
   const resolvedParams = React.use(params);
@@ -82,7 +86,7 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<UserProfile>(userProfileRef);
 
-  const roleConfigsQuery = useMemoFirebase(() => collection(firestore, 'system_settings', 'access', 'roles'), [firestore]);
+  const roleConfigsQuery = useMemoFirebase(() => user ? collection(firestore, 'system_settings', 'access', 'roles') : null, [firestore, user]);
   const { data: roleConfigs } = useCollection<any>(roleConfigsQuery);
 
   const isAdmin = isSuperAdmin(user?.email) || userProfile?.role === 'Admin';
@@ -98,6 +102,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
     { id: "inventory", key: "project-tab-inventory", label: "INVENTORY", icon: Warehouse },
     { id: "utilisation", key: "project-tab-utilisation", label: "UTILISATION", icon: PieChart },
     { id: "movements", key: "project-tab-movements", label: "MOVEMENTS", icon: ArrowLeftRight },
+    { id: "meetings", key: "project-tab-meetings", label: "MEETINGS", icon: NotebookPen },
+    { id: "checklists", key: "project-tab-checklists", label: "CHECKLISTS", icon: ClipboardCheck },
     { id: "ptw", key: "project-tab-ptw", label: "PERMITS", icon: ShieldCheck },
     { id: "dpr", key: "project-tab-dpr", label: "DPR", icon: TableIcon },
     { id: "tasks", key: "project-tab-tasks", label: "TASKS", icon: CheckSquare },
@@ -154,6 +160,39 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
 
   const visitQuery = useMemoFirebase(() => query(collection(firestore, 'site_visits'), where('siteId', '==', projectId)), [firestore, projectId]);
   const { data: visits } = useCollection(visitQuery);
+
+  const meetingsQuery = useMemoFirebase(() => query(collection(firestore, 'meetings'), where('siteId', '==', projectId)), [firestore, projectId]);
+  const { data: meetings } = useCollection<Meeting>(meetingsQuery);
+
+  // Checklist Queries
+  const mmsQuery = useMemoFirebase(() => query(collection(firestore, 'installation_checklists'), where('siteId', '==', projectId)), [firestore, projectId]);
+  const { data: mmsChecklists } = useCollection(mmsQuery);
+  
+  const inverterQuery = useMemoFirebase(() => query(collection(firestore, 'inverter_checklists'), where('siteId', '==', projectId)), [firestore, projectId]);
+  const { data: invChecklists } = useCollection(inverterQuery);
+  
+  const htLineQuery = useMemoFirebase(() => query(collection(firestore, 'ht_line_checklists'), where('siteId', '==', projectId)), [firestore, projectId]);
+  const { data: htLineChecklists } = useCollection(htLineQuery);
+  
+  const htCondQuery = useMemoFirebase(() => query(collection(firestore, 'ht_conductor_checklists'), where('siteId', '==', projectId)), [firestore, projectId]);
+  const { data: htCondChecklists } = useCollection(htCondQuery);
+  
+  const breakageQuery = useMemoFirebase(() => query(collection(firestore, 'module_breakages'), where('siteId', '==', projectId)), [firestore, projectId]);
+  const { data: breakageChecklists } = useCollection(breakageQuery);
+
+  const allChecklists = React.useMemo(() => {
+    const list: ChecklistRecord[] = [];
+    mmsChecklists?.forEach(c => list.push({ ...c, type: 'MMS', reference: c.tableNumber }));
+    invChecklists?.forEach(c => list.push({ ...c, type: 'Inverter', reference: c.inverterNumber }));
+    htLineChecklists?.forEach(c => list.push({ ...c, type: 'HT Line', reference: `Pole ${c.poleNumber}` }));
+    htCondChecklists?.forEach(c => list.push({ ...c, type: 'HT Conductor', reference: c.poleConfiguration }));
+    breakageChecklists?.forEach(c => list.push({ ...c, type: 'Module Breakage', reference: c.serialNumber }));
+    return list.sort((a, b) => {
+      const da = a.createdAt?.toDate?.()?.getTime() || 0;
+      const db = b.createdAt?.toDate?.()?.getTime() || 0;
+      return db - da;
+    });
+  }, [mmsChecklists, invChecklists, htLineChecklists, htCondChecklists, breakageChecklists]);
 
   const liaisonRef = useMemoFirebase(() => doc(firestore, 'liaisoning_records', projectId), [firestore, projectId]);
   const { data: liaisonRecord } = useDoc<LiaisoningRecord>(liaisonRef);
@@ -233,6 +272,8 @@ export default function ProjectCommandCenterPage({ params }: { params: Promise<{
           <TabsContent value="inventory"><InventoryTab inventory={inventory || []} bomItems={bomItems || []} movements={movements || []} utilisations={utilisations || []} /></TabsContent>
           <TabsContent value="utilisation"><UtilisationTab utilisations={utilisations || []} /></TabsContent>
           <TabsContent value="movements"><MovementsTab movements={movements || []} /></TabsContent>
+          <TabsContent value="meetings"><MeetingsTab meetings={meetings || []} /></TabsContent>
+          <TabsContent value="checklists"><ChecklistsTab checklists={allChecklists || []} /></TabsContent>
           <TabsContent value="ptw"><PermitsTab permits={permits || []} /></TabsContent>
           <TabsContent value="dpr"><DPRTab dprs={dprs || []} /></TabsContent>
           <TabsContent value="tasks"><TasksTab tasks={tasks || []} /></TabsContent>
