@@ -303,10 +303,10 @@ export default function ProjectDatesPage() {
                     <TableCell className="font-mono text-xs font-black text-foreground whitespace-nowrap">
                       {site.plannedScodDate ? format(parseISO(site.plannedScodDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
-                    <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
+                    <TableCell className="font-mono text-xs font-bold text-amber-600 whitespace-nowrap">
                       {site.workStartDate ? format(parseISO(site.workStartDate), 'dd MMM yyyy') : '—'}
                     </TableCell>
-                    <TableCell className="font-mono text-xs font-bold text-muted-foreground whitespace-nowrap">
+                    <TableCell className="font-mono text-xs font-bold text-green-600 whitespace-nowrap">
                       <div className="flex flex-col items-center gap-1">
                         <span>{site.commissioningDate ? format(parseISO(site.commissioningDate), 'dd MMM yyyy') : '—'}</span>
                         {site.commissioningDate && site.workStartDate && (
