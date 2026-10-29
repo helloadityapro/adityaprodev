@@ -34,7 +34,10 @@ import {
   Check,
   ChevronRight,
   Package,
-  ChevronsUpDown
+  ChevronsUpDown,
+  MessageSquarePlus,
+  Send,
+  X
 } from 'lucide-react';
 import { format, subDays, subMonths } from 'date-fns';
 import { Button } from '@/components/ui/button';
@@ -76,6 +79,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Checkbox } from '@/components/ui/checkbox';
 import { sendNotification } from "@/lib/notifications";
 
 type RequisitionItem = {
@@ -99,7 +103,7 @@ type Requisition = {
   siteId: string;
   siteName: string;
   items: RequisitionItem[];
-  status: 'Pending' | 'ManagerApproved' | 'Approved' | 'Rejected' | 'Approved & Looking Into It' | 'Ordered' | 'Dispatched' | 'Delivered';
+  status: 'Pending' | 'ManagerApproved' | 'Approved' | 'Rejected' | 'Approved & Looking Into It' | 'Looking into it' | 'Ordered' | 'Dispatched' | 'Delivered';
   urgency: 'Low' | 'Medium' | 'High';
   neededBy: string;
   remarks?: string;
@@ -135,6 +139,9 @@ export default function RequisitionsListPage() {
   const [assignUserSearch, setAssignUserSearch] = React.useState("");
   const [isProcessing, setIsProcessing] = React.useState(false);
   const [deletingReq, setDeletingReq] = React.useState<Requisition | null>(null);
+
+  const [commentTarget, setCommentTarget] = React.useState<Requisition | null>(null);
+  const [newComment, setNewComment] = React.useState("");
 
   const [actionState, setActionState] = React.useState<{ req: Requisition, targetStatus: string } | null>(null);
 
@@ -263,6 +270,52 @@ export default function RequisitionsListPage() {
     setActionState(null);
   };
 
+  const handlePostComment = async () => {
+    if (!commentTarget || !newComment.trim() || !user || !userProfile) return;
+    setIsProcessing(true);
+    
+    try {
+      const reqRef = doc(firestore, 'material_requisitions', commentTarget.id);
+      
+      // Auto-update status from "Not Attended Yet" to "Looking into it"
+      const currentStatus = commentTarget.status;
+      const targetStatus = currentStatus === 'Approved & Looking Into It' ? 'Looking into it' : currentStatus;
+
+      const timelineEntry: TimelineEntry = {
+        action: "Comment Added",
+        status: targetStatus,
+        remarks: newComment.trim(),
+        userName: userProfile.username || user.email || 'System',
+        userId: user.uid,
+        timestamp: new Date().toISOString()
+      };
+
+      updateDocumentNonBlocking(reqRef, {
+        status: targetStatus,
+        updatedAt: serverTimestamp(),
+        timeline: arrayUnion(timelineEntry)
+      });
+
+      if (commentTarget.userId !== user.uid) {
+        sendNotification(firestore, {
+          userId: commentTarget.userId,
+          title: "New Comment on Requisition",
+          description: `${userProfile.username} commented on your request for ${commentTarget.siteName}.`,
+          link: "/requisitions/list",
+          push: true
+        });
+      }
+
+      toast({ title: 'Comment Posted', description: targetStatus === 'Looking into it' && currentStatus !== 'Looking into it' ? 'Requisition status promoted to Looking into it.' : 'Your update has been recorded.' });
+      setCommentTarget(null);
+      setNewComment("");
+    } catch (e: any) {
+      toast({ variant: 'destructive', title: 'Error', description: e.message });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleAssignPerson = async (targetUserId: string) => {
     if (!assignTarget || !user || !userProfile) return;
     setIsProcessing(true);
@@ -287,6 +340,16 @@ export default function RequisitionsListPage() {
         updatedAt: serverTimestamp(),
         timeline: arrayUnion(timelineEntry)
       });
+
+      if (targetUserId) {
+        sendNotification(firestore, {
+          userId: targetUserId,
+          title: "New Task: Material Requisition",
+          description: `You have been assigned to fulfill a material request for ${assignTarget.siteName}.`,
+          link: "/requisitions/list",
+          push: true
+        });
+      }
 
       toast({ title: 'Assigned Successfully', description: `Request delegated to ${targetUser?.username}.` });
       setAssignTarget(null);
@@ -318,6 +381,7 @@ export default function RequisitionsListPage() {
       Approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200" },
       Rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" },
       "Approved & Looking Into It": { label: "Not Attended Yet", color: "bg-indigo-100 text-indigo-800 border-indigo-200" },
+      "Looking into it": { label: "Looking into it", color: "bg-blue-50 text-blue-700 border-blue-200" },
       Ordered: { label: "Ordered", color: "bg-purple-100 text-purple-800 border-purple-200" },
       Dispatched: { label: "Dispatched", color: "bg-amber-100 text-amber-800 border-amber-200" },
       Delivered: { label: "Delivered", color: "bg-emerald-100 text-emerald-800 border-emerald-200" },
@@ -333,7 +397,7 @@ export default function RequisitionsListPage() {
   }
 
   const getFulfillmentOptions = () => {
-    return ["Approved & Looking Into It", "Ordered", "Dispatched", "Delivered"];
+    return ["Approved & Looking Into It", "Looking into it", "Ordered", "Dispatched", "Delivered"];
   };
 
   if (isProfileLoading || isReqsLoading) return <div className="p-8 space-y-4"><Skeleton className="h-12 w-full" /><Skeleton className="h-96 w-full" /></div>;
@@ -361,14 +425,14 @@ export default function RequisitionsListPage() {
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Search Keywords</Label>
             <div className="relative">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-              <Input placeholder="Site, Item or Requester..." className="pl-10 h-10 rounded-sm bg-background border-primary/10 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+              <Input placeholder="Site, Item or Requester..." className="pl-10 h-11 rounded-sm bg-background border-primary/10 text-sm" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
             </div>
           </div>
           
           <div className="space-y-1.5">
             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Target Status</Label>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-10 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
+              <SelectTrigger className="h-11 rounded-sm border-primary/20 bg-background font-bold text-xs uppercase">
                 <SelectValue placeholder="All Status" />
               </SelectTrigger>
               <SelectContent>
@@ -377,6 +441,7 @@ export default function RequisitionsListPage() {
                 <SelectItem value="ManagerApproved" className="text-xs font-bold uppercase text-blue-700">Pending Admin</SelectItem>
                 <SelectItem value="Approved" className="text-xs font-bold uppercase text-green-700">Approved</SelectItem>
                 <SelectItem value="Approved & Looking Into It" className="text-xs font-bold uppercase text-indigo-700">Not Attended Yet</SelectItem>
+                <SelectItem value="Looking into it" className="text-xs font-bold uppercase text-blue-700">Looking into it</SelectItem>
                 <SelectItem value="Ordered" className="text-xs font-bold uppercase text-purple-700">Ordered</SelectItem>
                 <SelectItem value="Dispatched" className="text-xs font-bold uppercase text-amber-700">Dispatched</SelectItem>
                 <SelectItem value="Delivered" className="text-xs font-bold uppercase text-emerald-700">Delivered</SelectItem>
@@ -487,7 +552,7 @@ export default function RequisitionsListPage() {
                       const canAdminApprove = isAdmin && (req.status === 'ManagerApproved' || (req.status === 'Pending' && !req.siteManagerId));
                       const canAssign = isAdmin && req.status === 'Approved';
                       const isAssigned = req.assignedToId === user?.uid;
-                      const canUpdateFulfillment = isAssigned && ["Approved & Looking Into It", "Ordered", "Dispatched", "Delivered"].includes(req.status);
+                      const canUpdateFulfillment = isAssigned && ["Approved & Looking Into It", "Looking into it", "Ordered", "Dispatched", "Delivered"].includes(req.status);
 
                       const materialsText = req.items.map(i => i.itemName).join(', ');
                       const totalQty = req.items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0);
@@ -557,8 +622,8 @@ export default function RequisitionsListPage() {
                               <div className="flex justify-end gap-1">
                                 {isMgrOfReq && (
                                   <div className="flex gap-1">
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: 'ManagerApproved' })}><CheckCircle2 className="h-4 w-4" /></Button>
-                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><XCircle className="h-4 w-4" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-green-600 rounded-sm hover:bg-green-50" onClick={() => setActionState({ req, targetStatus: 'ManagerApproved' })}><CheckCircle2 className="h-5 w-5" /></Button>
+                                    <Button size="icon" variant="ghost" className="h-8 w-8 text-red-600 rounded-sm hover:bg-red-50" onClick={() => setActionState({ req, targetStatus: 'Rejected' })}><XCircle className="h-5 w-5" /></Button>
                                   </div>
                                 )}
                                 {canAdminApprove && (
@@ -570,13 +635,18 @@ export default function RequisitionsListPage() {
                                 {canAssign && (
                                   <Button size="sm" variant="outline" className="h-8 px-3 rounded-sm font-black text-[9px] uppercase border-primary/20 text-primary" onClick={() => setAssignTarget(req)}><UserPlus className="h-3.5 w-3.5 mr-1" /> Assign</Button>
                                 )}
-                                {canUpdateFulfillment && (
-                                  <Select value={req.status} onValueChange={(val: any) => setActionState({ req, targetStatus: val })}>
-                                    <SelectTrigger className="h-8 w-[130px] text-[10px] font-black uppercase"><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                      {getFulfillmentOptions().map(opt => <SelectItem key={opt} value={opt} className="text-[10px] font-bold uppercase">{opt}</SelectItem>)}
-                                    </SelectContent>
-                                  </Select>
+                                {isAssigned && (
+                                  <div className="flex gap-1">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-indigo-600 rounded-sm hover:bg-indigo-50" onClick={() => setCommentTarget(req)} title="Add Comment"><MessageSquarePlus className="h-4 w-4" /></Button>
+                                    {canUpdateFulfillment && (
+                                      <Select value={req.status} onValueChange={(val: any) => setActionState({ req, targetStatus: val })}>
+                                        <SelectTrigger className="h-8 w-[130px] text-[10px] font-black uppercase"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                          {getFulfillmentOptions().map(opt => <SelectItem key={opt} value={opt} className="text-[10px] font-bold uppercase">{opt}</SelectItem>)}
+                                        </SelectContent>
+                                      </Select>
+                                    )}
+                                  </div>
                                 )}
                                 <Button variant="ghost" size="icon" className="h-8 w-8 text-primary rounded-sm hover:bg-primary/10" onClick={() => toggleExpand(req.id)}><Eye className="h-4 w-4" /></Button>
                                 {(isAdmin || (isOwner && req.status === 'Pending')) && (
@@ -658,6 +728,44 @@ export default function RequisitionsListPage() {
               onClick={() => handleAction((document.getElementById('action-remarks-input') as HTMLTextAreaElement)?.value || "")}
             >
               Confirm Status
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!commentTarget} onOpenChange={(o) => !o && setCommentTarget(null)}>
+        <DialogContent className="max-w-md w-[95vw] rounded-sm p-0 overflow-hidden border-none shadow-2xl bg-background flex flex-col">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 text-left">
+             <DialogTitle className="text-xl font-black uppercase tracking-tight">Add Audit Comment</DialogTitle>
+             <DialogDescription className="text-xs font-medium">Providing feedback for {commentTarget?.siteName}.</DialogDescription>
+          </DialogHeader>
+          <div className="p-6 space-y-4">
+             <div className="space-y-2">
+                <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Your Comment</Label>
+                <Textarea 
+                  placeholder="Type your investigation update or findings..." 
+                  className="min-h-[120px] rounded-sm text-sm" 
+                  value={newComment} 
+                  onChange={e => setNewComment(e.target.value)}
+                />
+             </div>
+             {commentTarget?.status === 'Approved & Looking Into It' && (
+               <div className="p-3 bg-blue-50 border border-blue-100 rounded-sm flex items-start gap-2">
+                  <Clock className="h-4 w-4 text-blue-600 shrink-0 mt-0.5" />
+                  <p className="text-[10px] font-medium text-blue-800 leading-relaxed">
+                    Posting this comment will automatically change the status from <strong>"Not Attended Yet"</strong> to <strong>"Looking into it"</strong>.
+                  </p>
+               </div>
+             )}
+          </div>
+          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 flex flex-col sm:flex-row">
+            <DialogClose asChild><Button variant="outline" className="w-full sm:flex-1 h-11 rounded-sm font-bold uppercase text-[10px]">Cancel</Button></DialogClose>
+            <Button 
+              onClick={handlePostComment} 
+              disabled={isProcessing || !newComment.trim()}
+              className="w-full sm:flex-1 h-11 rounded-sm font-black uppercase text-[10px] shadow-lg"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Send className="h-4 w-4 mr-2" />} Post Comment
             </Button>
           </DialogFooter>
         </DialogContent>
