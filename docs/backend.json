@@ -263,6 +263,8 @@
         "financialClosureDate": { "type": "string", "format": "date", "description": "Financial Closure Date" },
         "ppaScodDate": { "type": "string", "format": "date", "description": "PPA Scheduled Commercial Operation Date" },
         "plannedScodDate": { "type": "string", "format": "date", "description": "Internally Planned SCOD" },
+        "workStartDate": { "type": "string", "format": "date", "description": "Actual construction start date" },
+        "commissioningDate": { "type": "string", "format": "date", "description": "Actual project commissioning date" },
         "drawingUrl": { "type": "string", "description": "URL to the Table Numbering Drawing PDF" },
         "drawingName": { "type": "string", "description": "Original filename of the drawing" },
         "moduleBreakageCount": { "type": "number", "default": 0, "description": "Running counter of reported module breakages on site" },

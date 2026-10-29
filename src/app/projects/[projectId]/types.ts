@@ -1,3 +1,4 @@
+
 import { PageKey } from '@/lib/access-control';
 
 export type Attachment = {
@@ -51,6 +52,8 @@ export type Project = {
   financialClosureDate?: string;
   ppaScodDate?: string;
   plannedScodDate?: string;
+  workStartDate?: string;
+  commissioningDate?: string;
 };
 
 export type BoMItem = {

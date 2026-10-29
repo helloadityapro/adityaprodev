@@ -106,6 +106,8 @@ const siteSchema = z.object({
   projectOwnerName: z.string().optional(),
   workStatus: z.enum(["Yet to Start", "Work in progress", "Completed", "Cancelled"]).default("Yet to Start"),
   projectStatus: z.enum(["open", "close"]).default("open"),
+  workStartDate: z.string().optional(),
+  commissioningDate: z.string().optional(),
 });
 
 type SortOrder = 'name' | 'newest' | 'oldest';
@@ -166,7 +168,9 @@ export default function AddNewProjectPage() {
       projectOwnerId: "",
       projectOwnerName: "",
       workStatus: "Yet to Start",
-      projectStatus: "open"
+      projectStatus: "open",
+      workStartDate: '',
+      commissioningDate: '',
     },
   });
 
@@ -183,7 +187,9 @@ export default function AddNewProjectPage() {
         projectOwnerId: "",
         projectOwnerName: "",
         workStatus: "Yet to Start",
-        projectStatus: "open"
+        projectStatus: "open",
+        workStartDate: '',
+        commissioningDate: '',
       });
     }
   }, [isAddDialogOpen, siteForm]);
@@ -202,6 +208,8 @@ export default function AddNewProjectPage() {
         projectOwnerName: siteToEdit.projectOwnerName || "",
         workStatus: siteToEdit.workStatus || "Work in progress",
         projectStatus: siteToEdit.projectStatus || "open",
+        workStartDate: siteToEdit.workStartDate || "",
+        commissioningDate: siteToEdit.commissioningDate || "",
       });
     }
   }, [siteToEdit, siteForm]);
@@ -620,6 +628,27 @@ export default function AddNewProjectPage() {
                       )} />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField control={siteForm.control} name="workStartDate" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Work Start Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} className="rounded-sm" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={siteForm.control} name="commissioningDate" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Commissioning Date</FormLabel>
+                        <FormControl>
+                          <Input type="date" {...field} className="rounded-sm" />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                  </div>
                   
                   <div className="grid grid-cols-2 gap-4">
                     <FormField control={siteForm.control} name="latitude" render={({ field }) => (
@@ -804,6 +833,28 @@ export default function AddNewProjectPage() {
                   )} />
                 </div>
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <FormField control={siteForm.control} name="workStartDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Work Start Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} className="rounded-sm" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+                <FormField control={siteForm.control} name="commissioningDate" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Commissioning Date</FormLabel>
+                    <FormControl>
+                      <Input type="date" {...field} className="rounded-sm" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+              </div>
+
               <div className="grid grid-cols-2 gap-4">
                 <FormField control={siteForm.control} name="latitude" render={({ field }) => (
                   <FormItem><FormLabel>Latitude</FormLabel><FormControl><Input type="number" step="0.000001" placeholder="19.0760" {...field} className="rounded-sm" /></FormControl><FormMessage /></FormItem>
