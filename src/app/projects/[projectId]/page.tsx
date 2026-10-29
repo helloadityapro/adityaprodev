@@ -19,7 +19,7 @@ import {
   and, 
   limit
 } from 'firebase/firestore';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Building2, 
@@ -37,7 +37,10 @@ import {
   Table as TableIcon,
   CheckSquare,
   Navigation,
-  FolderOpen
+  FolderOpen,
+  Activity,
+  Users,
+  TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
