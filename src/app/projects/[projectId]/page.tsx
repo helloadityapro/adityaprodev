@@ -47,6 +47,7 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import Link from 'next/link';
 import { type PageKey, slugifyRole } from '@/lib/access-control';
 import { isSuperAdmin } from '@/lib/auth-constants';
+import { cn } from '@/lib/utils';
 
 // Types & Utils
 import { Project, UserProfile, MappingOverride, DataItem, BoMItem, PurchaseOrder, WorkOrder, Payment, InventoryItem, MasterItem, MaterialUtilisation, LiaisoningRecord } from './types';
