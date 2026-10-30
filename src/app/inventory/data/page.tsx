@@ -22,17 +22,17 @@ import {
   ArrowDown,
   ListFilter,
   FileDown,
-  Eye,
-  Trash2,
-  FileText,
-  ExternalLink,
-  Building2,
-  Truck,
-  ShieldCheck,
-  History,
-  Loader2,
-  CheckCircle2,
-  XCircle,
+  Eye, 
+  Trash2, 
+  FileText, 
+  ExternalLink, 
+  Building2, 
+  Truck, 
+  ShieldCheck, 
+  History, 
+  Loader2, 
+  CheckCircle2, 
+  XCircle, 
   AlertCircle
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -73,6 +73,12 @@ import * as XLSX from 'xlsx';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { slugifyRole } from '@/lib/access-control';
 import { useToast } from '@/hooks/use-toast';
+import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert';
+
+/**
+ * Material Movement Data Page
+ * Registry of all material transfers, dispatches, and incoming verification status.
+ */
 
 type Attachment = {
   url: string;
@@ -668,7 +674,7 @@ export default function MovementDataPage() {
             )}
           </div>
 
-          <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
+          <div className="sm:justify-end sm:space-x-2 p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
             <DialogClose asChild>
               <Button variant="outline" className="w-full sm:flex-1 h-11 font-bold uppercase text-[10px]">
                 Cancel
@@ -690,7 +696,7 @@ export default function MovementDataPage() {
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
               Accept
             </Button>
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -793,7 +799,7 @@ export default function MovementDataPage() {
       </Dialog>
 
       <AlertDialog open={!!deletingMovement} onOpenChange={(o) => !o && setDeletingMovement(null)}>
-        <AlertDialogContent className="rounded-sm max-w-md w-[95vw]">
+        <AlertDialogContent className="rounded-sm max-md w-[95vw]">
           <AlertDialogHeader className="text-left">
             <AlertDialogTitle className="text-destructive font-black uppercase tracking-tight flex items-center gap-2">
               <Trash2 className="h-5 w-5" /> Delete Material Log?
@@ -831,4 +837,9 @@ function StatusBadge({ status, className }: { status: string, className?: string
         {item.label}
       </Badge>
     );
+}
+
+function SortIcon({ column, config }: { column: SortKey, config: { key: SortKey; direction: 'asc' | 'desc' } }) {
+  if (config.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
+  return config.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
 }
