@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -47,6 +46,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 
 const woItemSchema = z.object({
   description: z.string().min(1, 'Description is required.'),
@@ -274,7 +274,7 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
   return (
     <div className="space-y-8 max-w-6xl mx-auto pb-20 px-4">
       <div className="flex flex-col gap-1">
-        <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary"><ArrowLeft className="mr-2 h-4 w-4" /> Cancel Edit</Button>
+        <Button variant="ghost" size="sm" onClick={() => router.back()} className="w-fit mb-2 -ml-2 text-muted-foreground hover:text-primary transition-colors"><ArrowLeft className="mr-2 h-4 w-4" /> Cancel Edit</Button>
         <h1 className="flex items-center gap-2"><Pencil className="h-8 w-8 text-primary" /> Edit Work Order</h1>
         <p className="text-muted-foreground font-medium">Update contract value or line items. Resubmission requires Admin re-approval.</p>
       </div>
@@ -414,7 +414,7 @@ export default function EditWOPage({ params }: { params: Promise<{ projectId: st
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
                       <div className="md:col-span-5"><FormField control={form.control} name={`items.${index}.description`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Service Description</FormLabel><FormControl><Input placeholder="e.g. Earthwork excavation" {...field} className="h-10 rounded-sm bg-background" /></FormControl><FormMessage /></FormItem>)} /></div>
                       <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.quantity`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Qty</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /></div>
-                      <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /></div>
+                      <div className="md:col-span-2"><FormField control={form.control} name={`items.${index}.rate`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Unit Rate (₹)</FormLabel><FormControl><Input type="number" step="0.01" {...field} className="h-10 rounded-sm bg-background font-mono font-bold" /></FormControl><FormMessage /></FormItem>)} /></div>
                       <div className="md:col-span-1"><FormField control={form.control} name={`items.${index}.gstPercent`} render={({ field }) => (<FormItem><FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">GST %</FormLabel><FormControl><Input type="number" {...field} className="h-10 rounded-sm bg-background font-mono font-bold text-center px-1" /></FormControl><FormMessage /></FormItem>)} /></div>
                       <div className="md:col-span-2"><div className="space-y-2"><Label className="text-[10px] font-black uppercase text-primary tracking-widest text-right block">Line Total (₹)</Label><div className="h-10 px-3 bg-primary/5 border border-primary/10 rounded-sm flex items-center justify-end font-mono font-black text-primary text-sm shadow-inner">{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</div></div></div>
                     </div>
