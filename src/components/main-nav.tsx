@@ -101,7 +101,7 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
 
   return (
     <div className="flex flex-col gap-4 py-2 flex-1">
-      {/* Main Section */}
+      {/* Main Hub Section */}
       <SidebarGroup>
         <SidebarGroupLabel className="px-2 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/60">Main Hub</SidebarGroupLabel>
         <SidebarMenu>
@@ -885,26 +885,6 @@ export function MainNav({ userRole, userDepartment, pendingPtwCount, canShow }: 
                         <Link href="/registries/makes">
                           <Tag className="h-4 w-4" />
                           <span>Makes</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  )}
-                  {canShow('master-data-tables-add') && (
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/registries/tables/add'} onClick={handleMobileClose}>
-                        <Link href="/registries/tables/add">
-                          <Plus className="h-4 w-4" />
-                          <span>Add Tables Data</span>
-                        </Link>
-                      </SidebarMenuSubButton>
-                    </SidebarMenuSubItem>
-                  )}
-                  {canShow('master-data-tables-list') && (
-                    <SidebarMenuSubItem>
-                      <SidebarMenuSubButton asChild isActive={pathname === '/registries/tables/list'} onClick={handleMobileClose}>
-                        <Link href="/registries/tables/list">
-                          <List className="h-4 w-4" />
-                          <span>Tables Data</span>
                         </Link>
                       </SidebarMenuSubButton>
                     </SidebarMenuSubItem>

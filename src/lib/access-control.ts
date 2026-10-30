@@ -1,3 +1,4 @@
+'use client';
 /**
  * @fileOverview Definition of all available sidebar pages and their keys.
  * This acts as the source of truth for the User Access Management system.
@@ -37,8 +38,6 @@ export type PageKey =
   | 'checklists-ht-conductor'
   | 'checklists-inverter'
   | 'checklists-data'
-  | 'master-data-tables-add'
-  | 'master-data-tables-list'
   | 'admin-attendance-summary'
   | 'admin-attendance-matrix'
   | 'admin-day-report'
@@ -111,8 +110,6 @@ export const APP_PAGES: AppPage[] = [
   { id: 'admin-suppliers', label: 'Supplier Registry', category: 'Registries', path: '/registries/suppliers' },
   { id: 'admin-contractors', label: 'Contractor Registry', category: 'Registries', path: '/registries/contractors' },
   { id: 'admin-makes', label: 'Makes Registry', category: 'Registries', path: '/registries/makes' },
-  { id: 'master-data-tables-add', label: 'Add Tables Data', category: 'Registries', path: '/registries/tables/add' },
-  { id: 'master-data-tables-list', label: 'Tables Data', category: 'Registries', path: '/registries/tables/list' },
 
   { id: 'checklists-installation', label: 'Table Level MMS Checklist', category: 'Checklists', path: '/checklists/installation' },
   { id: 'checklists-ht-line', label: 'HT Line Checklist', category: 'Checklists', path: '/checklists/ht-line' },
@@ -198,10 +195,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/checklists/ht-conductor')) return 'checklists-installation';
   if (path.startsWith('/checklists/inverter')) return 'checklists-installation';
   if (path.startsWith('/checklists/data')) return 'checklists-data';
-  if (path.startsWith('/registries/tables')) {
-    if (path.includes('/add')) return 'master-data-tables-add';
-    if (path.includes('/list')) return 'master-data-tables-list';
-  }
+
   if (path.startsWith('/registries/suppliers')) return 'admin-suppliers';
   if (path.startsWith('/registries/contractors')) return 'admin-contractors';
   if (path.startsWith('/registries/makes')) return 'admin-makes';
