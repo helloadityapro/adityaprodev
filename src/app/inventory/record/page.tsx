@@ -6,7 +6,7 @@ import { useForm, useFieldArray } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useFirestore, useUser, useDoc, useMemoFirebase, useFirebaseApp, useCollection, addDocumentNonBlocking, updateDocumentNonBlocking, setDocumentNonBlocking } from "@/firebase";
-import { collection, doc, serverTimestamp, query, where, limit, getDocs, addDoc, and, or, increment } from "firebase/firestore";
+import { collection, doc, serverTimestamp, query, where, limit, getDocs, and, or, increment } from "firebase/firestore";
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from "firebase/storage";
 import { Search, Check, ChevronsUpDown, Loader2, ArrowLeftRight, Calendar, Plus, Trash2, ListPlus, Truck, Building2, CheckCircle2, FileUp, FileText, X, ArrowLeft, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -122,9 +122,6 @@ export default function RecordMovementPage() {
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
-
-  const contractorsQuery = useMemoFirebase(() => collection(firestore, 'contractors'), [firestore]);
-  const { data: allContractors } = useCollection<any>(contractorsQuery);
 
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
@@ -362,7 +359,6 @@ export default function RecordMovementPage() {
       }
 
       const isTransfer = values.sourceOrDestinationType === 'Site';
-      // Inward acceptance logic: Only Outward movements to another Site become Pending
       const status = (isTransfer && values.movementType === 'Outward') ? 'Pending' : 'Recorded';
 
       const recordingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', selectedSiteId)));
@@ -375,7 +371,6 @@ export default function RecordMovementPage() {
       }
 
       for (const item of values.items) {
-        // Log the movement for the current site
         addDocumentNonBlocking(collection(firestore, 'material_movements'), {
           ...values,
           itemName: item.itemName,
@@ -391,8 +386,6 @@ export default function RecordMovementPage() {
           createdAt: serverTimestamp()
         });
 
-        // Always update stock at the current recording site (Site A)
-        // If it's an Inward from Site B, we assume Site A has already accepted it by recording it
         const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('itemName', '==', item.itemName));
         const invSnap = await getDocs(invQuery);
         const currentSiteAdjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
@@ -415,9 +408,6 @@ export default function RecordMovementPage() {
           }, { merge: true });
         }
 
-        // INWARD ACCEPTANCE LOGIC:
-        // If Site A is receiving from Site B, Site B's stock should decrease immediately.
-        // If Site A is sending to Site B, Site B's stock is NOT increased until they accept it (in data/page.tsx)
         if (isTransfer && values.movementType === 'Inward' && otherSiteId) {
             const otherInvQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', otherSiteId), where('itemName', '==', item.itemName));
             const otherInvSnap = await getDocs(otherInvQuery);
@@ -430,7 +420,6 @@ export default function RecordMovementPage() {
         }
       }
 
-      // Notifications for transfers
       if (isTransfer && values.movementType === 'Outward' && otherSiteId) {
           const usersQ = query(collection(firestore, 'users'), where('assignedProjectIds', 'array-contains', otherSiteId));
           const usersSnap = await getDocs(usersQ);
@@ -438,7 +427,7 @@ export default function RecordMovementPage() {
               sendNotification(firestore, {
                   userId: d.id,
                   title: "Incoming Material Dispatch",
-                  description: `${userProfile.username} dispatched ${values.items.length} items from ${values.siteName}. Review and accept in Inventory Data.`,
+                  description: `${userProfile.username} dispatched ${values.items.length} items from ${values.siteName}.`,
                   link: "/inventory/data",
                   push: true
               });
@@ -458,7 +447,7 @@ export default function RecordMovementPage() {
     }
   };
 
-  const filteredSites = accessibleSites.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase()));
+  const filteredSites = allSites?.filter(s => s.name.toLowerCase().includes(siteSearchQuery.toLowerCase())) || [];
 
   if (isSubmitted && submittedData) {
     return (
@@ -541,8 +530,8 @@ export default function RecordMovementPage() {
                       </SelectContent>
                     </Select>
                     <FormMessage />
-                  </FormItem>)} 
-                />
+                  </FormItem>
+                )} />
 
                 <FormField control={form.control} name="siteName" render={({ field }) => (
                   <FormItem className="flex flex-col">
@@ -552,9 +541,9 @@ export default function RecordMovementPage() {
                         <FormControl><Button variant="outline" role="combobox" className={cn("w-full justify-between font-normal h-11 rounded-sm text-left", !field.value && "text-muted-foreground")}>{field.value || "Select site..."}<ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" /></Button></FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none focus-visible:ring-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
-                        <ScrollArea className="h-[200px]">{filteredSites.map(site => (
-                          <Button key={site.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(site.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", site.name === field.value ? "opacity-100" : "opacity-0")} />{site.name}</Button>
+                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search sites..." className="h-9 border-none focus-visible:ring-0 px-0 text-sm" value={siteSearchQuery} onChange={e => setSiteSearchQuery(e.target.value)} /></div>
+                        <ScrollArea className="h-[200px]">{filteredSites.map(s => (
+                          <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSitePopoverOpen(false); }}><Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />{s.name}</Button>
                         ))}</ScrollArea>
                       </PopoverContent>
                     </Popover>
@@ -596,14 +585,11 @@ export default function RecordMovementPage() {
                         </FormControl>
                       </PopoverTrigger>
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
-                        <div className="flex items-center border-b px-3">
-                          <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearchQuery} onChange={(e) => setSupplierSearchQuery(e.target.value)} />
-                        </div>
+                        <div className="flex items-center border-b px-3"><Search className="mr-2 h-4 w-4 shrink-0 opacity-50" /><Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearchQuery} onChange={(e) => setSupplierSearchQuery(e.target.value)} /></div>
                         <ScrollArea className="h-[200px]">
                           {filteredSuppliers.map(s => (
                             <Button key={s.id} type="button" variant="ghost" className="w-full justify-start h-10 text-sm" onClick={() => { field.onChange(s.name); setIsSupplierPopoverOpen(false); setSupplierSearchQuery(""); }}>
-                              <Check className={cn("mr-2 h-4 w-4 text-primary", s.name === field.value ? "opacity-100" : "opacity-0")} />
+                              <Check className={cn("mr-2 h-4 w-4 text-primary", s.id === field.value ? "opacity-100" : "opacity-0")} />
                               {s.name}
                             </Button>
                           ))}
@@ -661,7 +647,7 @@ export default function RecordMovementPage() {
 
                   <FormField control={form.control} name="invoiceDate" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</Label>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</FormLabel>
                       <FormControl>
                         <Input type="date" {...field} className="h-11 rounded-sm" />
                       </FormControl>
