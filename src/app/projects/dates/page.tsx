@@ -319,9 +319,9 @@ export default function ProjectDatesPage() {
     <div className="space-y-6 md:space-y-8 pb-20 animate-in fade-in duration-500">
       <div className="flex flex-col gap-1">
         <h1 className="text-xl md:text-3xl font-black uppercase tracking-tight text-foreground flex items-center gap-3">
-          <CalendarDays className="h-8 w-8 text-primary" /> Chronological Milestones
+          <CalendarDays className="h-8 w-8 text-primary" /> Project Dates
         </h1>
-        <p className="text-muted-foreground text-sm font-medium">Tracking contractual and internal SCOD timelines for utility scale projects.</p>
+        <p className="text-muted-foreground text-sm font-medium">Tracking contractual and internal SCOD timelines for projects.</p>
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">

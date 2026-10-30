@@ -46,7 +46,7 @@ interface WOTabProps {
   isAdmin: boolean;
 }
 
-export default function WOTab({ projectId, workOrders, userProfile, isAdmin }: WOTabProps) {
+export function WOTab({ projectId, workOrders, userProfile, isAdmin }: WOTabProps) {
   const firestore = useFirestore();
   const [woSearch, setWoSearch] = React.useState("");
   const [woSortConfig, setWoSortConfig] = React.useState<{ key: WOSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });

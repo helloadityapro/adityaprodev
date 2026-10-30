@@ -41,20 +41,6 @@ import Link from 'next/link';
 import { PurchaseOrder, MasterItem, UserProfile, POSortKey } from '../types';
 import { formatTimestamp } from '../utils';
 
-interface BoMTabProps {
-  projectId: string;
-  siteName: string;
-  bomItems: BoMItem[] | null;
-  masterItems: MasterItem[] | null;
-  userProfile: UserProfile | null;
-  user: any;
-  isAdmin: boolean;
-  isManager: boolean;
-  canManageBom: boolean;
-}
-
-const UNITS = ["Numbers", "Kilograms", "Liters", "Meters", "Sets", "Bundles", "Pairs", "Drums"];
-
 export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: { projectId: string, purchaseOrders: PurchaseOrder[] | null, userProfile: UserProfile | null, isAdmin: boolean }) {
   const firestore = useFirestore();
   const [poSearch, setPoSearch] = React.useState("");
@@ -95,7 +81,7 @@ export function POTab({ projectId, purchaseOrders, userProfile, isAdmin }: { pro
 
   const POSortIcon = ({ column }: { column: POSortKey }) => {
     if (poSortConfig.key !== column) return <ArrowUpDown className="ml-2 h-3 w-3 opacity-30" />;
-    return poSortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
+    return sortConfig.direction === 'asc' ? <ArrowUp className="ml-2 h-3 w-3 text-primary" /> : <ArrowDown className="ml-2 h-3 w-3 text-primary" />;
   };
 
   function toggleRow(id: string) {
