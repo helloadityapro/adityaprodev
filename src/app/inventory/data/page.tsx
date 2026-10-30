@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -670,16 +669,26 @@ export default function MovementDataPage() {
           </div>
 
           <DialogFooter className="p-4 bg-muted/5 border-t gap-3 shrink-0 flex flex-col sm:flex-row">
-            <Button variant="ghost" className="w-full sm:flex-1 h-11 font-bold uppercase text-[10px]" onClick={() => handleProcessInward('Rejected')} disabled={isProcessing}>
-               Full Rejection
+            <DialogClose asChild>
+              <Button variant="outline" className="w-full sm:flex-1 h-11 font-bold uppercase text-[10px]">
+                Cancel
+              </Button>
+            </DialogClose>
+            <Button 
+              variant="outline" 
+              className="w-full sm:flex-1 h-11 font-bold uppercase text-[10px] text-red-600 border-red-200 hover:bg-red-50" 
+              onClick={() => handleProcessInward('Rejected')} 
+              disabled={isProcessing}
+            >
+              Reject
             </Button>
             <Button 
-              className="w-full sm:flex-1 h-11 font-black uppercase text-[10px] bg-amber-600 hover:bg-amber-700 shadow-lg" 
+              className="w-full sm:flex-1 h-11 font-black uppercase text-[10px] shadow-lg" 
               onClick={() => handleProcessInward('Accepted')}
               disabled={isProcessing || !acceptedQty || parseFloat(acceptedQty) <= 0}
             >
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
-              Finalize Inward
+              Accept
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -793,7 +802,7 @@ export default function MovementDataPage() {
               Are you sure you want to permanently remove this {deletingMovement?.movementType.toLowerCase()} log for <strong>{deletingMovement?.itemName}</strong>? This action cannot be reversed and may lead to inventory discrepancies if not manually adjusted.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="gap-2 flex flex-col sm:flex-row pt-4 border-t mt-4">
+          <AlertDialogFooter>
             <AlertDialogCancel className="rounded-sm font-bold uppercase text-[10px] h-11 flex-1">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteMovement} disabled={isProcessing} className="bg-destructive text-white hover:bg-destructive/90 rounded-sm font-bold uppercase text-[10px] h-11 flex-1 shadow-lg">
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
