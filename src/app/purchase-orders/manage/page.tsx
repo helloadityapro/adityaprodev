@@ -162,7 +162,7 @@ export default function GlobalManagePOsPage() {
 
   const [searchTerm, setSearchTerm] = React.useState("");
   const [statusFilter, setStatusFilter] = React.useState("all");
-  const [dateFilter, setDateFilter] = React.useState("allTime");
+  const [dateFilter, setDateFilter] = React.useState("7days");
   const [sortConfig, setSortConfig] = React.useState<{ key: POSortKey; direction: 'asc' | 'desc' }>({ key: 'date', direction: 'desc' });
   const [expandedRows, setExpandedRows] = React.useState<Set<string>>(new Set());
   const [poToDelete, setPoToDelete] = React.useState<PurchaseOrder | null>(null);
@@ -458,7 +458,7 @@ export default function GlobalManagePOsPage() {
   const clearFilters = () => {
     setSearchTerm("");
     setStatusFilter("all");
-    setDateFilter("allTime");
+    setDateFilter("7days");
   };
 
   if (isProfileLoading || isPOsLoading) {
@@ -487,7 +487,7 @@ export default function GlobalManagePOsPage() {
         </div>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-card p-4 border border-primary/10 rounded-sm shadow-sm no-print">
         <div className="relative w-full md:w-96">
           <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input 
