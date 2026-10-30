@@ -1,3 +1,4 @@
+
 "use client";
 
 import * as React from "react";
@@ -122,6 +123,9 @@ export default function RecordMovementPage() {
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
 
+  const contractorsQuery = useMemoFirebase(() => collection(firestore, 'contractors'), [firestore]);
+  const { data: allContractors } = useCollection<any>(contractorsQuery);
+
   const suppliersQuery = useMemoFirebase(() => collection(firestore, 'suppliers'), [firestore]);
   const { data: allSuppliers } = useCollection<Supplier>(suppliersQuery);
 
@@ -152,7 +156,7 @@ export default function RecordMovementPage() {
     }
     
     const filtered = allSites.filter(s => siteIds.has(s.id));
-    return Array.from(new Map(filtered.map(s => [s.name, s])).values());
+    return Array.from(new Map(filtered.map(site => [site.name, site])).values());
   }, [allSites, userProfile, isAdmin, isManager, teamMembers, allOverrides]);
 
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
@@ -358,29 +362,16 @@ export default function RecordMovementPage() {
       }
 
       const isTransfer = values.sourceOrDestinationType === 'Site';
-      const status = isTransfer ? 'Pending' : 'Recorded';
+      // Inward acceptance logic: Only Outward movements to another Site become Pending
+      const status = (isTransfer && values.movementType === 'Outward') ? 'Pending' : 'Recorded';
 
       const recordingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', selectedSiteId)));
       const recordingOverridesSnap = await getDocs(recordingOverridesQ);
       const effectiveSiteManagerId = !recordingOverridesSnap.empty ? recordingOverridesSnap.docs[0].data().managerId : (userProfile.siteManagerId || null);
 
-      let receivingManagerId = null;
+      let otherSiteId = null;
       if (isTransfer) {
-        const destSiteName = values.movementType === 'Outward' ? values.sourceOrDestination : values.siteName;
-        const destSite = allSites?.find(s => s.name === destSiteName);
-        
-        if (destSite) {
-          const receivingOverridesQ = query(collection(firestore, 'team_mapping_overrides'), and(where('engineerId', '==', user.uid), where('siteId', '==', destSite.id)));
-          const receivingOverridesSnap = await getDocs(receivingOverridesQ);
-          if (!receivingOverridesSnap.empty) {
-            receivingManagerId = receivingOverridesSnap.docs[0].data().managerId;
-          } else {
-            const usersQ = query(collection(firestore, 'users'), where('role', '==', 'Site Manager'));
-            const usersSnap = await getDocs(usersQ);
-            const manager = usersSnap.docs.find(d => (d.data().assignedProjectIds || []).includes(destSite.id));
-            receivingManagerId = manager?.id || null;
-          }
-        }
+        otherSiteId = allSites?.find(s => s.name === values.sourceOrDestination)?.id || null;
       }
 
       for (const item of values.items) {
@@ -394,13 +385,14 @@ export default function RecordMovementPage() {
           userId: user.uid,
           userName: userProfile.username,
           siteId: selectedSiteId,
+          sourceOrDestinationId: otherSiteId,
           siteManagerId: effectiveSiteManagerId,
           status,
-          receivingManagerId,
           createdAt: serverTimestamp()
         });
 
-        // Always update stock at the current recording site
+        // Always update stock at the current recording site (Site A)
+        // If it's an Inward from Site B, we assume Site A has already accepted it by recording it
         const invQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', selectedSiteId), where('itemName', '==', item.itemName));
         const invSnap = await getDocs(invQuery);
         const currentSiteAdjustment = values.movementType === 'Inward' ? item.quantity : -item.quantity;
@@ -423,43 +415,41 @@ export default function RecordMovementPage() {
           }, { merge: true });
         }
 
-        // Logic for "Other Side" update in site-to-site transfers
-        if (isTransfer) {
-          const otherSite = allSites?.find(s => s.name === values.sourceOrDestination);
-          if (otherSite) {
-            const otherInvQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', otherSite.id), where('itemName', '==', item.itemName));
+        // INWARD ACCEPTANCE LOGIC:
+        // If Site A is receiving from Site B, Site B's stock should decrease immediately.
+        // If Site A is sending to Site B, Site B's stock is NOT increased until they accept it (in data/page.tsx)
+        if (isTransfer && values.movementType === 'Inward' && otherSiteId) {
+            const otherInvQuery = query(collection(firestore, 'project_inventory'), where('siteId', '==', otherSiteId), where('itemName', '==', item.itemName));
             const otherInvSnap = await getDocs(otherInvQuery);
-            
-            // If current is Inward (receiving from other), other is Outward (deduct)
-            // If current is Outward (sending to other), other is Inward (add)
-            const otherSiteAdjustment = values.movementType === 'Inward' ? -item.quantity : item.quantity;
-
             if (!otherInvSnap.empty) {
-              const otherInvDoc = otherInvSnap.docs[0];
-              updateDocumentNonBlocking(doc(firestore, 'project_inventory', otherInvDoc.id), {
-                stockLevel: increment(otherSiteAdjustment),
-                lastUpdated: serverTimestamp()
-              });
-            } else {
-              const newOtherInvRef = doc(collection(firestore, 'project_inventory'));
-              setDocumentNonBlocking(newOtherInvRef, {
-                siteId: otherSite.id,
-                siteName: otherSite.name,
-                itemName: item.itemName,
-                stockLevel: Math.max(0, otherSiteAdjustment),
-                unit: item.unit,
-                lastUpdated: serverTimestamp()
-              }, { merge: true });
+                updateDocumentNonBlocking(doc(firestore, 'project_inventory', otherInvSnap.docs[0].id), {
+                    stockLevel: increment(-item.quantity),
+                    lastUpdated: serverTimestamp()
+                });
             }
-          }
         }
+      }
+
+      // Notifications for transfers
+      if (isTransfer && values.movementType === 'Outward' && otherSiteId) {
+          const usersQ = query(collection(firestore, 'users'), where('assignedProjectIds', 'array-contains', otherSiteId));
+          const usersSnap = await getDocs(usersQ);
+          usersSnap.forEach(d => {
+              sendNotification(firestore, {
+                  userId: d.id,
+                  title: "Incoming Material Dispatch",
+                  description: `${userProfile.username} dispatched ${values.items.length} items from ${values.siteName}. Review and accept in Inventory Data.`,
+                  link: "/inventory/data",
+                  push: true
+              });
+          });
       }
 
       setSubmittedData(values);
       setIsSubmitted(true);
       toast({ 
         title: isTransfer ? "Transfer Logged" : "Movement Recorded", 
-        description: isTransfer ? "Request is pending destination manager approval." : "Logs generated and stock levels updated." 
+        description: (isTransfer && values.movementType === 'Outward') ? "Request is pending destination site acceptance." : "Logs generated and stock levels updated." 
       });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Error", description: e.message });
@@ -608,7 +598,7 @@ export default function RecordMovementPage() {
                       <PopoverContent className="w-[--radix-popover-trigger-width] p-0" align="start">
                         <div className="flex items-center border-b px-3">
                           <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                          <Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearchQuery} onChange={e => setSupplierSearchQuery(e.target.value)} />
+                          <Input placeholder="Search vendors..." className="h-9 w-full border-none focus-visible:ring-0 px-0 text-sm" value={supplierSearchQuery} onChange={(e) => setSupplierSearchQuery(e.target.value)} />
                         </div>
                         <ScrollArea className="h-[200px]">
                           {filteredSuppliers.map(s => (
@@ -671,7 +661,7 @@ export default function RecordMovementPage() {
 
                   <FormField control={form.control} name="invoiceDate" render={({ field }) => (
                     <FormItem>
-                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</FormLabel>
+                      <FormLabel className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Invoice Date</Label>
                       <FormControl>
                         <Input type="date" {...field} className="h-11 rounded-sm" />
                       </FormControl>
