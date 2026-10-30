@@ -14,18 +14,38 @@ import {
   Clock, 
   ArrowDownCircle, 
   ArrowUpCircle, 
-  PieChart 
+  PieChart,
+  User,
+  ShieldCheck,
+  ArrowLeftRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { InventoryItem, BoMItem, DataItem } from '../types';
-import { formatTimestamp } from '../utils';
 
 interface InventoryTabProps {
   inventory: InventoryItem[] | null;
   bomItems: BoMItem[] | null;
   movements: DataItem[] | null;
   utilisations: DataItem[] | null;
+}
+
+function StatusBadge({ status, className }: { status: string, className?: string }) {
+  const config: Record<string, { label: string, color: string }> = {
+    Pending: { label: "Pending Acceptance", color: "bg-yellow-100 text-yellow-800 border-yellow-200" },
+    Accepted: { label: "Accepted", color: "bg-green-100 text-green-800 border-green-200" },
+    "Partially Accepted": { label: "Partially Accepted", color: "bg-blue-100 text-blue-800 border-blue-200" },
+    Rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200" },
+    Recorded: { label: "Recorded", color: "bg-slate-100 text-slate-800 border-slate-200" },
+  };
+
+  const item = config[status] || { label: status, color: "bg-slate-100 text-slate-800 border-slate-200" };
+
+  return (
+    <Badge variant="outline" className={cn("rounded-sm text-[8px] font-black uppercase h-4 px-1", item.color, className)}>
+      {item.label}
+    </Badge>
+  );
 }
 
 export function InventoryTab({ inventory, bomItems, movements, utilisations }: InventoryTabProps) {
@@ -42,7 +62,7 @@ export function InventoryTab({ inventory, bomItems, movements, utilisations }: I
     <div className="space-y-8 mt-6 animate-in fade-in duration-300">
       <Card className="rounded-sm shadow-md border-primary/10 overflow-hidden text-left">
         <CardHeader className="bg-muted/5 border-b py-4">
-          <CardTitle className="text-xs font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> On-Site Inventory Registry</CardTitle>
+          <CardTitle className="text-sm font-bold uppercase tracking-widest flex items-center gap-2"><Warehouse className="h-4 w-4 text-primary" /> On-Site Inventory Registry</CardTitle>
         </CardHeader>
         <CardContent className="p-0">
           <div className="overflow-x-auto">
@@ -91,8 +111,42 @@ export function InventoryTab({ inventory, bomItems, movements, utilisations }: I
                           <TableCell colSpan={6} className="p-0 border-b">
                             <div className="p-6 px-12 space-y-8 animate-in slide-in-from-top-1 duration-200 text-left">
                               <div className="space-y-4">
-                                <div className="flex items-center gap-2 mb-2"><History className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement History</span></div>
-                                {itemMovements.length > 0 ? (<div className="grid gap-2">{[...itemMovements].sort((a: any, b: any) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0)).map((m: any) => (<div key={m.id} className="flex items-center justify-between p-3 bg-background border rounded-sm text-[11px] shadow-sm"><div className="flex items-center gap-4"><Badge variant="outline" className={cn("text-[8px] font-black h-5 px-1.5 uppercase", m.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>{m.movementType}</Badge><div className="flex flex-col"><span className="font-bold text-foreground">Qty: {m.quantity} {m.unit}</span><span className="text-[9px] text-muted-foreground uppercase">{m.movementType === 'Inward' ? 'From' : 'To'}: {m.sourceOrDestination}</span></div></div><div className="flex flex-col items-end"><span className="font-bold text-muted-foreground uppercase text-[9px]">{m.userName}</span><span className="text-[9px] text-muted-foreground/60">{m.movementDate}</span></div></div>))}</div>) : <p className="text-[10px] text-center text-muted-foreground italic uppercase">No logs.</p>}
+                                <div className="flex items-center gap-2 mb-2"><History className="h-3.5 w-3.5 text-primary" /><span className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Movement Audit History</span></div>
+                                {itemMovements.length > 0 ? (
+                                  <div className="grid gap-2">
+                                    {[...itemMovements].sort((a: any, b: any) => (b.createdAt?.toDate?.()?.getTime() || 0) - (a.createdAt?.toDate?.()?.getTime() || 0)).map((m: any) => (
+                                      <div key={m.id} className="flex items-center justify-between p-3 bg-background border rounded-sm text-[11px] shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                          <div className="flex flex-col gap-1">
+                                            <Badge variant="outline" className={cn("text-[8px] font-black h-5 px-1.5 uppercase w-fit", m.movementType === 'Inward' ? "bg-green-50 text-green-700 border-green-200" : "bg-blue-50 text-blue-700 border-blue-200")}>{m.movementType}</Badge>
+                                            <StatusBadge status={m.status || 'Recorded'} />
+                                          </div>
+                                          <div className="flex flex-col">
+                                            <div className="flex items-center gap-2">
+                                              <span className="font-bold text-foreground">Dispatched: {m.quantity} {m.unit}</span>
+                                              {(m.status === 'Accepted' || m.status === 'Partially Accepted') && (
+                                                <Badge variant="outline" className="text-[8px] h-4 px-1 border-emerald-200 bg-emerald-50 text-emerald-700 font-bold">Received: {m.acceptedQuantity} {m.unit}</Badge>
+                                              )}
+                                            </div>
+                                            <span className="text-[9px] text-muted-foreground uppercase">{m.movementType === 'Inward' ? 'From' : 'To'}: {m.sourceOrDestination}</span>
+                                            {m.acceptanceRemarks && (
+                                              <p className="text-[9px] text-muted-foreground italic mt-1 border-l-2 border-primary/20 pl-2">"{m.acceptanceRemarks}"</p>
+                                            )}
+                                          </div>
+                                        </div>
+                                        <div className="flex flex-col items-end gap-1">
+                                          <div className="flex flex-col items-end">
+                                            <span className="font-bold text-muted-foreground uppercase text-[9px]">{m.userName}</span>
+                                            {m.acceptedByName && (
+                                              <span className="text-[8px] font-black text-emerald-600 uppercase flex items-center gap-1"><ShieldCheck className="h-2.5 w-2.5" /> Verified by {m.acceptedByName}</span>
+                                            )}
+                                          </div>
+                                          <span className="text-[9px] font-mono font-bold text-muted-foreground/60">{m.movementDate}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : <p className="text-[10px] text-center text-muted-foreground italic uppercase">No logs.</p>}
                               </div>
                               <div className="space-y-4">
                                 <div className="flex items-center gap-2 mb-2"><History className="h-3.5 w-3.5 text-amber-600" /><span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-600">Utilisation History</span></div>
