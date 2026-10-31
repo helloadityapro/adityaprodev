@@ -33,6 +33,7 @@ export type PageKey =
   | 'liaisoning'
   | 'attendance'
   | 'attendance-map'
+  | 'notifications-history'
   | 'checklists-installation'
   | 'checklists-ht-line'
   | 'checklists-ht-conductor'
@@ -84,6 +85,7 @@ export const APP_PAGES: AppPage[] = [
   { id: 'documents', label: 'Documents', category: 'Main Hub', path: '/documents' },
   { id: 'lms', label: 'Learning Hub', category: 'Main Hub', path: '/lms' },
   { id: 'rewards', label: 'Rewards', category: 'Main Hub', path: '/rewards' },
+  { id: 'notifications-history', label: 'Notifications', category: 'Main Hub', path: '/notifications' },
   
   { id: 'projects', label: 'Projects', category: 'Operations', path: '/projects/list' },
   { id: 'project-dates', label: 'Project Dates', category: 'Operations', path: '/projects/dates' },
@@ -195,6 +197,7 @@ export function getPageKeyByPath(path: string): PageKey | null {
   if (path.startsWith('/checklists/ht-conductor')) return 'checklists-installation';
   if (path.startsWith('/checklists/inverter')) return 'checklists-installation';
   if (path.startsWith('/checklists/data')) return 'checklists-data';
+  if (path === '/notifications') return 'notifications-history';
 
   if (path.startsWith('/registries/suppliers')) return 'admin-suppliers';
   if (path.startsWith('/registries/contractors')) return 'admin-contractors';

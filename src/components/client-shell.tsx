@@ -1,4 +1,3 @@
-
 'use client';
 
 import React from "react";
@@ -25,7 +24,7 @@ import { WorkAnniversary } from "@/components/work-anniversary";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, Cake, Award } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, Cake, Award, Bell } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
@@ -171,11 +170,9 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
     if (isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
     if (!userProfile) return false;
 
-    // Bypass for Purchase & Supply Chain department for inventory operations
     const isPurchaseDept = userProfile.department === 'Purchase & Supply Chain' || userProfile.department === 'Procurement and Supply-chain';
     if (isPurchaseDept && (key === 'inventory' || key === 'purchase-orders')) return true;
 
-    // Use specific keys if defined in profile, otherwise role defaults
     const allowedKeys = userProfile.customPermissions 
       ? new Set(userProfile.customPermissions) 
       : new Set(roleConfigs?.find(c => c.id === userRoleStr)?.allowedPageKeys || []);
@@ -200,19 +197,15 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const isAuthorized = React.useMemo(() => {
     if (isAuthPage || isSuperAdmin(user?.email) || userProfile?.role === 'Admin') return true;
-    // OPTIMIZATION: Wait for roleConfigs to load to prevent "Access Restricted" flicker
     if (isUserLoading || isProfileLoading || !userProfile || !roleConfigs) return true;
 
-    // Direct Checklist pages are usually open to all workers
     if (pathname.startsWith('/checklists')) return true;
 
     const pageKey = getPageKeyByPath(pathname);
-    if (!pageKey) return true; // Default allowed if not mapped to a specific system key
+    if (!pageKey) return true;
 
-    // Essential screens that bypass restriction logic
     if (pageKey === 'rewards' || pageKey === 'reports') return true;
 
-    // Department bypass for Purchase & Supply Chain
     const isPurchaseDept = userProfile.department === 'Purchase & Supply Chain' || userProfile.department === 'Procurement and Supply-chain';
     if (isPurchaseDept && (pageKey === 'inventory' || pageKey === 'purchase-orders')) return true;
 
@@ -302,7 +295,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
       collection(firestore, 'notifications'), 
       where('userId', '==', user.uid),
       orderBy('createdAt', 'desc'),
-      limit(20) // Only need the most recent for shell-level toasts/indicators
+      limit(20) 
     );
   }, [user, firestore]);
   const { data: unsortedNotifications } = useCollection<Notification>(notificationsQuery);
@@ -319,16 +312,17 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
       if (notifications && user) {
           const now = Date.now();
-          const freshnessThreshold = 60000; 
+          const freshnessThreshold = 10000; // Only toast very recent alerts (10s)
 
           notifications.forEach(notif => {
               if (processedNotifsRef.current.has(notif.id)) return;
               processedNotifsRef.current.add(notif.id);
 
               const createdAt = notif.createdAt?.toDate?.().getTime() || now;
-              const isFresh = (now - createdAt) < freshnessThreshold || createdAt > shellMountTime.current;
+              // Check if notification was created after the shell mounted AND is very recent
+              const isNewlyCreated = createdAt > shellMountTime.current && (now - createdAt) < freshnessThreshold;
 
-              if (!notif.read && isFresh) {
+              if (!notif.read && isNewlyCreated) {
                   const title = notif.title || "Activity Update";
                   const isSuccess = /approved|success|confirmed|completed|earned|assigned|logged|submitted/i.test(title);
                   const isDestructive = /rejected|error|cancelled|removed|failed/i.test(title);
@@ -346,7 +340,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                           router.push(notif.link);
                         }}
                       >
-                        View
+                        <Eye className="mr-1.5 h-3 w-3" /> View
                       </Button>
                     ) : undefined
                   });
