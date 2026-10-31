@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -12,7 +11,8 @@ import {
   useDoc, 
   useMemoFirebase, 
   useCollection, 
-  addDocumentNonBlocking 
+  addDocumentNonBlocking,
+  useFirebaseApp
 } from '@/firebase';
 import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -53,7 +53,7 @@ const expenseItemSchema = z.object({
   description: z.string().min(1, 'Description is required.'),
   date: z.string().min(1, 'Date is required.'),
   kmReading: z.coerce.number().optional().default(0),
-  amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
+  amount: z.number().min(0.01, 'Amount must be greater than 0.'),
   localProof: z.any().optional(),
 });
 
@@ -87,7 +87,7 @@ export default function SubmitExpensePage() {
   const router = useRouter();
 
   const userProfileRef = useMemoFirebase(() => user ? doc(firestore, 'users', user.uid) : null, [firestore, user]);
-  const { data: userProfile } = useDoc<any>(userProfileRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<any>(userProfileRef);
 
   const sitesQuery = useMemoFirebase(() => collection(firestore, 'sites'), [firestore]);
   const { data: allSites } = useCollection<Site>(sitesQuery);
@@ -226,7 +226,6 @@ export default function SubmitExpensePage() {
       toast({ variant: 'destructive', title: 'Submission Error', description: e.message });
     } finally {
       setIsSubmitting(false);
-      setUploadProgress({});
     }
   };
 
@@ -391,7 +390,8 @@ export default function SubmitExpensePage() {
 
                 <div className="space-y-4">
                   {fields.map((field, index) => {
-                    const isTravelling = watchedItems[index]?.category === "Travelling";
+                    const item = watchedItems[index];
+                    const isTravelling = item?.category === "Travelling";
                     
                     return (
                       <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
