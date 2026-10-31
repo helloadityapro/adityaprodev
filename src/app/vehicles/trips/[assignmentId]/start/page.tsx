@@ -152,7 +152,7 @@ export default function StartTripPage({ params }: { params: Promise<{ assignment
         if (adminDoc.id === user.uid) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
-          title: "Site Journey Commenced",
+          title: "Site Journey Started",
           description: `${trip.userName} started a trip with ${trip.vehicleDetails}.`,
           link: `/vehicles/trips/manage?view=${assignmentId}`,
         });

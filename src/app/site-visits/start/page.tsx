@@ -169,7 +169,7 @@ export default function StartSiteVisitPage() {
         sendNotification(firestore, {
           userId: adminDoc.id,
           title: "Site Visit Started",
-          description: `${userProfile.username} checked-in at "${finalLocationName}".`,
+          description: `${userProfile.username} started a site at "${finalLocationName}".`,
           link: `/site-visits/${visitRef!.id}`,
           push: true
         });

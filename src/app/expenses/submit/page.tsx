@@ -2,7 +2,7 @@
 'use client';
 
 import * as React from 'react';
-import { useForm, useFieldArray } from 'react-hook-form';
+import { useForm, useFieldArray, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
@@ -12,8 +12,7 @@ import {
   useDoc, 
   useMemoFirebase, 
   useCollection, 
-  addDocumentNonBlocking, 
-  useFirebaseApp 
+  addDocumentNonBlocking 
 } from '@/firebase';
 import { collection, doc, serverTimestamp, query, where, getDocs } from 'firebase/firestore';
 import { getStorage, ref, uploadBytesResumable, getDownloadURL } from 'firebase/storage';
@@ -36,7 +35,8 @@ import {
   Building2,
   Send,
   CheckCircle2,
-  FileText
+  Calendar,
+  Fuel
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -46,10 +46,13 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from '@/lib/utils';
 import { Progress } from "@/components/ui/progress";
 import { sendNotification } from '@/lib/notifications';
+import { format } from 'date-fns';
 
 const expenseItemSchema = z.object({
   category: z.string().min(1, 'Category is required.'),
   description: z.string().min(1, 'Description is required.'),
+  date: z.string().min(1, 'Date is required.'),
+  kmReading: z.coerce.number().optional().default(0),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   localProof: z.any().optional(),
 });
@@ -71,6 +74,11 @@ type GenericItem = {
   name: string;
 };
 
+type FuelRate = {
+  rate: number;
+  effectiveFrom: string;
+};
+
 export default function SubmitExpensePage() {
   const firestore = useFirestore();
   const firebaseApp = useFirebaseApp();
@@ -87,6 +95,9 @@ export default function SubmitExpensePage() {
   const categoriesQuery = useMemoFirebase(() => collection(firestore, 'expense_categories'), [firestore]);
   const { data: categories } = useCollection<GenericItem>(categoriesQuery);
 
+  const fuelSettingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'fuel'), [firestore]);
+  const { data: fuelSettings } = useDoc<{ rates: FuelRate[] }>(fuelSettingsRef);
+
   const [isSitePopoverOpen, setIsSitePopoverOpen] = React.useState(false);
   const [siteSearchQuery, setSiteSearchQuery] = React.useState("");
   const [isSubmitting, setIsSubmitting] = React.useState(false);
@@ -99,7 +110,7 @@ export default function SubmitExpensePage() {
       title: "",
       type: "Site",
       siteName: "",
-      items: [{ category: "", description: "", amount: 0 }]
+      items: [{ category: "", description: "", date: format(new Date(), 'yyyy-MM-dd'), kmReading: 0, amount: 0 }]
     },
   });
 
@@ -108,8 +119,38 @@ export default function SubmitExpensePage() {
     name: "items"
   });
 
-  const watchedItems = form.watch('items');
-  const totalAmount = watchedItems.reduce((sum, item) => sum + (Number(item.amount) || 0), 0);
+  const watchedItems = useWatch({
+    control: form.control,
+    name: "items",
+  });
+
+  const totalAmount = React.useMemo(() => {
+    return (watchedItems || []).reduce((sum, item) => sum + (Number(item?.amount) || 0), 0);
+  }, [watchedItems]);
+
+  const getApplicableFuelRate = React.useCallback((date: string) => {
+    if (!fuelSettings?.rates || fuelSettings.rates.length === 0) return 0;
+    const sorted = [...fuelSettings.rates].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+    const applicable = sorted.find(r => date >= r.effectiveFrom);
+    return applicable?.rate || sorted[sorted.length - 1].rate || 0;
+  }, [fuelSettings]);
+
+  // Handle automatic KM calculation
+  React.useEffect(() => {
+    watchedItems?.forEach((item, index) => {
+      if (item?.category === "Travelling") {
+        const rate = getApplicableFuelRate(item.date);
+        const km = Number(item.kmReading) || 0;
+        const calculatedAmount = (km / 50) * rate;
+        const currentAmount = Number(item.amount) || 0;
+        
+        // Use a threshold to avoid precision issues triggering infinite loops
+        if (Math.abs(currentAmount - calculatedAmount) > 0.01) {
+          form.setValue(`items.${index}.amount`, parseFloat(calculatedAmount.toFixed(2)));
+        }
+      }
+    });
+  }, [watchedItems, getApplicableFuelRate, form]);
 
   const uploadProof = async (file: File, userId: string, index: number): Promise<string | null> => {
     if (!file) return null;
@@ -153,7 +194,6 @@ export default function SubmitExpensePage() {
         return { ...rest, proofUrl };
       }));
 
-      const expenseId = `exp_${Date.now()}`;
       await addDocumentNonBlocking(collection(firestore, 'expenses'), {
         userId: user.uid,
         userName: userProfile.username || user.email,
@@ -175,7 +215,7 @@ export default function SubmitExpensePage() {
           userId: adminDoc.id,
           title: "New Expense Claim",
           description: `${userProfile.username} submitted an expense claim of ₹${totalAmount.toFixed(2)}.`,
-          link: `/expenses/list`,
+          link: `/expenses/manage`,
           push: true
         });
       });
@@ -224,7 +264,7 @@ export default function SubmitExpensePage() {
     <div className="space-y-8 max-w-5xl mx-auto pb-20">
       <div className="flex flex-col gap-1">
         <h1 className="flex items-center gap-2">
-          <Wallet className="h-8 w-8" /> New Expense Submission
+          <Wallet className="h-8 w-8 text-primary" /> New Expense Submission
         </h1>
         <p className="text-muted-foreground font-medium">Log official purchases or payments for organizational audit.</p>
       </div>
@@ -347,154 +387,201 @@ export default function SubmitExpensePage() {
                     <Receipt className="h-4 w-4 text-primary" />
                     <h3 className="text-sm font-black uppercase tracking-widest text-foreground">Line Items</h3>
                   </div>
+                </div>
+
+                <div className="space-y-4">
+                  {fields.map((field, index) => {
+                    const isTravelling = watchedItems[index]?.category === "Travelling";
+                    
+                    return (
+                      <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
+                        {fields.length > 1 && (
+                          <Button 
+                            type="button" 
+                            variant="ghost" 
+                            size="icon" 
+                            className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
+                            onClick={() => remove(index)}
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+
+                        <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
+                          <div className="md:col-span-2">
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.date`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[9px] font-bold uppercase">Date</FormLabel>
+                                  <FormControl>
+                                    <Input type="date" {...field} className="h-10 bg-background text-[10px]" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className={cn("md:col-span-2")}>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.category`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[9px] font-bold uppercase">Category</FormLabel>
+                                  <Select onValueChange={field.onChange} value={field.value}>
+                                    <FormControl>
+                                      <SelectTrigger className="h-10 bg-background">
+                                        <SelectValue placeholder="Select" />
+                                      </SelectTrigger>
+                                    </FormControl>
+                                    <SelectContent>
+                                      {categories?.map(cat => (
+                                        <SelectItem key={cat.id} value={cat.name} className="text-xs font-bold">{cat.name}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          {isTravelling && (
+                            <div className="md:col-span-2 animate-in zoom-in-95 duration-200">
+                              <FormField
+                                control={form.control}
+                                name={`items.${index}.kmReading`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel className="text-[9px] font-bold uppercase flex items-center gap-1.5 text-primary">
+                                      <Fuel className="h-2.5 w-2.5" /> KM Reading
+                                    </FormLabel>
+                                    <FormControl>
+                                      <div className="relative">
+                                        <Input type="number" step="0.1" placeholder="KM" {...field} className="h-10 bg-primary/5 font-mono font-bold text-primary pr-8" />
+                                        <span className="absolute right-2 top-2.5 text-[8px] font-black opacity-40">KM</span>
+                                      </div>
+                                    </FormControl>
+                                    <FormMessage />
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          )}
+
+                          <div className={cn(isTravelling ? "md:col-span-3" : "md:col-span-5")}>
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.description`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[9px] font-bold uppercase">Description</FormLabel>
+                                  <FormControl>
+                                    <Input placeholder="Details..." {...field} className="h-10 bg-background" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="md:col-span-2">
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.amount`}
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-[9px] font-bold uppercase">Amount (₹)</FormLabel>
+                                  <FormControl>
+                                    <div className="relative">
+                                      <span className="absolute left-3 top-2.5 text-muted-foreground text-xs font-bold">₹</span>
+                                      <Input 
+                                        type="number" 
+                                        step="0.01" 
+                                        placeholder="0.00" 
+                                        {...field} 
+                                        readOnly={isTravelling}
+                                        className={cn("h-10 rounded-sm bg-background font-mono font-bold pl-7", isTravelling && "bg-muted/20 cursor-not-allowed text-primary")} 
+                                      />
+                                    </div>
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
+
+                          <div className="md:col-span-1 flex flex-col justify-end">
+                            <FormField
+                              control={form.control}
+                              name={`items.${index}.localProof`}
+                              render={({ field: { value, onChange, ...rest } }) => {
+                                const preview = value instanceof File ? URL.createObjectURL(value) : null;
+                                return (
+                                  <FormItem>
+                                    <div className="flex flex-col gap-2">
+                                      <input 
+                                        type="file" 
+                                        accept="image/*" 
+                                        className="hidden" 
+                                        id={`proof-${index}`} 
+                                        onChange={(e) => onChange(e.target.files?.[0])}
+                                        {...rest}
+                                      />
+                                      {preview ? (
+                                        <div className="relative">
+                                          <div className="relative group h-10 w-full rounded-sm overflow-hidden border bg-background flex items-center justify-center">
+                                            <img src={preview} className="h-full w-full object-cover" alt="Preview" />
+                                            <div 
+                                              className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity"
+                                              onClick={() => onChange(null)}
+                                            >
+                                              <X className="h-4 w-4 text-white" />
+                                            </div>
+                                          </div>
+                                          {uploadProgress[index] !== undefined && (
+                                            <div className="absolute -bottom-4 left-0 right-0 space-y-0.5">
+                                              <div className="flex justify-between items-center text-[7px] font-black uppercase text-primary">
+                                                <span>Uploading</span>
+                                                <span>{Math.round(uploadProgress[index])}%</span>
+                                              </div>
+                                              <Progress value={uploadProgress[index]} className="h-1 rounded-none" />
+                                            </div>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <Button asChild variant="outline" size="icon" className="w-full h-10 border-dashed rounded-sm text-primary hover:bg-primary/5 cursor-pointer">
+                                          <label htmlFor={`proof-${index}`}>
+                                            <FileUp className="h-4 w-4" />
+                                          </label>
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <FormMessage />
+                                  </FormItem>
+                                );
+                              }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="flex justify-center pt-2">
                   <Button 
                     type="button" 
                     variant="outline" 
                     size="sm" 
-                    onClick={() => append({ category: "", description: "", amount: 0 })}
-                    className="h-8 rounded-sm font-bold border-primary text-primary hover:bg-primary/5"
+                    onClick={() => append({ category: "", description: "", date: format(new Date(), 'yyyy-MM-dd'), kmReading: 0, amount: 0 })}
+                    className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest border-primary text-primary hover:bg-primary/5 px-8 shadow-sm border-dashed"
                   >
-                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Add Line
+                    <Plus className="h-3.5 w-3.5 mr-1.5" /> Add New Expense Item
                   </Button>
-                </div>
-
-                <div className="space-y-4">
-                  {fields.map((field, index) => (
-                    <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative animate-in fade-in slide-in-from-top-2 duration-300">
-                      {fields.length > 1 && (
-                        <Button 
-                          type="button" 
-                          variant="ghost" 
-                          size="icon" 
-                          className="absolute top-2 right-2 h-7 w-7 text-destructive hover:bg-destructive/10 rounded-sm"
-                          onClick={() => remove(index)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      )}
-
-                      <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                        <div className="md:col-span-3">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.category`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Category</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value}>
-                                  <FormControl>
-                                    <SelectTrigger className="h-10 rounded-sm bg-background">
-                                      <SelectValue placeholder="Select" />
-                                    </SelectTrigger>
-                                  </FormControl>
-                                  <SelectContent>
-                                    {categories?.map(cat => (
-                                      <SelectItem key={cat.id} value={cat.name} className="text-xs font-bold">{cat.name}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="md:col-span-5">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.description`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Description</FormLabel>
-                                <FormControl>
-                                  <Input placeholder="What was this spent on?" {...field} className="h-10 rounded-sm bg-background" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="md:col-span-2">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.amount`}
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">Amount (₹)</FormLabel>
-                                <FormControl>
-                                  <div className="relative">
-                                    <span className="absolute left-3 top-2.5 text-muted-foreground text-sm font-bold">₹</span>
-                                    <Input 
-                                      type="number" 
-                                      step="0.01" 
-                                      placeholder="0.00" 
-                                      {...field} 
-                                      className="h-10 rounded-sm bg-background font-mono font-bold pl-7" 
-                                    />
-                                  </div>
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        </div>
-
-                        <div className="md:col-span-2 flex flex-col justify-end">
-                          <FormField
-                            control={form.control}
-                            name={`items.${index}.localProof`}
-                            render={({ field: { value, onChange, ...rest } }) => {
-                              const preview = value instanceof File ? URL.createObjectURL(value) : null;
-                              return (
-                                <FormItem>
-                                  <div className="flex flex-col gap-2">
-                                    <input 
-                                      type="file" 
-                                      accept="image/*" 
-                                      className="hidden" 
-                                      id={`proof-${index}`} 
-                                      onChange={(e) => onChange(e.target.files?.[0])}
-                                      {...rest}
-                                    />
-                                    {preview ? (
-                                      <div className="relative">
-                                        <div className="relative group h-10 w-full rounded-sm overflow-hidden border bg-background flex items-center justify-center">
-                                          <img src={preview} className="h-full w-full object-cover" alt="Preview" />
-                                          <div 
-                                            className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center cursor-pointer transition-opacity"
-                                            onClick={() => onChange(null)}
-                                          >
-                                            <X className="h-4 w-4 text-white" />
-                                          </div>
-                                        </div>
-                                        {uploadProgress[index] !== undefined && (
-                                          <div className="absolute -bottom-4 left-0 right-0 space-y-0.5">
-                                            <div className="flex justify-between items-center text-[7px] font-black uppercase text-primary">
-                                              <span>Uploading</span>
-                                              <span>{Math.round(uploadProgress[index])}%</span>
-                                            </div>
-                                            <Progress value={uploadProgress[index]} className="h-1 rounded-none" />
-                                          </div>
-                                        )}
-                                      </div>
-                                    ) : (
-                                      <Button asChild variant="outline" size="icon" className="w-full h-10 border-dashed rounded-sm text-primary hover:bg-primary/5 cursor-pointer">
-                                        <label htmlFor={`proof-${index}`}>
-                                          <FileUp className="h-4 w-4" />
-                                        </label>
-                                      </Button>
-                                    )}
-                                  </div>
-                                  <FormMessage />
-                                </FormItem>
-                              );
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               </div>
 

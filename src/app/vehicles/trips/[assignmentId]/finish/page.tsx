@@ -154,7 +154,7 @@ export default function FinishTripPage({ params }: { params: Promise<{ assignmen
         if (adminDoc.id === user.uid) return;
         sendNotification(firestore, {
           userId: adminDoc.id,
-          title: "Site Journey Concluded",
+          title: "Site Journey Completed",
           description: `${trip.userName} finished a trip with ${trip.vehicleDetails}. Distance: ${((endValue - (trip.startReading || 0))).toFixed(1)} KM.`,
           link: `/vehicles/trips/manage?view=${assignmentId}`,
         });

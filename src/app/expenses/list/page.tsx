@@ -1,3 +1,4 @@
+
 'use client';
 
 import * as React from 'react';
@@ -40,7 +41,8 @@ import {
   ChevronsUpDown,
   Check,
   ShieldCheck,
-  Clock
+  Clock,
+  Fuel
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter, useSearchParams, usePathname } from 'next/navigation';
@@ -72,6 +74,8 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 const expenseItemSchema = z.object({
   category: z.string().min(1, 'Category is required.'),
   description: z.string().min(1, 'Description is required.'),
+  date: z.string().min(1, 'Date is required.'),
+  kmReading: z.coerce.number().optional().default(0),
   amount: z.coerce.number().min(0.01, 'Amount must be greater than 0.'),
   receiptUrl: z.string().optional(),
   localFile: z.any().optional(),
@@ -145,6 +149,9 @@ export default function ExpensesListPage() {
   const categoriesQuery = useMemoFirebase(() => collection(firestore, 'expense_categories'), [firestore]);
   const { data: categories } = useCollection<{ name: string; id: string }>(categoriesQuery);
 
+  const fuelSettingsRef = useMemoFirebase(() => doc(firestore, 'system_settings', 'fuel'), [firestore]);
+  const { data: fuelSettings } = useDoc<any>(fuelSettingsRef);
+
   const expensesQuery = useMemoFirebase(() => {
     if (!user || isProfileLoading) return null;
     const colRef = collection(firestore, 'expenses');
@@ -183,6 +190,28 @@ export default function ExpensesListPage() {
       });
     }
   }, [editingExpense, editForm]);
+
+  const getApplicableFuelRate = React.useCallback((date: string) => {
+    if (!fuelSettings?.rates || fuelSettings.rates.length === 0) return 0;
+    const sorted = [...fuelSettings.rates].sort((a, b) => b.effectiveFrom.localeCompare(a.effectiveFrom));
+    const applicable = sorted.find((r: any) => date >= r.effectiveFrom);
+    return applicable?.rate || sorted[sorted.length - 1].rate || 0;
+  }, [fuelSettings]);
+
+  // Handle automatic KM calculation for EDIT form
+  React.useEffect(() => {
+    watchedItems?.forEach((item, index) => {
+      if (item?.category === "Travelling") {
+        const rate = getApplicableFuelRate(item.date);
+        const km = Number(item.kmReading) || 0;
+        const calculatedAmount = (km / 50) * rate;
+        const currentAmount = Number(item.amount) || 0;
+        if (Math.abs(currentAmount - calculatedAmount) > 0.01) {
+          editForm.setValue(`items.${index}.amount`, parseFloat(calculatedAmount.toFixed(2)));
+        }
+      }
+    });
+  }, [watchedItems, getApplicableFuelRate, editForm]);
 
   // Handle deep link via URL view parameter
   React.useEffect(() => {
@@ -227,7 +256,6 @@ export default function ExpensesListPage() {
           push: true,
         });
       } else {
-        // Dual Approval Logic
         const currentApprovals = actionState.expense.approvals || [];
         
         if (currentApprovals.some(a => a.adminId === user.uid)) {
@@ -350,7 +378,7 @@ export default function ExpensesListPage() {
   };
 
   const triggerWhatsApp = (expense: ExpenseSubmission) => {
-    const itemsList = expense.items.map(item => `- [${item.category}] ${item.description}: ₹${item.amount.toFixed(2)}`).join('\n');
+    const itemsList = expense.items.map(item => `- [${item.date}] [${item.category}] ${item.description}: ₹${item.amount.toFixed(2)}`).join('\n');
     const message = `*Aditya Pro - New Expense Submission*\n\n*Title:* ${expense.title}\n*Site:* ${expense.siteName}\n*Total:* ₹${expense.totalAmount.toFixed(2)}\n\n*Items:*\n${itemsList}\n\n*Submitted By:* ${expense.userName}\n\n*Review Link:* ${window.location.origin}/expenses/list?view=${expense.id}`;
     const url = `https://wa.me/?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
@@ -359,7 +387,6 @@ export default function ExpensesListPage() {
   const filteredExpenses = React.useMemo(() => {
     if (!expenses) return [];
     
-    // Sort in memory to avoid index requirements
     const sorted = [...expenses].sort((a, b) => {
       const dateA = a.createdAt?.toDate?.()?.getTime() || 0;
       const dateB = b.createdAt?.toDate?.()?.getTime() || 0;
@@ -424,7 +451,6 @@ export default function ExpensesListPage() {
         </div>
       </div>
 
-      {/* Mobile-Responsive Card List */}
       <div className="md:hidden space-y-4">
         {filteredExpenses.length > 0 ? filteredExpenses.map((expense) => {
           const canDelete = isAdmin || expense.userId === user?.uid;
@@ -491,7 +517,6 @@ export default function ExpensesListPage() {
         )}
       </div>
 
-      {/* Desktop Table View */}
       <div className="hidden md:block">
         <Card className="rounded-sm shadow-lg border-primary/10 overflow-hidden">
           <CardContent className="p-0">
@@ -593,9 +618,8 @@ export default function ExpensesListPage() {
         </Card>
       </div>
 
-      {/* Detail Modal */}
       <Dialog open={!!selectedExpense} onOpenChange={(o) => !o && handleCloseDetail()}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Wallet className="h-5 w-5 text-primary" /></div>
@@ -640,7 +664,6 @@ export default function ExpensesListPage() {
                   </div>
                 </div>
 
-                {/* Approval Trail */}
                 {selectedExpense.approvals && selectedExpense.approvals.length > 0 && (
                   <div className="space-y-4">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
@@ -684,6 +707,7 @@ export default function ExpensesListPage() {
                           <TableHead className="text-[10px] font-black uppercase px-4">Date</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Category</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Note</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">Reading</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Amount</TableHead>
                           <TableHead className="text-right px-4 text-[10px] font-black uppercase">Receipt</TableHead>
                         </TableRow>
@@ -696,6 +720,13 @@ export default function ExpensesListPage() {
                               <Badge variant="secondary" className="text-[8px] h-4 px-1 rounded-sm uppercase font-bold">{item.category}</Badge>
                             </TableCell>
                             <TableCell className="text-xs font-semibold leading-relaxed">{item.description}</TableCell>
+                            <TableCell className="text-center">
+                              {item.category === 'Travelling' && item.kmReading ? (
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-black text-primary">{item.kmReading} <span className="text-[8px] opacity-40">KM</span></span>
+                                </div>
+                              ) : '—'}
+                            </TableCell>
                             <TableCell className="font-mono text-xs font-bold text-primary">₹{item.amount.toFixed(2)}</TableCell>
                             <TableCell className="text-right px-4">
                               {item.receiptUrl ? (
@@ -757,7 +788,6 @@ export default function ExpensesListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Action Modal */}
       <Dialog open={!!actionState} onOpenChange={() => setActionState(null)}>
         <DialogContent className="rounded-sm max-md">
           <DialogHeader>
@@ -790,7 +820,6 @@ export default function ExpensesListPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation */}
       <AlertDialog open={!!deletingExpense} onOpenChange={(o) => !o && setDeletingExpense(null)}>
         <AlertDialogContent className="rounded-sm">
           <AlertDialogHeader>
@@ -816,10 +845,9 @@ export default function ExpensesListPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Edit Dialog */}
       <Dialog open={!!editingExpense} onOpenChange={(o) => !o && setEditingExpense(null)}>
-        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
-          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0">
+        <DialogContent className="max-w-5xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
+          <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between space-y-0 text-left">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Pencil className="h-5 w-5 text-primary" /></div>
               <div>
@@ -886,68 +914,91 @@ export default function ExpensesListPage() {
                     <div className="space-y-4">
                       <div className="flex items-center justify-between border-b pb-2 px-1">
                         <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2"><Plus className="h-4 w-4" /> Expense Items</Label>
-                        <Button type="button" variant="outline" size="sm" onClick={() => append({ category: "", description: "", amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary">Add Line</Button>
+                        <Button type="button" variant="outline" size="sm" onClick={() => append({ category: "", description: "", date: format(new Date(), 'yyyy-MM-dd'), kmReading: 0, amount: 0 })} className="h-8 rounded-sm font-bold border-primary text-primary">Add Line</Button>
                       </div>
 
                       <div className="space-y-4">
-                        {fields.map((field, index) => (
-                          <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative group animate-in fade-in slide-in-from-top-2">
-                            {fields.length > 1 && (
-                              <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                            )}
-                            <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-end">
-                              <div className="md:col-span-3">
-                                <FormField control={editForm.control} name={`items.${index}.category`} render={({ field }) => (
-                                  <FormItem>
-                                    <FormLabel className="text-[9px] font-bold uppercase">Category</FormLabel>
-                                    <Select onValueChange={field.onChange} value={field.value}>
-                                      <FormControl><SelectTrigger className="h-10 bg-background"><SelectValue placeholder="Select" /></SelectTrigger></FormControl>
-                                      <SelectContent>{categories?.map(c => <SelectItem key={c.id} value={c.name} className="text-xs">{c.name}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                  </FormItem>
-                                )} />
-                              </div>
-                              <div className="md:col-span-5">
-                                <FormField control={editForm.control} name={`items.${index}.description`} render={({ field }) => (
-                                  <FormItem><FormLabel className="text-[9px] font-bold uppercase">Description</FormLabel><FormControl><Input placeholder="Notes..." {...field} className="h-10 bg-background" /></FormControl></FormItem>
-                                )} />
-                              </div>
-                              <div className="md:col-span-2">
-                                <FormField control={editForm.control} name={`items.${index}.amount`} render={({ field }) => (
-                                  <FormItem><FormLabel className="text-[9px] font-bold uppercase">Amount</FormLabel><FormControl><div className="relative"><Input type="number" step="0.01" {...field} className="h-10 pl-6 font-mono font-bold" /><span className="absolute left-2 top-2.5 text-muted-foreground text-xs">₹</span></div></FormControl></FormItem>
-                                )} />
-                              </div>
-                              <div className="md:col-span-2 flex flex-col justify-end">
-                                <FormField control={editForm.control} name={`items.${index}.localFile`} render={({ field: { value, onChange, ...rest } }) => {
-                                  const preview = value instanceof File ? URL.createObjectURL(value) : (watchedItems[index]?.receiptUrl || null);
-                                  return (
-                                    <FormItem className="space-y-0">
-                                      <div className="flex flex-col gap-2">
-                                        <input type="file" className="hidden" id={`edit-proof-${index}`} onChange={e => onChange(e.target.files?.[0])} {...rest} />
-                                        {preview ? (
-                                          <div className="relative group/thumb h-10 rounded-sm overflow-hidden border bg-background flex items-center justify-center">
-                                            {watchedItems[index]?.receiptUrl && !(value instanceof File) ? (
-                                              <Badge variant="secondary" className="h-7 text-[8px] font-black uppercase">Stored Doc</Badge>
-                                            ) : (
-                                              <img src={preview} className="h-full w-full object-cover" alt="Thumb" />
-                                            )}
-                                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center cursor-pointer" onClick={() => { onChange(null); if(!value) editForm.setValue(`items.${index}.receiptUrl`, ""); }}>
-                                               <X className="h-4 w-4 text-white" />
-                                            </div>
-                                          </div>
-                                        ) : (
-                                          <Button asChild variant="outline" size="icon" className="w-full h-10 border-dashed rounded-sm text-primary hover:bg-primary/5 cursor-pointer">
-                                            <label htmlFor={`edit-proof-${index}`}><FileUp className="h-4 w-4" /></label>
-                                          </Button>
-                                        )}
-                                      </div>
+                        {fields.map((field, index) => {
+                          const item = watchedItems[index];
+                          const isTravelling = item?.category === "Travelling";
+                          
+                          return (
+                            <div key={field.id} className="p-6 border rounded-sm bg-muted/5 relative group animate-in fade-in slide-in-from-top-2">
+                              {fields.length > 1 && (
+                                <Button type="button" variant="ghost" size="icon" className="absolute top-2 right-2 h-7 w-7 text-destructive" onClick={() => remove(index)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                              )}
+                              <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-end">
+                                <div className="md:col-span-2">
+                                  <FormField control={editForm.control} name={`items.${index}.date`} render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-[9px] font-bold uppercase">Date</FormLabel>
+                                      <FormControl><Input type="date" {...field} className="h-10 bg-background text-[10px]" /></FormControl>
                                     </FormItem>
-                                  );
-                                }} />
+                                  )} />
+                                </div>
+                                <div className="md:col-span-2">
+                                  <FormField control={editForm.control} name={`items.${index}.category`} render={({ field }) => (
+                                    <FormItem>
+                                      <FormLabel className="text-[9px] font-bold uppercase">Category</FormLabel>
+                                      <Select onValueChange={field.onChange} value={field.value}>
+                                        <FormControl><SelectTrigger className="h-10 bg-background"><SelectValue placeholder="Select" /></SelectTrigger></FormControl>
+                                        <SelectContent>{categories?.map(c => <SelectItem key={c.id} value={c.name} className="text-xs">{c.name}</SelectItem>)}</SelectContent>
+                                      </Select>
+                                    </FormItem>
+                                  )} />
+                                </div>
+                                {isTravelling && (
+                                  <div className="md:col-span-1">
+                                    <FormField control={editForm.control} name={`items.${index}.kmReading`} render={({ field }) => (
+                                      <FormItem>
+                                        <FormLabel className="text-[9px] font-bold uppercase">KM</FormLabel>
+                                        <FormControl><Input type="number" step="0.1" {...field} className="h-10 bg-background font-mono font-bold text-xs" /></FormControl>
+                                      </FormItem>
+                                    )} />
+                                  </div>
+                                )}
+                                <div className={isTravelling ? "md:col-span-3" : "md:col-span-4"}>
+                                  <FormField control={editForm.control} name={`items.${index}.description`} render={({ field }) => (
+                                    <FormItem><FormLabel className="text-[9px] font-bold uppercase">Description</FormLabel><FormControl><Input placeholder="Notes..." {...field} className="h-10 bg-background" /></FormControl></FormItem>
+                                  )} />
+                                </div>
+                                <div className="md:col-span-2">
+                                  <FormField control={editForm.control} name={`items.${index}.amount`} render={({ field }) => (
+                                    <FormItem><FormLabel className="text-[9px] font-bold uppercase">Amount</FormLabel><FormControl><div className="relative"><Input type="number" step="0.01" {...field} readOnly={isTravelling} className={cn("h-10 pl-6 font-mono font-bold", isTravelling && "bg-muted/20 text-primary")} /><span className="absolute left-2 top-2.5 text-muted-foreground text-xs">₹</span></div></FormControl></FormItem>
+                                  )} />
+                                </div>
+                                <div className="md:col-span-1 flex flex-col justify-end">
+                                  <FormField control={editForm.control} name={`items.${index}.localFile`} render={({ field: { value, onChange, ...rest } }) => {
+                                    const preview = value instanceof File ? URL.createObjectURL(value) : (item?.receiptUrl || null);
+                                    return (
+                                      <FormItem className="space-y-0">
+                                        <div className="flex flex-col gap-2">
+                                          <input type="file" className="hidden" id={`edit-proof-${index}`} onChange={e => onChange(e.target.files?.[0])} {...rest} />
+                                          {preview ? (
+                                            <div className="relative group/thumb h-10 rounded-sm overflow-hidden border bg-background flex items-center justify-center">
+                                              {item?.receiptUrl && !(value instanceof File) ? (
+                                                <Badge variant="secondary" className="h-7 text-[8px] font-black uppercase">Stored Doc</Badge>
+                                              ) : (
+                                                <img src={preview} className="h-full w-full object-cover" alt="Thumb" />
+                                              )}
+                                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover/thumb:opacity-100 flex items-center justify-center cursor-pointer" onClick={() => { onChange(null); if(!value) editForm.setValue(`items.${index}.receiptUrl`, ""); }}>
+                                                 <X className="h-4 w-4 text-white" />
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <Button asChild variant="outline" size="icon" className="w-full h-10 border-dashed rounded-sm text-primary hover:bg-primary/5 cursor-pointer">
+                                              <label htmlFor={`edit-proof-${index}`}><FileUp className="h-4 w-4" /></label>
+                                            </Button>
+                                          )}
+                                        </div>
+                                      </FormItem>
+                                    );
+                                  }} />
+                                </div>
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     </div>
                   </form>

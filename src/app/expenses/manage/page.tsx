@@ -27,12 +27,13 @@ import {
   User as UserIcon, 
   Calendar, 
   Building2, 
-  ExternalLink,
+  ExternalLink, 
   Loader2,
   ShieldCheck,
   MessageCircle,
   CreditCard,
-  Clock
+  Clock,
+  Fuel
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useRouter } from 'next/navigation';
@@ -57,6 +58,8 @@ import { sendNotification } from '@/lib/notifications';
 type ExpenseItem = {
   category: string;
   description: string;
+  date: string;
+  kmReading?: number;
   amount: number;
   proofUrl?: string;
 };
@@ -150,7 +153,6 @@ export default function ManageExpensesPage() {
           push: true,
         });
       } else {
-        // Dual Approval Logic
         const currentApprovals = decisionState.report.approvals || [];
         
         if (currentApprovals.some(a => a.adminId === user.uid)) {
@@ -338,9 +340,8 @@ export default function ManageExpensesPage() {
         </CardContent>
       </Card>
 
-      {/* Detail Audit Dialog */}
       <Dialog open={!!selectedReport} onOpenChange={(o) => !o && setSelectedReport(null)}>
-        <DialogContent className="max-w-3xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background">
+        <DialogContent className="max-w-4xl p-0 overflow-hidden border-none rounded-sm shadow-2xl bg-background flex flex-col h-[90vh]">
           <DialogHeader className="p-6 bg-primary/5 border-b shrink-0 flex flex-row items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="bg-primary/10 p-2 rounded-sm"><Wallet className="h-5 w-5 text-primary" /></div>
@@ -359,7 +360,7 @@ export default function ManageExpensesPage() {
             )}
           </DialogHeader>
 
-          <ScrollArea className="max-h-[70vh]">
+          <ScrollArea className="flex-1">
             {selectedReport && (
               <div className="p-8 space-y-10">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -382,7 +383,6 @@ export default function ManageExpensesPage() {
                   </div>
                 </div>
 
-                {/* Approval Trail */}
                 {selectedReport.approvals && selectedReport.approvals.length > 0 && (
                   <div className="space-y-4">
                     <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
@@ -417,19 +417,29 @@ export default function ManageExpensesPage() {
                     <Table>
                       <TableHeader className="bg-muted/30">
                         <TableRow>
-                          <TableHead className="text-[10px] font-black uppercase px-4">Category</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase px-4">Date</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase">Category</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Description</TableHead>
+                          <TableHead className="text-[10px] font-black uppercase text-center">Reading</TableHead>
                           <TableHead className="text-[10px] font-black uppercase">Amount</TableHead>
-                          <TableHead className="text-right px-4 text-[10px] font-black uppercase">Proof</TableHead>
+                          <TableHead className="text-right text-[10px] font-black uppercase px-4">Proof</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
                         {selectedReport.items.map((item, idx) => (
                           <TableRow key={idx} className="bg-background">
-                            <TableCell className="px-4">
+                            <TableCell className="px-4 font-mono text-[10px] font-bold text-muted-foreground">{item.date}</TableCell>
+                            <TableCell>
                               <Badge variant="secondary" className="text-[8px] h-4 px-1 rounded-sm uppercase font-bold">{item.category}</Badge>
                             </TableCell>
                             <TableCell className="text-xs font-semibold">{item.description}</TableCell>
+                            <TableCell className="text-center">
+                              {item.category === 'Travelling' && item.kmReading ? (
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <span className="text-[10px] font-black text-primary">{item.kmReading} KM</span>
+                                </div>
+                              ) : '—'}
+                            </TableCell>
                             <TableCell className="font-mono text-xs font-bold text-primary">₹{item.amount.toFixed(2)}</TableCell>
                             <TableCell className="text-right px-4">
                               {item.proofUrl ? (
@@ -483,13 +493,13 @@ export default function ManageExpensesPage() {
             {isAdmin && (selectedReport?.status === 'Pending' || selectedReport?.status === 'FirstApproved') && (
               <div className="flex gap-2 w-full justify-end">
                 <Button 
-                  className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-6" 
+                  className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest bg-green-600 hover:bg-green-700 px-8" 
                   onClick={() => { setDecisionState({ report: selectedReport!, targetStatus: 'Approved' }); setSelectedReport(null); }}
                   disabled={selectedReport.approvals?.some(a => a.adminId === user?.uid)}
                 >
                   {selectedReport.status === 'FirstApproved' ? 'Final Approve' : 'Approve'}
                 </Button>
-                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-6" onClick={() => { setDecisionState({ report: selectedReport!, targetStatus: 'Rejected' }); setSelectedReport(null); }}>Reject</Button>
+                <Button variant="destructive" className="h-10 rounded-sm font-black uppercase text-[10px] tracking-widest px-8" onClick={() => { setDecisionState({ report: selectedReport!, targetStatus: 'Rejected' }); setSelectedReport(null); }}>Reject</Button>
               </div>
             )}
             <DialogClose asChild><Button variant="outline" className="rounded-sm font-black uppercase text-[10px] h-10 px-8 tracking-widest">Close Audit</Button></DialogClose>
@@ -497,7 +507,6 @@ export default function ManageExpensesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Action Confirmation Dialog */}
       <Dialog open={!!decisionState} onOpenChange={() => setDecisionState(null)}>
         <DialogContent className="rounded-sm max-md">
           <DialogHeader>

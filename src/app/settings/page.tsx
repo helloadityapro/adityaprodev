@@ -5,7 +5,7 @@ import * as React from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useUser, useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { isSuperAdmin } from '@/lib/auth-constants';
 import { 
@@ -26,7 +26,8 @@ import {
   User,
   UserIcon,
   Tag,
-  RotateCcw
+  RotateCcw,
+  Fuel
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -66,6 +67,7 @@ export default function SettingsPage() {
   const adminTools = [
     { label: 'User Access', href: '/settings/access', icon: Lock, color: 'text-primary' },
     { label: 'Rewards Setup', href: '/settings/rewards', icon: Coins, color: 'text-amber-600' },
+    { label: 'Fuel Rates', href: '/settings/fuel-rates', icon: Fuel, color: 'text-emerald-600' },
     { label: 'Quotes Hub', href: '/settings/quotes', icon: Quote, color: 'text-blue-600' },
     { label: 'User Directory', href: '/settings/users', icon: Users, color: 'text-purple-600' },
     { label: 'Team Mapping', href: '/settings/teams', icon: Workflow, color: 'text-emerald-600' },
