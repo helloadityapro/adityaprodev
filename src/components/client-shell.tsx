@@ -24,7 +24,7 @@ import { WorkAnniversary } from "@/components/work-anniversary";
 import { BottomNav } from "@/components/bottom-nav";
 import { QuickActions } from "@/components/quick-actions";
 import { CredentialsPromptDialog } from "@/components/credentials-prompt-dialog";
-import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, Cake, Award, Bell } from "lucide-react";
+import { Loader2, Sun, Moon, ShieldAlert, LogOut, UserX, RefreshCw, Lock, Cake, Award, Bell, Eye } from "lucide-react";
 import { isSuperAdmin } from "@/lib/auth-constants";
 import { motion, AnimatePresence } from "framer-motion";
 import { Capacitor } from '@capacitor/core';
@@ -35,7 +35,6 @@ const DISPLAYED_NOTIFS_KEY = 'displayedNotifIds';
 
 type Notification = {
   id: string;
-  userId: string;
   title: string;
   description: string;
   link: string;
@@ -49,10 +48,6 @@ type AccessConfig = {
   allowedPageKeys: PageKey[];
 };
 
-/**
- * A ultra-lightweight loader that uses static quotes to avoid network blocking
- * during the first 5 seconds of application startup.
- */
 function FullPageLoader() {
   const [quote, setQuote] = React.useState("");
 
@@ -63,7 +58,6 @@ function FullPageLoader() {
       "Coming together is a beginning. Keeping together is progress. Working together is success.",
       "Alone we can do so little; together we can do so much."
     ];
-    // Select a static quote immediately without waiting for Firestore
     setQuote(defaultQuotes[Math.floor(Math.random() * defaultQuotes.length)]);
   }, []);
 
@@ -289,11 +283,11 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
 
   const pendingPtwCount = React.useMemo(() => permitsForBadge?.length || 0, [permitsForBadge]);
 
+  // Listen to per-user notification subcollection for toasts
   const notificationsQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(
-      collection(firestore, 'notifications'), 
-      where('userId', '==', user.uid),
+      collection(firestore, 'users', user.uid, 'notifications'), 
       orderBy('createdAt', 'desc'),
       limit(20) 
     );
@@ -312,14 +306,13 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
   React.useEffect(() => {
       if (notifications && user) {
           const now = Date.now();
-          const freshnessThreshold = 10000; // Only toast very recent alerts (10s)
+          const freshnessThreshold = 10000;
 
           notifications.forEach(notif => {
               if (processedNotifsRef.current.has(notif.id)) return;
               processedNotifsRef.current.add(notif.id);
 
               const createdAt = notif.createdAt?.toDate?.().getTime() || now;
-              // Check if notification was created after the shell mounted AND is very recent
               const isNewlyCreated = createdAt > shellMountTime.current && (now - createdAt) < freshnessThreshold;
 
               if (!notif.read && isNewlyCreated) {
@@ -336,7 +329,7 @@ export function ClientShell({ children }: { children: React.ReactNode }) {
                         size="sm" 
                         className="h-8 rounded-sm font-bold text-[10px] uppercase px-3 shadow-md"
                         onClick={() => {
-                          updateDocumentNonBlocking(doc(firestore, 'notifications', notif.id), { read: true });
+                          updateDocumentNonBlocking(doc(firestore, 'users', user.uid, 'notifications', notif.id), { read: true });
                           router.push(notif.link);
                         }}
                       >

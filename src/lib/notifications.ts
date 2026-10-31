@@ -1,4 +1,3 @@
-
 'use client';
 
 import { collection, serverTimestamp, Firestore } from 'firebase/firestore';
@@ -14,12 +13,14 @@ export interface NotificationPayload {
 
 /**
  * Standard utility to send notifications within the Aditya Pro ecosystem.
- * This helper writes to Firestore, which then triggers a Cloud Function
- * to dispatch a real push notification if the 'push' flag is true.
+ * Stores notifications in user-specific subcollections for better performance and security.
  */
 export function sendNotification(firestore: Firestore, data: NotificationPayload) {
-  return addDocumentNonBlocking(collection(firestore, 'notifications'), {
-    ...data,
+  // Target the user's specific notification subcollection
+  return addDocumentNonBlocking(collection(firestore, 'users', data.userId, 'notifications'), {
+    title: data.title,
+    description: data.description,
+    link: data.link,
     read: false,
     push: data.push ?? false,
     createdAt: serverTimestamp(),

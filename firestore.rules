@@ -1,4 +1,3 @@
-
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -29,6 +28,12 @@ service cloud.firestore {
         (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['totalPoints', 'hiddenPermitIds', 'starredProjectIds']))
       );
       allow delete: if isAdmin();
+
+      // Per-user notification subcollection
+      match /notifications/{notifId} {
+        allow read, update, delete: if request.auth.uid == userId;
+        allow create: if isSignedIn();
+      }
     }
 
     match /team_mapping_overrides/{overrideId} {
@@ -313,7 +318,6 @@ service cloud.firestore {
     }
 
     match /projects/{projectId} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    match /notifications/{notifId} { allow read, write: if isSignedIn(); }
     match /point_adjustment_requests/{requestId} { allow read, write: if isAdmin(); }
     match /cleanup_requests/{requestId} { allow read, write: if isAdmin(); }
     
@@ -347,6 +351,12 @@ service cloud.firestore {
 
     match /liaisoning_records/{siteId} {
       allow read: if isSignedIn();
+      allow write: if isSignedIn();
+    }
+
+    // Legacy global notifications collection (kept for migration safety)
+    match /notifications/{notifId} { 
+      allow read: if isSignedIn() && resource.data.userId == request.auth.uid;
       allow write: if isSignedIn();
     }
   }

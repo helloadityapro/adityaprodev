@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { 
-  useCollection, 
   useFirestore, 
   useUser, 
   useDoc, 
@@ -20,7 +19,8 @@ import {
   writeBatch,
   getDocs,
   startAfter,
-  Timestamp
+  Timestamp,
+  addDoc
 } from 'firebase/firestore';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -36,7 +36,8 @@ import {
   Loader2,
   ListFilter,
   History,
-  FilterX
+  FilterX,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -48,7 +49,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 type Notification = {
   id: string;
-  userId: string;
   title: string;
   description: string;
   link: string;
@@ -56,7 +56,7 @@ type Notification = {
   createdAt: any;
 };
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 15;
 
 export default function NotificationsHistoryPage() {
   const { user } = useUser();
@@ -64,64 +64,123 @@ export default function NotificationsHistoryPage() {
   const router = useRouter();
   const { toast } = useToast();
 
+  const [notifications, setNotifications] = React.useState<Notification[]>([]);
   const [filter, setFilter] = React.useState<'all' | 'unread'>('all');
-  const [isProcessing, setIsProcessing] = React.useState(false);
-  const [mounted, setMounted] = React.useState(false);
+  const [isLoading, setIsLoading] = React.useState(true);
+  const [isMoreLoading, setIsMoreLoading] = React.useState(false);
+  const [lastDoc, setLastDoc] = React.useState<any>(null);
+  const [isMoreAvailable, setIsMoreAvailable] = React.useState(true);
+  const [isMigrating, setIsMigrating] = React.useState(false);
+  
+  const [isMounted, setIsMounted] = React.useState(false);
+  React.useEffect(() => setIsMounted(true), []);
 
-  React.useEffect(() => setMounted(true), []);
+  const fetchNotifications = React.useCallback(async (isInitial = true, currentFilter = filter) => {
+    if (!user) return;
+    if (isInitial) setIsLoading(true);
+    else setIsMoreLoading(true);
 
-  const notificationsQuery = useMemoFirebase(() => {
-    if (!user) return null;
-    const colRef = collection(firestore, 'notifications');
-    const baseQuery = filter === 'unread' 
-      ? query(colRef, where('userId', '==', user.uid), where('read', '==', false), orderBy('createdAt', 'desc'))
-      : query(colRef, where('userId', '==', user.uid), orderBy('createdAt', 'desc'));
-    
-    return query(baseQuery, limit(100)); // Show a decent amount, pagination can be added if needed
-  }, [user, firestore, filter]);
+    try {
+      const colRef = collection(firestore, 'users', user.uid, 'notifications');
+      let q = query(colRef, orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
 
-  const { data: notifications, isLoading } = useCollection<Notification>(notificationsQuery);
+      if (currentFilter === 'unread') {
+        q = query(colRef, where('read', '==', false), orderBy('createdAt', 'desc'), limit(PAGE_SIZE));
+      }
 
-  const handleMarkAsRead = (id: string, link?: string) => {
-    updateDocumentNonBlocking(doc(firestore, 'notifications', id), { read: true });
-    if (link) router.push(link);
+      if (!isInitial && lastDoc) {
+        q = query(q, startAfter(lastDoc));
+      }
+
+      const snap = await getDocs(q);
+      const results = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
+      
+      if (isInitial) {
+        setNotifications(results);
+      } else {
+        setNotifications(prev => [...prev, ...results]);
+      }
+
+      setLastDoc(snap.docs[snap.docs.length - 1]);
+      setIsMoreAvailable(snap.docs.length === PAGE_SIZE);
+    } catch (e) {
+      console.error(e);
+      toast({ variant: 'destructive', title: 'Fetch Error', description: 'Could not load notifications.' });
+    } finally {
+      setIsLoading(false);
+      setIsMoreLoading(false);
+    }
+  }, [user, firestore, filter, toast, lastDoc]);
+
+  // Handle one-time migration from global collection
+  const migrateLegacyNotifications = React.useCallback(async () => {
+    if (!user || isMigrating) return;
+    setIsMigrating(true);
+    try {
+      const legacyQ = query(collection(firestore, 'notifications'), where('userId', '==', user.uid), limit(50));
+      const legacySnap = await getDocs(legacyQ);
+      
+      if (!legacySnap.empty) {
+        console.log(`Migrating ${legacySnap.size} legacy notifications for user ${user.uid}`);
+        const batch = writeBatch(firestore);
+        
+        legacySnap.docs.forEach(d => {
+          const data = d.data();
+          const targetRef = doc(collection(firestore, 'users', user.uid, 'notifications'));
+          batch.set(targetRef, {
+            ...data,
+            migratedFromLegacy: true
+          });
+          batch.delete(d.ref); // Remove from global after copying
+        });
+
+        await batch.commit();
+        toast({ title: 'Inbox Synchronized', description: 'Previous notifications have been moved to your personal repository.' });
+        fetchNotifications(true);
+      }
+    } catch (e) {
+      console.error("Migration failed:", e);
+    } finally {
+      setIsMigrating(false);
+    }
+  }, [user, firestore, isMigrating, toast, fetchNotifications]);
+
+  React.useEffect(() => {
+    fetchNotifications(true);
+    migrateLegacyNotifications();
+  }, [user, filter]); // Re-fetch on filter change or user change
+
+  const handleMarkAsRead = (notif: Notification) => {
+    if (notif.read || !user) return;
+    updateDocumentNonBlocking(doc(firestore, 'users', user.uid, 'notifications', notif.id), { read: true });
+    setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+    if (notif.link) router.push(notif.link);
   };
 
   const handleMarkAllRead = async () => {
-    if (!notifications || !user) return;
-    setIsProcessing(true);
-    try {
-      const batch = writeBatch(firestore);
-      notifications.filter(n => !n.read).forEach(n => {
-        batch.update(doc(firestore, 'notifications', n.id), { read: true });
-      });
-      await batch.commit();
-      toast({ title: 'Success', description: 'All alerts marked as read.' });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    if (!user || notifications.length === 0) return;
+    const batch = writeBatch(firestore);
+    notifications.filter(n => !n.read).forEach(n => {
+      batch.update(doc(firestore, 'users', user.uid, 'notifications', n.id), { read: true });
+    });
+    await batch.commit();
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    toast({ title: 'Success', description: 'All alerts marked as read.' });
   };
 
   const handleDeleteAllRead = async () => {
-    if (!notifications || !user) return;
-    setIsProcessing(true);
-    try {
-      const batch = writeBatch(firestore);
-      notifications.filter(n => n.read).forEach(n => {
-        batch.delete(doc(firestore, 'notifications', n.id));
-      });
-      await batch.commit();
-      toast({ title: 'Cleanup Complete', description: 'Read notifications cleared.' });
-    } catch (e: any) {
-      toast({ variant: 'destructive', title: 'Error', description: e.message });
-    } finally {
-      setIsProcessing(false);
-    }
+    if (!user) return;
+    const batch = writeBatch(firestore);
+    const readNotifs = notifications.filter(n => n.read);
+    readNotifs.forEach(n => {
+      batch.delete(doc(firestore, 'users', user.uid, 'notifications', n.id));
+    });
+    await batch.commit();
+    setNotifications(prev => prev.filter(n => !n.read));
+    toast({ title: 'Cleanup Complete', description: 'Read records purged from repository.' });
   };
 
-  if (isLoading || !mounted) {
+  if (isLoading) {
     return (
       <div className="space-y-6 max-w-4xl mx-auto p-4 md:p-8">
         <Skeleton className="h-10 w-48" />
@@ -130,7 +189,7 @@ export default function NotificationsHistoryPage() {
     );
   }
 
-  const unreadCount = notifications?.filter(n => !n.read).length || 0;
+  const unreadCount = notifications.filter(n => !n.read).length;
 
   return (
     <div className="space-y-8 max-w-4xl mx-auto pb-20 p-4 md:p-8 animate-in fade-in duration-500">
@@ -142,7 +201,7 @@ export default function NotificationsHistoryPage() {
             </div>
             <h1 className="text-2xl md:text-3xl font-black uppercase tracking-tight">Notification Hub</h1>
           </div>
-          <p className="text-muted-foreground text-sm font-medium">Full audit trail of your organizational alerts and updates.</p>
+          <p className="text-muted-foreground text-sm font-medium">Personal audit trail of your organizational alerts and updates.</p>
         </div>
         
         <div className="flex items-center gap-2">
@@ -150,10 +209,10 @@ export default function NotificationsHistoryPage() {
             variant="outline" 
             size="sm" 
             onClick={handleMarkAllRead} 
-            disabled={unreadCount === 0 || isProcessing}
+            disabled={unreadCount === 0}
             className="h-10 rounded-sm font-bold border-primary/20 text-primary hover:bg-primary/5"
           >
-            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <CheckCheck className="h-4 w-4 mr-2" />}
+            <CheckCheck className="h-4 w-4 mr-2" />
             Mark All Read
           </Button>
           <Button 
@@ -163,7 +222,7 @@ export default function NotificationsHistoryPage() {
             className="h-10 rounded-sm font-bold text-destructive hover:bg-destructive/5"
           >
             <Trash2 className="h-4 w-4 mr-2" />
-            Clear History
+            Clear Read
           </Button>
         </div>
       </div>
@@ -194,11 +253,11 @@ export default function NotificationsHistoryPage() {
             </div>
           </div>
           <Badge variant="outline" className="rounded-sm font-black text-[10px] uppercase bg-primary/5 text-primary border-primary/10 h-6">
-            {notifications?.length || 0} Records
+            {notifications.length}{isMoreAvailable ? '+' : ''} Records
           </Badge>
         </CardHeader>
         <CardContent className="p-0">
-          {notifications && notifications.length > 0 ? (
+          {notifications.length > 0 ? (
             <div className="divide-y divide-border/40">
               {notifications.map((notif) => (
                 <div 
@@ -226,7 +285,7 @@ export default function NotificationsHistoryPage() {
                       </h4>
                       <div className="flex items-center gap-2 text-[10px] font-mono font-bold text-muted-foreground/40 shrink-0">
                         <Clock className="h-3 w-3" />
-                        {formatDistanceToNow(notif.createdAt?.toDate() || new Date(), { addSuffix: true })}
+                        {isMounted && notif.createdAt ? formatDistanceToNow(notif.createdAt.toDate(), { addSuffix: true }) : '—'}
                       </div>
                     </div>
                     <p className="text-sm text-muted-foreground leading-relaxed">
@@ -238,14 +297,14 @@ export default function NotificationsHistoryPage() {
                           size="sm" 
                           variant="ghost" 
                           className="h-8 rounded-sm text-primary font-black uppercase text-[10px] tracking-widest px-4 bg-primary/5 hover:bg-primary/10"
-                          onClick={() => handleMarkAsRead(notif.id, notif.link)}
+                          onClick={() => handleMarkAsRead(notif)}
                         >
                           Review Entry <ArrowRight className="ml-1.5 h-3 w-3" />
                         </Button>
                       )}
                       {!notif.read && (
                         <button 
-                          onClick={() => handleMarkAsRead(notif.id)}
+                          onClick={() => handleMarkAsRead(notif)}
                           className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 hover:text-primary transition-colors"
                         >
                           Mark as seen
@@ -255,6 +314,19 @@ export default function NotificationsHistoryPage() {
                   </div>
                 </div>
               ))}
+              
+              {isMoreAvailable && (
+                <div className="p-6 bg-muted/10 flex justify-center">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => fetchNotifications(false)} 
+                    disabled={isMoreLoading}
+                    className="h-11 rounded-sm font-black uppercase text-[10px] tracking-widest px-10 border-primary/20 text-primary"
+                  >
+                    {isMoreLoading ? <><Loader2 className="h-4 w-4 animate-spin mr-2" /> Loading History</> : "Load More Notifications"}
+                  </Button>
+                </div>
+              )}
             </div>
           ) : (
             <div className="py-32 flex flex-col items-center justify-center text-center gap-4">
@@ -262,13 +334,20 @@ export default function NotificationsHistoryPage() {
                 <Inbox className="h-12 w-12 text-muted-foreground/20" />
               </div>
               <div className="space-y-1">
-                <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Notification Box Empty</p>
+                <p className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Inbox Empty</p>
                 <p className="text-xs text-muted-foreground/60 font-medium">All relevant alerts have been processed.</p>
               </div>
             </div>
           )}
         </CardContent>
       </Card>
+      
+      {isMigrating && (
+        <div className="fixed bottom-24 left-1/2 -translate-x-1/2 bg-slate-900 text-white p-4 rounded-sm shadow-2xl flex items-center gap-3 animate-in slide-in-from-bottom-10">
+          <RefreshCw className="h-4 w-4 animate-spin text-primary" />
+          <span className="text-[10px] font-black uppercase tracking-widest">Migrating Legacy History...</span>
+        </div>
+      )}
     </div>
   );
 }

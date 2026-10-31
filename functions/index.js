@@ -1,7 +1,6 @@
 /**
  * @fileOverview Firebase Cloud Function to dispatch true Push Notifications via FCM.
- * This script monitors the 'notifications' collection and sends messages
- * to all registered device tokens for the target user.
+ * Updated to support per-user notification subcollections.
  */
 
 const { onDocumentCreated } = require("firebase-functions/v2/firestore");
@@ -11,16 +10,16 @@ const { initializeApp } = require("firebase-admin/app");
 
 initializeApp();
 
-exports.dispatchPushNotification = onDocumentCreated("notifications/{notificationId}", async (event) => {
+exports.dispatchPushNotification = onDocumentCreated("users/{userId}/notifications/{notificationId}", async (event) => {
   const data = event.data.data();
+  const userId = event.params.userId;
   
   // Only process if the 'push' flag is explicitly true
   if (!data.push) {
-    console.log("Notification logged as in-app only (no push flag).");
+    console.log(`Notification for ${userId} logged as in-app only (no push flag).`);
     return;
   }
 
-  const userId = data.userId;
   const db = getFirestore();
   const messaging = getMessaging();
 
@@ -41,7 +40,6 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
     }
 
     // 2. Prepare the FCM payload optimized for background/killed state delivery
-    // We include both 'notification' (for OS handling) and 'data' (for app handling)
     const messagePayload = {
       notification: {
         title: String(data.title),
@@ -52,18 +50,18 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
         notificationId: String(event.params.notificationId)
       },
       android: {
-        priority: 'high', // Critical for background/killed state delivery
+        priority: 'high',
         notification: {
           channelId: 'default',
-          priority: 'max', // Heads-up priority for Android
+          priority: 'max',
           visibility: 'public',
           sound: 'default',
-          clickAction: 'FCM_PLUGIN_ACTIVITY' // Ensures intent triggers correctly
+          clickAction: 'FCM_PLUGIN_ACTIVITY'
         }
       },
       apns: {
         headers: {
-          'apns-priority': '10', // Critical for immediate delivery on iOS
+          'apns-priority': '10',
         },
         payload: {
           aps: {
@@ -73,24 +71,22 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
             },
             sound: 'default',
             badge: 1,
-            contentAvailable: true // Critical for background "wake up"
+            contentAvailable: true
           }
         }
       },
-      // Target multiple tokens (multicast)
-      tokens: Array.from(new Set(tokens)), // Ensure unique tokens
+      tokens: Array.from(new Set(tokens)),
     };
 
     // 3. Send via FCM
     const response = await messaging.sendEachForMulticast(messagePayload);
     
-    // 4. Cleanup invalid tokens atomically if any (e.g. user uninstalled app)
+    // 4. Cleanup invalid tokens atomically if any
     if (response.failureCount > 0) {
       const failedTokens = [];
       response.responses.forEach((resp, idx) => {
         if (!resp.success) {
           const errorCode = resp.error.code;
-          // Clean up tokens that are definitely invalid/expired
           if (errorCode === 'messaging/invalid-registration-token' ||
               errorCode === 'messaging/registration-token-not-registered') {
             failedTokens.push(tokens[idx]);
@@ -99,7 +95,7 @@ exports.dispatchPushNotification = onDocumentCreated("notifications/{notificatio
       });
 
       if (failedTokens.length > 0) {
-        console.log(`Cleaning up ${failedTokens.length} expired tokens for user ${userId} atomically.`);
+        console.log(`Cleaning up ${failedTokens.length} expired tokens for user ${userId}.`);
         await db.collection("users").doc(userId).update({
           fcmTokens: FieldValue.arrayRemove(...failedTokens)
         });

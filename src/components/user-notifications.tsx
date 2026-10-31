@@ -20,7 +20,6 @@ import {
 import {
   collection,
   query,
-  where,
   doc,
   writeBatch,
   limit,
@@ -34,12 +33,11 @@ import Link from 'next/link';
 
 type Notification = {
   id: string;
-  userId: string;
   title: string;
   description: string;
   link: string;
   read: boolean;
-  createdAt: any; // Firestore Timestamp
+  createdAt: any;
 };
 
 export function UserNotifications() {
@@ -47,17 +45,16 @@ export function UserNotifications() {
   const firestore = useFirestore();
   const router = useRouter();
   
-  // Mounted check to prevent hydration mismatch with time-ago strings
   const [isMounted, setIsMounted] = React.useState(false);
   React.useEffect(() => setIsMounted(true), []);
 
+  // Use per-user subcollection query limited to 50 latest
   const notificationsQuery = useMemoFirebase(() => {
     if (!user) return null;
     return query(
-      collection(firestore, 'notifications'),
-      where('userId', '==', user.uid),
+      collection(firestore, 'users', user.uid, 'notifications'),
       orderBy('createdAt', 'desc'),
-      limit(50) // Fix: Limit to 50 as requested
+      limit(50)
     );
   }, [user, firestore]);
 
@@ -70,8 +67,8 @@ export function UserNotifications() {
   }, [notifications]);
 
   const handleNotificationClick = (notification: Notification) => {
-    if (!notification.read) {
-      const notifRef = doc(firestore, 'notifications', notification.id);
+    if (!notification.read && user) {
+      const notifRef = doc(firestore, 'users', user.uid, 'notifications', notification.id);
       updateDocumentNonBlocking(notifRef, { read: true });
     }
     if (notification.link) {
@@ -80,14 +77,14 @@ export function UserNotifications() {
   };
 
   const handleMarkAllAsRead = async () => {
-    if (!notifications || !firestore) return;
+    if (!notifications || !firestore || !user) return;
 
     const unreadNotifications = notifications.filter((n) => !n.read);
     if (unreadNotifications.length === 0) return;
 
     const batch = writeBatch(firestore);
     unreadNotifications.forEach((notification) => {
-      const notifRef = doc(firestore, 'notifications', notification.id);
+      const notifRef = doc(firestore, 'users', user.uid, 'notifications', notification.id);
       batch.update(notifRef, { read: true });
     });
     await batch.commit();
