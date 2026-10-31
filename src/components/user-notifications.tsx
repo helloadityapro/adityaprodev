@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Bell, CheckCheck, X, CheckCircle, XCircle, ChevronRight, History } from 'lucide-react';
+import { Bell, CheckCheck, X, CheckCircle, XCircle, ChevronRight, History, Loader2 } from 'lucide-react';
 import {
   Popover,
   PopoverContent,
